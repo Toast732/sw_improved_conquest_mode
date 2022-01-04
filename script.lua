@@ -1738,8 +1738,8 @@ function tickVehicles()
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
-				local vehicle_pos = vehicle_object.transform
-				if vehicle_pos.y <= -20 then
+				local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_pos)
+				if vehicle_y <= -20 then
 					killVehicle(squad_index, vehicle_id, true);
 				end
 				local ai_target = nil
