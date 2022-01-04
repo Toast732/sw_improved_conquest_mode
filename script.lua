@@ -581,6 +581,7 @@ function onPlayerJoin(steam_id, name, peer_id)
 	end
 end
 
+--[[
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
 		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
@@ -597,19 +598,7 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 				if vehicle_id == incoming_vehicle_id and body_id == 0 then
-					if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
-					local damage_prev = vehicle_object.current_damage
-					vehicle_object.current_damage = vehicle_object.current_damage + amount
-
-					local enemy_hp = g_savedata.settings.ENEMY_HP
-
-					if vehicle_object.size == "large" then
-						enemy_hp = enemy_hp * 4
-					elseif vehicle_object.size == "medium" then
-						enemy_hp = enemy_hp * 2
-					end
-
-					if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+					if vehicle_object
 						killVehicle(squad_index, vehicle_id, true)
 					elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
 						killVehicle(squad_index, vehicle_id, false)
@@ -618,7 +607,7 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 			end
 		end
 	end
-end
+end--]]
 
 function onVehicleTeleport(vehicle_id, peer_id, x, y, z)
 	if is_dlc_weapons then
@@ -1749,6 +1738,10 @@ function tickVehicles()
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
+				local vehicle_pos = vehicle_object.transform
+				if vehicle_pos.y <= -20 then
+					killVehicle(squad_index, vehicle_id, true);
+				end
 				local ai_target = nil
 				local ai_state = 1
 				local ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
