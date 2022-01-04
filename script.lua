@@ -1739,7 +1739,7 @@ function tickVehicles()
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
 				local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-				if vehicle_y <= -20 then
+				if vehicle_y <= -17 then
 					killVehicle(squad_index, vehicle_id, true);
 				end
 				local ai_target = nil
