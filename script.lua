@@ -143,8 +143,12 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = false
+local render_debug = true
 local g_debug_speed_multiplier = 1
+
+local playerData = {
+	isDebugging = {}
+}
 
 local g_holding_pattern = {
     {x=500, z=500},
@@ -181,11 +185,32 @@ g_savedata = {
 	constructable_vehicles = {},
 	constructable_turrets = {},
 	is_attack = false,
+	isError = false,
 }
 
 --[[
         Functions
 --]]
+
+function wpDLCDebug(message, requiresDebugging, isError)
+	if requiresDebugging == true then
+		for k, v in pairs(playerData.isDebugging) do
+			if playerData.isDebugging.v ~= true then
+				if isError then
+					server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, v)
+				else
+					server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, v)
+				end
+			end
+		end
+	else
+		if isError then
+			server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, 0)
+		else
+			server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, 0)
+		end
+	end
+end
 
 function onCreate(is_world_create)
 
@@ -204,6 +229,8 @@ function onCreate(is_world_create)
     is_dlc_weapons = server.dlcWeapons()
 
     if is_dlc_weapons then
+
+		server.announce("Loading Script: " .. server.getAddonData((server.getAddonIndex())).name, "Complete", 0)
 
         if is_world_create then
 
@@ -418,7 +445,7 @@ function spawnTurret(island)
 	end
 end
 
-function spawnAIVehicle()
+function spawnAIVehicle(nearPlayer, user_peer_id)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
@@ -449,9 +476,29 @@ function spawnAIVehicle()
 	local spawn_transform = matrix.multiply(g_savedata.ai_base_island.transform, matrix.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
-		local boat_spawn_transform, found_ocean = server.getOceanTransform(g_savedata.ai_base_island.transform, 500, 6000)
-		if found_ocean == false then return end
-		spawn_transform = matrix.multiply(boat_spawn_transform, matrix.translation(math.random(-500, 500), 0, math.random(-500, 500)))
+		if nearPlayer ~= true then
+			local boat_spawn_transform, found_ocean = server.getOceanTransform(g_savedata.ai_base_island.transform, 500, 6000)
+			if found_ocean == false then return end
+			spawn_transform = matrix.multiply(boat_spawn_transform, matrix.translation(math.random(-500, 500), 0, math.random(-500, 500)))
+		else
+			local pMatrix, is_success = server.getPlayerPos(user_peer_id)
+			if is_success ~= true then
+				local name, is_success = server.getPlayerName(user_peer_id)
+				if is_success ~= true then
+					wpDLCDebug("failed to get the specified player's name, peer id: "..user_peer_id, true, true)
+					wpDLCDebug("failed to get the specified player's matrix, peer id: "..user_peer_id.." returned matrix: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, true)
+				else
+					wpDLCDebug("failed to get the specified player's matrix, peer name: "..name.." returned x: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, true)
+				end
+				return false
+			else
+				wpDLCDebug("player's matrix, peer id: "..user_peer_id.." returned x: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, false)
+			end
+			local boat_spawn_transform, found_ocean = server.getOceanTransform(pMatrix, 500, 6000)
+			if found_ocean == false then return end
+			spawn_transform = matrix.multiply(boat_spawn_transform, matrix.translation(math.random(-500, 500), 0, math.random(-500, 500)))
+		end
+		
 	end
 
 	-- spawn objects
@@ -461,6 +508,18 @@ function spawnAIVehicle()
 		survivors = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
 		fires = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
 	}
+	local vehX, vehY, vehZ = matrix.position(spawn_transform)
+	if selected_prefab.vehicle.display_name ~= nil then
+		wpDLCDebug("spawned vehicle: "..selected_prefab.vehicle.display_name.." at X: "..vehX.." Y: "..vehY.." Z: "..vehZ, true, false)
+		for k, v in pairs(playerData.isDebugging) do
+			if playerData.isDebugging.v then
+				server.addMapObject(v, 891752, 0, 2, vehX, vehZ, vehX, vehZ, 0, 0, selected_prefab.vehicle.display_name, 0, selected_prefab.vehicle.tags)
+			end
+		end
+	else
+		wpDLCDebug("the selected vehicle is nil", true, true)
+		
+	end
 
 	if render_debug then server.announce("dlcw", "spawning army vehicle: " .. selected_prefab.location.data.name .. " / " .. selected_prefab.location.playlist_index .. " / " .. selected_prefab.vehicle.display_name) end
 
@@ -519,7 +578,7 @@ end
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command, arg1, arg2, arg3, arg4)
 
 	if is_dlc_weapons then
-		if command == "?wep_reset" and server.isDev() then
+		if command == "?wep_reset" and is_admin then
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				if squad_index ~= RESUPPLY_SQUAD_INDEX then
 					setSquadCommand(squad, COMMAND_NONE)
@@ -530,11 +589,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			g_savedata.is_attack = false
 		end
 
-		if command == "?wep_debug_vehicle" and server.isDev() then
+		if command == "?wep_debug_vehicle" and is_admin then
 			g_debug_vehicle_id = arg1
 		end
 
-		if command == "?wep_debug" and server.isDev() then
+		if command == "?wep_debug" and is_admin then
 			render_debug = not render_debug
 
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -544,21 +603,36 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			end
 		end
 
-		if command == "?wep_debug_speed" and server.isDev() then
+		if command == "?wep_debug_speed" and is_admin then
 			g_debug_speed_multiplier = arg1
 		end
 
-		if command == "?wep_vreset" and server.isDev() then
+		if command == "?wep_vreset" and is_admin then
 			server.resetVehicleState(arg1)
 		end	
 
-		if command == "?target" and server.isDev() then
+		if command == "?target" and is_admin then
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					for i, char in  pairs(vehicle_object.survivors) do
 						server.setAITargetVehicle(char.id, arg1)
 					end
 				end
+			end
+		end
+
+		if command == "?spawnEnemyAI" and is_admin or command == "?SEAI" and is_admin then
+			wpDLCDebug("spawn enemy ai, peer id: "..user_peer_id, true, false)
+			spawnAIVehicle(true, user_peer_id)
+		end
+
+		if command == "?enableWeaponsDLCDebugging" and is_admin or command == "?WDLCD" and is_admin then
+			if playerData.isDebugging.user_peer_id ~= true then
+				playerData.isDebugging.user_peer_id = true
+				server.announce("Script: " .. server.getAddonData((server.getAddonIndex())).name, "Debugging Enabled", user_peer_id)
+			else
+				playerData.isDebugging.user_peer_id = false
+				server.announce("Script: " .. server.getAddonData((server.getAddonIndex())).name, "Debugging Disabled", user_peer_id)
 			end
 		end
 	end
@@ -581,33 +655,34 @@ function onPlayerJoin(steam_id, name, peer_id)
 	end
 end
 
---[[
-function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
-	if is_dlc_weapons then
-		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
+if hpModeIsEnabled then
+	function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
+		if is_dlc_weapons then
+			local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
-		if player_vehicle ~= nil then
-			local damage_prev = player_vehicle.current_damage
-			player_vehicle.current_damage = player_vehicle.current_damage + amount
+			if player_vehicle ~= nil then
+				local damage_prev = player_vehicle.current_damage
+				player_vehicle.current_damage = player_vehicle.current_damage + amount
 
-			if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
-				player_vehicle.death_pos = player_vehicle.transform
+				if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
+					player_vehicle.death_pos = player_vehicle.transform
+				end
 			end
-		end
 
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-				if vehicle_id == incoming_vehicle_id and body_id == 0 then
-					if vehicle_object
-						killVehicle(squad_index, vehicle_id, true)
-					elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
-						killVehicle(squad_index, vehicle_id, false)
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					if vehicle_id == incoming_vehicle_id and body_id == 0 then
+						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+							killVehicle(squad_index, vehicle_id, true)
+						elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
+							killVehicle(squad_index, vehicle_id, false)
+						end
 					end
 				end
 			end
 		end
 	end
-end--]]
+end
 
 function onVehicleTeleport(vehicle_id, peer_id, x, y, z)
 	if is_dlc_weapons then
@@ -1259,7 +1334,7 @@ function killVehicle(squad_index, vehicle_id, instant)
 		vehicle_object.is_killed = true
 		vehicle_object.death_timer = 0
 
-		if instant then
+		--[[if instant then
 			local explosion_size = 1.5
 			if vehicle_object.size == "small" then
 				explosion_size = 0.2
@@ -1268,8 +1343,8 @@ function killVehicle(squad_index, vehicle_id, instant)
 			end
 
 			if render_debug then server.announce("dlcw", "explosion spawned") end
-			server.spawnExplosion(vehicle_object.transform, explosion_size)
-		else
+			server.spawnExplosion(vehicle_object.transform, explosion_size)]]--
+		if not instant then
 			local fire_id = vehicle_object.fire_id
 			if fire_id ~= nil then
 				if render_debug then server.announce("dlcw", "explosion fire enabled") end
