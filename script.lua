@@ -143,7 +143,7 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = true
+local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local playerData = {
@@ -192,28 +192,45 @@ g_savedata = {
         Functions
 --]]
 
-function wpDLCDebug(message, requiresDebugging, isError)
+function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 	if requiresDebugging == true then
-		for k, v in pairs(playerData.isDebugging) do
-			if playerData.isDebugging.v ~= true then
+		if toPlayer ~= -1 and toPlayer ~= nil then
+			if playerData.isDebugging.toPlayer then
 				if isError then
-					server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, v)
+					server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, toPlayer)
 				else
-					server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, v)
+					server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, toPlayer)
+				end
+			end
+		else
+			for k, v in pairs(playerData.isDebugging) do
+				if playerData.isDebugging.v then
+					if isError then
+						server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, v)
+					else
+						server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, v)
+					end
 				end
 			end
 		end
 	else
-		if isError then
-			server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, 0)
+		if toPlayer ~= -1 and toPlayer ~= nil then
+			if isError then
+				server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, toPlayer)
+			else
+				server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, toPlayer)
+			end
 		else
-			server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, 0)
+			if isError then
+				server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, 0)
+			else
+				server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, 0)
+			end
 		end
 	end
 end
 
 function onCreate(is_world_create)
-
 	if g_savedata.settings == nil then
 		g_savedata.settings = {
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
@@ -594,13 +611,13 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 		end
 
 		if command == "?wep_debug" and is_admin then
-			render_debug = not render_debug
+			wpDLCDebug("?wep_debug has been disabled, use ?WDLCD instead, or ?enableWeaponsDLCDebug", false, true, user_peer_id)
 
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			--[[for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					server.removeMapObject(0,vehicle_object.map_id)
 				end
-			end
+			end--]]
 		end
 
 		if command == "?wep_debug_speed" and is_admin then
@@ -622,22 +639,22 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 		end
 
 		if command == "?spawnEnemyAI" and is_admin or command == "?SEAI" and is_admin then
-			wpDLCDebug("spawn enemy ai, peer id: "..user_peer_id, true, false)
 			spawnAIVehicle(true, user_peer_id)
 		end
 
-		if command == "?enableWeaponsDLCDebugging" and is_admin or command == "?WDLCD" and is_admin then
+		if command == "?enableWeaponsDLCDebug" and is_admin or command == "?WDLCD" and is_admin then
+			render_debug = not render_debug
 			if playerData.isDebugging.user_peer_id ~= true then
 				playerData.isDebugging.user_peer_id = true
-				server.announce("Script: " .. server.getAddonData((server.getAddonIndex())).name, "Debugging Enabled", user_peer_id)
+				wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
 			else
 				playerData.isDebugging.user_peer_id = false
-				server.announce("Script: " .. server.getAddonData((server.getAddonIndex())).name, "Debugging Disabled", user_peer_id)
+				wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 			end
 		end
 	end
-
 end
+
 
 function onPlayerJoin(steam_id, name, peer_id)
 	if is_dlc_weapons then
@@ -877,163 +894,209 @@ function addPath(vehicle_object, target_dest)
 end
 
 function tickGamemode()
-	-- tick enemy base spawning
-	g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + 1
-	if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
-		g_savedata.ai_base_island.production_timer = 0
+	if is_dlc_weapons then
+		-- tick enemy base spawning
+		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + 1
+		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
+			g_savedata.ai_base_island.production_timer = 0
 
-		spawnTurret(g_savedata.ai_base_island)
-		spawnAIVehicle()
-	end
-
-	for island_index, island in pairs(g_savedata.controllable_islands) do
-
-		-- spawn turrets at owned islands
-		if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 1 then
-			spawnTurret(island)
+			spawnTurret(g_savedata.ai_base_island)
+			spawnAIVehicle()
 		end
+
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+
+			-- spawn turrets at owned islands
+			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 1 then
+				spawnTurret(island)
+			end
+			
+			-- tick capture timers
+			-- new mode
+			if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
+				local tick_rate = 60
+
+				local ai_capturing = 0
+				local players_capturing = 0
+
+				-- does a check for how many enemy ai are capturing the island
+				if island.faction ~= FACTION_AI then
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							if isTickID(vehicle_id, tick_rate) then
+								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
+									ai_capturing = ai_capturing + 1 -- adds 1 ai to the amount capturing
+									-- island.capture_timer = island.capture_timer - ISLAND_CAPTURE_AMOUNT_PER_SECOND * tick_rate / 60
+								end
+							end
+						end
+					end
+				end
+
+				-- does a check for how many player's are capturing the island
+				if island.faction ~= FACTION_PLAYER then
+					local playerList = server.getPlayers()
+					for _, player in pairs(playerList) do
+						if isTickID(player.id, tick_rate) then
+							local player_transform = server.getPlayerPos(player.id)
+							local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
+							if matrix.distance(flag_vehicle_transform, player_transform) < 3 then
+								players_capturing = players_capturing + 1 -- adds 1 player to the amount capturing
+								--island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * 100) *  tick_rate / 60
+							end
+						end
+					end
+				end
+				
+			elseif island.capture_timer < 0 then -- if the capture timer is less than 0
+				island.capture_timer = 0 
+			else -- if the capture timer is greater than the maximum
+				island.capture_timer = g_savedata.settings.CAPTURE_TIME
+			end
+			-- default
+			if island.capture_timer > 0 then
+				if island.faction ~= FACTION_AI then
+					local vehicle_tick_rate = 60
+
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							if isTickID(vehicle_id, vehicle_tick_rate) then
+								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
+									island.capture_timer = island.capture_timer - ISLAND_CAPTURE_AMOUNT_PER_SECOND * vehicle_tick_rate / 60
+								end
+							end
+						end
+					end
+
+					if island.capture_timer <= 0 then
+						island.capture_timer = 0
+						island.faction = FACTION_AI
+						g_savedata.is_attack = false
+
+						server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
+
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
+								setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
+							end
+						end
+					end
+				end
+			end
+
+			if island.capture_timer < g_savedata.settings.CAPTURE_TIME then
+				if island.faction ~= FACTION_PLAYER then
+					local player_tick_rate = 60
+					local playerList = server.getPlayers()
+
+					for _, player in pairs(playerList) do
+						if isTickID(player.id, player_tick_rate) then
+							local player_transform = server.getPlayerPos(player.id)
+							local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
+
+							if matrix.distance(flag_vehicle_transform, player_transform) < 3 then
+								island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * 100) *  player_tick_rate / 60
+							end
+						end
+					end
+
+					if island.capture_timer >= g_savedata.settings.CAPTURE_TIME then
+						island.capture_timer = g_savedata.settings.CAPTURE_TIME
+						island.faction = FACTION_PLAYER
+
+						server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
+
+						-- update vehicles looking to resupply
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad_index == RESUPPLY_SQUAD_INDEX then
+								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+									resetPath(vehicle_object)
+								end
+							end
+						end
+					end
+				end
+			end
+
+			if isTickID(island.flag_vehicle.id, 60) then
+				local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+
+				if island.faction ~= FACTION_PLAYER then
+					server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+				else
+					server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+				end
+			end
+		end
+
+		if render_debug then
+
+			local ts_x, ts_y, ts_z = matrix.position(g_savedata.ai_base_island.transform)
+			server.removeMapObject(0, g_savedata.ai_base_island.map_id)
+
+			local plane_count = 0
+			local heli_count = 0
+			local army_count = 0
+			local turret_count = 0
 		
-		-- tick capture timers
-		if island.capture_timer > 0 then
-			if island.faction ~= FACTION_AI then
-				local vehicle_tick_rate = 60
-
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						if isTickID(vehicle_id, vehicle_tick_rate) then
-							if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
-								island.capture_timer = island.capture_timer - ISLAND_CAPTURE_AMOUNT_PER_SECOND * vehicle_tick_rate / 60
-							end
-						end
-					end
-				end
-
-				if island.capture_timer <= 0 then
-					island.capture_timer = 0
-					island.faction = FACTION_AI
-					g_savedata.is_attack = false
-
-					server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
-
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
-							setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
-						end
-					end
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					if vehicle_object.ai_type ~= AI_TYPE_LAND then army_count = army_count + 1 else turret_count = turret_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 				end
 			end
+
+			local t, a = getObjectiveIsland()
+			local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
+			debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
+			debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
+			debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
+			debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
+			debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
+			debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
+
+			if t then
+				debug_data = debug_data .. "Target: " .. t.name .. "\n"
+			end
+			if a then
+				debug_data = debug_data .. " Ally: " .. a.name
+			end
+			server.addMapObject(0, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
+
+			local ts_x, ts_y, ts_z = matrix.position(g_savedata.player_base_island.transform)
+			server.removeMapObject(0, g_savedata.player_base_island.map_id)
+			server.addMapObject(0, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
 		end
 
-		if island.capture_timer < g_savedata.settings.CAPTURE_TIME then
-			if island.faction ~= FACTION_PLAYER then
-				local player_tick_rate = 60
-				local playerList = server.getPlayers()
-
-				for _, player in pairs(playerList) do
-					if isTickID(player.id, player_tick_rate) then
-						local player_transform = server.getPlayerPos(player.id)
-						local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
-
-						if matrix.distance(flag_vehicle_transform, player_transform) < 3 then
-							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * 100) *  player_tick_rate / 60
-						end
-					end
+		-- Render Island Info
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if isTickID(island_index, 60) then
+				if island.capture_timer ~= island.capture_timer_prev or island.faction ~= island.faction_prev then
+					updatePeerIslandMapData(-1, island)
 				end
 
-				if island.capture_timer >= g_savedata.settings.CAPTURE_TIME then
-					island.capture_timer = g_savedata.settings.CAPTURE_TIME
-					island.faction = FACTION_PLAYER
-
-					server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
-
-					-- update vehicles looking to resupply
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad_index == RESUPPLY_SQUAD_INDEX then
-							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-								resetPath(vehicle_object)
-							end
-						end
-					end
-				end
+				island.capture_timer_prev = island.capture_timer
+				island.faction_prev = island.faction
 			end
-		end
-
-		if isTickID(island.flag_vehicle.id, 60) then
-			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-
-			if island.faction ~= FACTION_PLAYER then
-				server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
-			else
-				server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
-			end
-		end
-	end
-
-	if render_debug then
-
-		local ts_x, ts_y, ts_z = matrix.position(g_savedata.ai_base_island.transform)
-		server.removeMapObject(0, g_savedata.ai_base_island.map_id)
-
-		local plane_count = 0
-		local heli_count = 0
-		local army_count = 0
-		local turret_count = 0
-	
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-				if vehicle_object.ai_type ~= AI_TYPE_LAND then army_count = army_count + 1 else turret_count = turret_count + 1 end
-				if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
-				if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
-			end
-		end
-
-		local t, a = getObjectiveIsland()
-		local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
-		debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
-		debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
-		debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
-		debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
-		debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
-		debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
-
-		if t then
-			debug_data = debug_data .. "Target: " .. t.name .. "\n"
-		end
-		if a then
-			debug_data = debug_data .. " Ally: " .. a.name
-		end
-		server.addMapObject(0, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
-
-		local ts_x, ts_y, ts_z = matrix.position(g_savedata.player_base_island.transform)
-		server.removeMapObject(0, g_savedata.player_base_island.map_id)
-		server.addMapObject(0, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
-	end
-
-	-- Render Island Info
-	for island_index, island in pairs(g_savedata.controllable_islands) do
-		if isTickID(island_index, 60) then
-			if island.capture_timer ~= island.capture_timer_prev or island.faction ~= island.faction_prev then
-				updatePeerIslandMapData(-1, island)
-			end
-
-			island.capture_timer_prev = island.capture_timer
-			island.faction_prev = island.faction
 		end
 	end
 end
 
 function updatePeerIslandMapData(peer_id, island)
-	local ts_x, ts_y, ts_z = matrix.position(island.transform)
-	server.removeMapObject(peer_id, island.map_id)
+	if is_dlc_weapons then
+		local ts_x, ts_y, ts_z = matrix.position(island.transform)
+		server.removeMapObject(peer_id, island.map_id)
 
-	local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+		local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
 
-	if island.faction == FACTION_AI then
-		server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
-	elseif island.faction == FACTION_PLAYER then
-		server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
-	else
-		server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 75, 75, 75, 255)
+		if island.faction == FACTION_AI then
+			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+		elseif island.faction == FACTION_PLAYER then
+			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
+		else
+			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 75, 75, 75, 255)
+		end
 	end
 end
 
@@ -1072,151 +1135,153 @@ function getNearbySquad(transform, override_command)
 end
 
 function tickAI()
+	if is_dlc_weapons then
 
-	-- allocate squads to islands
-	for island_index, island in pairs(g_savedata.controllable_islands) do
-		if isTickID(island_index, 60) then
-			if island.faction == FACTION_AI then
-				if island.assigned_squad_index == -1 then
-					local squad, squad_index = getNearbySquad(island.transform)
+		-- allocate squads to islands
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if isTickID(island_index, 60) then
+				if island.faction == FACTION_AI then
+					if island.assigned_squad_index == -1 then
+						local squad, squad_index = getNearbySquad(island.transform)
 
-					if squad ~= nil then
-						setSquadCommandDefend(squad, island)
-						island.assigned_squad_index = squad_index
-					end
-				end
-			end
-		end
-	end
-
-	-- allocate squads to engage or investigate based on vision
-	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		if isTickID(squad_index, 60) then			
-			if squad_index ~= RESUPPLY_SQUAD_INDEX then
-				local squad_vision = squadGetVisionData(squad)
-
-				if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
-					setSquadCommandEngage(squad)
-				elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
-					if #squad_vision.investigate_players > 0 then
-						local investigate_player = squad_vision:getBestInvestigatePlayer()
-						setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
-					elseif #squad_vision.investigate_vehicles > 0 then
-						local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
-						setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
-					end
-				end
-			end
-		end
-	end
-
-	if isTickID(0, 60) then
-		g_count_squads = 0
-		g_count_attack = 0
-		g_count_patrol = 0
-
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			if squad_index ~= RESUPPLY_SQUAD_INDEX then
-				if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_LAND then
-					g_count_squads = g_count_squads + 1
-				end
-	
-				if squad.command == COMMAND_STAGE or squad.command == COMMAND_ATTACK then
-					g_count_attack = g_count_attack + 1
-				elseif squad.command == COMMAND_PATROL then
-					g_count_patrol = g_count_patrol + 1
-				end
-			end
-		end
-
-		local objective_island, ally_island = getObjectiveIsland()
-
-		if objective_island == nil then
-			g_savedata.is_attack = false
-		else
-			if g_savedata.is_attack == false then
-				local boats_ready = 0
-				local boats_total = 0
-				local air_ready = 0
-				local air_total = 0
-
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					if squad.command == COMMAND_STAGE then
-						local _, squad_leader = getSquadLeader(squad)
-						local squad_leader_transform = squad_leader.transform
-
-						if squad.ai_type == AI_TYPE_BOAT then
-							boats_total = boats_total + 1
-
-							local air_dist = matrix.distance(objective_island.transform, ally_island.transform)
-							local dist = matrix.distance(squad_leader_transform, objective_island.transform)
-							local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
-
-							if dist < air_dist * air_sea_speed_factor then
-								boats_ready = boats_ready + 1
-							end
-						else
-							air_total = air_total + 1
-
-							local dist = matrix.distance(squad_leader_transform, ally_island.transform)
-							if dist < 2000 then
-								air_ready = air_ready + 1
-							end
+						if squad ~= nil then
+							setSquadCommandDefend(squad, island)
+							island.assigned_squad_index = squad_index
 						end
 					end
 				end
-	
-				g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
-				g_is_boats_ready = boats_total == 0 or boats_ready / boats_total >= 0.25
-	
-				local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
-	
-				if is_attack then
-					g_savedata.is_attack = is_attack
-	
+			end
+		end
+
+		-- allocate squads to engage or investigate based on vision
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if isTickID(squad_index, 60) then			
+				if squad_index ~= RESUPPLY_SQUAD_INDEX then
+					local squad_vision = squadGetVisionData(squad)
+
+					if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
+						setSquadCommandEngage(squad)
+					elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
+						if #squad_vision.investigate_players > 0 then
+							local investigate_player = squad_vision:getBestInvestigatePlayer()
+							setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
+						elseif #squad_vision.investigate_vehicles > 0 then
+							local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
+							setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
+						end
+					end
+				end
+			end
+		end
+
+		if isTickID(0, 60) then
+			g_count_squads = 0
+			g_count_attack = 0
+			g_count_patrol = 0
+
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad_index ~= RESUPPLY_SQUAD_INDEX then
+					if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_LAND then
+						g_count_squads = g_count_squads + 1
+					end
+		
+					if squad.command == COMMAND_STAGE or squad.command == COMMAND_ATTACK then
+						g_count_attack = g_count_attack + 1
+					elseif squad.command == COMMAND_PATROL then
+						g_count_patrol = g_count_patrol + 1
+					end
+				end
+			end
+
+			local objective_island, ally_island = getObjectiveIsland()
+
+			if objective_island == nil then
+				g_savedata.is_attack = false
+			else
+				if g_savedata.is_attack == false then
+					local boats_ready = 0
+					local boats_total = 0
+					local air_ready = 0
+					local air_total = 0
+
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						if squad.command == COMMAND_STAGE then
-							setSquadCommandAttack(squad, objective_island)
+							local _, squad_leader = getSquadLeader(squad)
+							local squad_leader_transform = squad_leader.transform
+
+							if squad.ai_type == AI_TYPE_BOAT then
+								boats_total = boats_total + 1
+
+								local air_dist = matrix.distance(objective_island.transform, ally_island.transform)
+								local dist = matrix.distance(squad_leader_transform, objective_island.transform)
+								local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
+
+								if dist < air_dist * air_sea_speed_factor then
+									boats_ready = boats_ready + 1
+								end
+							else
+								air_total = air_total + 1
+
+								local dist = matrix.distance(squad_leader_transform, ally_island.transform)
+								if dist < 2000 then
+									air_ready = air_ready + 1
+								end
+							end
+						end
+					end
+		
+					g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
+					g_is_boats_ready = boats_total == 0 or boats_ready / boats_total >= 0.25
+		
+					local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
+		
+					if is_attack then
+						g_savedata.is_attack = is_attack
+		
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad.command == COMMAND_STAGE then
+								setSquadCommandAttack(squad, objective_island)
+							end
+						end
+					else
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+								if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
+									setSquadCommandStage(squad, objective_island)
+								else
+									setSquadCommandStage(squad, ally_island)
+								end
+							end
 						end
 					end
 				else
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-							if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
-								setSquadCommandStage(squad, objective_island)
-							else
+					local is_disengage = (g_count_attack / g_count_squads) < 0.25
+		
+					if is_disengage then
+						g_savedata.is_attack = false
+		
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad.command == COMMAND_ATTACK then
 								setSquadCommandStage(squad, ally_island)
 							end
 						end
 					end
 				end
-			else
-				local is_disengage = (g_count_attack / g_count_squads) < 0.25
-	
-				if is_disengage then
-					g_savedata.is_attack = false
-	
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_ATTACK then
-							setSquadCommandStage(squad, ally_island)
-						end
-					end
-				end
 			end
-		end
 
-		-- assign squads to patrol
-		local allied_islands = getAlliedIslands()
+			-- assign squads to patrol
+			local allied_islands = getAlliedIslands()
 
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			if squad.command == COMMAND_NONE then
-				if #allied_islands > 0 then
-					if (g_count_patrol / g_count_squads) < 0.5 then
-						g_count_patrol = g_count_patrol + 1
-						setSquadCommandPatrol(squad, allied_islands[math.random(1, #allied_islands)])
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.command == COMMAND_NONE then
+					if #allied_islands > 0 then
+						if (g_count_patrol / g_count_squads) < 0.5 then
+							g_count_patrol = g_count_patrol + 1
+							setSquadCommandPatrol(squad, allied_islands[math.random(1, #allied_islands)])
+						end
+					else
+						setSquadCommandPatrol(squad, g_savedata.ai_base_island)
 					end
-				else
-					setSquadCommandPatrol(squad, g_savedata.ai_base_island)
 				end
 			end
 		end
