@@ -144,6 +144,10 @@ local PLANE_SWOOP_MULTIPLIER = 1
 local PLANE_DOG_FIGHT_HEIGHT = 100
 local PLANE_STRAFE_LOCK_DISTANCE = 800
 
+local PLANE_EXPLOSION_DEPTH = -4
+local HELI_EXPLOSION_DEPTH = -4
+local BOAT_EXPLOSION_DEPTH = -17
+
 local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
@@ -1904,7 +1908,7 @@ function tickVehicles()
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
 				local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-				if vehicle_y <= -17 and g_savedata.settings.SINKING_MODE then
+				if vehicle_y <= BOAT_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_y <= HELI_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_y <= PLANE_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_PLANE then
 					killVehicle(squad_index, vehicle_id, true);
 				end
 				local ai_target = nil
