@@ -148,7 +148,7 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = true
+local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local playerData = {
