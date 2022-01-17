@@ -677,7 +677,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 		if command == "?WDLCTE" and is_admin then
 			local matrix, is_success_player = server.getPlayerPos(user_peer_id)
 			local tile_data, is_success_tile server.getTile(matrix)
-			wpDLCDebug("Sea Floor Depth: "..tile_data.sea_floor, false, false)
+			wpDLCDebug("Sea Floor Depth: "..tile_data.sea_floor, false, false, user_peer_id)
 		end
 	end
 end
@@ -1958,15 +1958,15 @@ function tickVehicles()
 							if ai_target then
 								local tar_x, tar_y, tar_z matrix.position(ai_target)
 								if matrix.distance(ai_target, vehicle_object.transform) < PLANE_STRAFE_LOCK_DISTANCE then
-									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set GUN RUN mode", false, false) end
+									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set GUN RUN mode", true, false) end
 								elseif ai_state ~= 1 then -- if its low enough and if they aren't too close together
 									ai_state = 1
-									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set to DESTINATION mode", false, false) end
+									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set to DESTINATION mode", true, false) end
 								else
-									if render_debug then wpDLCDebug("dist: "..matrix.distance(ai_target, vehicle_object.transform), false, false) end
+									if render_debug then wpDLCDebug("dist: "..matrix.distance(ai_target, vehicle_object.transform), true, false) end
 								end
 							else
-								wpDLCDebug("ai_target is nil (1968)", false, true)
+								wpDLCDebug("ai_target is nil (1969)", true, true)
 							end
 						end
 
