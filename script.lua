@@ -139,15 +139,31 @@ local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 60
 local VISIBLE_DISTANCE = 1500
 local WAYPOINT_CONSUME_DISTANCE = 100
 
+-- plane ai tuning settings
+local PLANE_SWOOP_MULTIPLIER = 1
+local PLANE_DOG_FIGHT_HEIGHT = 100
+local PLANE_STRAFE_LOCK_DISTANCE = 800
+
 local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = false
+local render_debug = true
 local g_debug_speed_multiplier = 1
 
 local playerData = {
 	isDebugging = {}
+}
+
+if render_debug then
+	local adminID = 0
+	playerData.isDebugging.adminID = true
+end
+
+local capture_speeds = {
+	100,
+	150,
+	175
 }
 
 local g_holding_pattern = {
@@ -233,13 +249,15 @@ end
 function onCreate(is_world_create)
 	if g_savedata.settings == nil then
 		g_savedata.settings = {
+			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
+			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
 			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 17, 1, 17),
 			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
 			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 10),
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 300) * 60 * 60,
-			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this", 100, 2500, 1, 325)
+			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this", 0, 2500, 1, 325),
 		}
 	end
 
@@ -276,6 +294,7 @@ function onCreate(is_world_create)
 						transform = flagZone.transform, 
 						faction = FACTION_PLAYER, 
 						faction_prev = FACTION_PLAYER,
+						is_contested = false,
 						capture_timer = g_savedata.settings.CAPTURE_TIME, 
 						capture_timer_prev = g_savedata.settings.CAPTURE_TIME,
 						map_id = server.getMapID(),
@@ -303,6 +322,7 @@ function onCreate(is_world_create)
 				transform = flagZone.transform, 
 				faction = FACTION_AI, 
 				faction_prev = FACTION_AI,
+				is_contested = false,
 				capture_timer = 0,
 				capture_timer_prev = 0,
 				map_id = server.getMapID(), 
@@ -326,6 +346,7 @@ function onCreate(is_world_create)
 					transform = flagZone.transform, 
 					faction = FACTION_NEUTRAL, 
 					faction_prev = FACTION_NEUTRAL,
+					is_contested = false,
 					capture_timer = g_savedata.settings.CAPTURE_TIME / 2,
 					capture_timer_prev = g_savedata.settings.CAPTURE_TIME / 2,
 					map_id = server.getMapID(), 
@@ -494,7 +515,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id)
 
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
 		if nearPlayer ~= true then
-			local boat_spawn_transform, found_ocean = server.getOceanTransform(g_savedata.ai_base_island.transform, 500, 6000)
+			local boat_spawn_transform, found_ocean = server.getOceanTransform(g_savedata.ai_base_island.transform, 500, 1500)
 			if found_ocean == false then return end
 			spawn_transform = matrix.multiply(boat_spawn_transform, matrix.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 		else
@@ -652,6 +673,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 			end
 		end
+
+		if command == "?WDLCTE" and is_admin then
+			local matrix, is_success_player = server.getPlayerPos(user_peer_id)
+			local tile_data, is_success_tile server.getTile(matrix)
+			wpDLCDebug("Sea Floor Depth: "..tile_data.sea_floor, false, false)
+		end
 	end
 end
 
@@ -672,9 +699,10 @@ function onPlayerJoin(steam_id, name, peer_id)
 	end
 end
 
-if hpModeIsEnabled then
-	function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
-		if is_dlc_weapons then
+function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
+	if is_dlc_weapons then
+		vehicleData = server.getVehicleData(incoming_vehicle_id)
+		if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") then
 			local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
 			if player_vehicle ~= nil then
@@ -689,6 +717,18 @@ if hpModeIsEnabled then
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if vehicle_id == incoming_vehicle_id and body_id == 0 then
+						if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
+						local damage_prev = vehicle_object.current_damage
+						vehicle_object.current_damage = vehicle_object.current_damage + amount
+
+						local enemy_hp = g_savedata.settings.ENEMY_HP
+
+						if vehicle_object.size == "large" then
+							enemy_hp = enemy_hp * 4
+						elseif vehicle_object.size == "medium" then
+							enemy_hp = enemy_hp * 2
+						end
+
 						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
 							killVehicle(squad_index, vehicle_id, true)
 						elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
@@ -912,119 +952,108 @@ function tickGamemode()
 			end
 			
 			-- tick capture timers
-			-- new mode
-			if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
-				local tick_rate = 60
-
-				local ai_capturing = 0
-				local players_capturing = 0
-
-				-- does a check for how many enemy ai are capturing the island
-				if island.faction ~= FACTION_AI then
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if isTickID(vehicle_id, tick_rate) then
-								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
-									ai_capturing = ai_capturing + 1 -- adds 1 ai to the amount capturing
-									-- island.capture_timer = island.capture_timer - ISLAND_CAPTURE_AMOUNT_PER_SECOND * tick_rate / 60
+			local ai_capturing = 0
+			local players_capturing = 0
+			local tick_rate = 60
+			
+			if isTickID(60, 60) then
+				if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
+					local playerList = server.getPlayers()
+					
+					-- does a check for how many enemy ai are capturing the island
+					if island.capture_timer > 0 then
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
+									ai_capturing = ai_capturing + 1
+								elseif matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
+									ai_capturing = ai_capturing + 1
 								end
 							end
 						end
 					end
-				end
 
-				-- does a check for how many player's are capturing the island
-				if island.faction ~= FACTION_PLAYER then
-					local playerList = server.getPlayers()
-					for _, player in pairs(playerList) do
-						if isTickID(player.id, tick_rate) then
+					-- does a check for how many players are capturing the island
+					if g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- if the % captured is not 100% or more
+						for _, player in pairs(playerList) do
 							local player_transform = server.getPlayerPos(player.id)
 							local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
-							if matrix.distance(flag_vehicle_transform, player_transform) < 3 then
-								players_capturing = players_capturing + 1 -- adds 1 player to the amount capturing
-								--island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * 100) *  tick_rate / 60
+							if matrix.distance(flag_vehicle_transform, player_transform) < 15 then -- if they are within 15 metres of the capture point
+								players_capturing = players_capturing + 1
+							elseif matrix.distance(flag_vehicle_transform, player_transform) < CAPTURE_RADIUS / 5 and island.faction == FACTION_PLAYER then -- if they are within CAPTURE_RADIUS / 5 metres of the capture point and if they own the point, this is their defending radius
+								players_capturing = players_capturing + 1
 							end
 						end
 					end
-				end
-				
-			elseif island.capture_timer < 0 then -- if the capture timer is less than 0
-				island.capture_timer = 0 
-			else -- if the capture timer is greater than the maximum
-				island.capture_timer = g_savedata.settings.CAPTURE_TIME
-			end
-			-- default
-			if island.capture_timer > 0 then
-				if island.faction ~= FACTION_AI then
-					local vehicle_tick_rate = 60
+
+					wpDLCDebug("players capping: "..players_capturing.." ai capping: "..ai_capturing.." island name: "..island.name, true, false)
+					if players_capturing > 0 and ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
+						if island.is_contested == false then -- notifies that an island is being contested
+							server.notify(-1, "ISLAND CONTESTED", "An island is being contested!", 1)
+							island.is_contested = true
+							updatePeerIslandMapData(-1, island)
+						end
+					else
+						island.is_contested = false
+						if players_capturing > 0 then -- tick player progress if theres one or more players capping
+							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(players_capturing, 3)]) *  tick_rate / 60
+						elseif ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
+							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(ai_capturing, 3)] / 100) * tick_rate / 60
+						end
+					end
+				elseif island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
+					island.capture_timer = 0
+					island.faction = FACTION_AI
+					g_savedata.is_attack = false
+
+					server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
 
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if isTickID(vehicle_id, vehicle_tick_rate) then
-								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
-									island.capture_timer = island.capture_timer - ISLAND_CAPTURE_AMOUNT_PER_SECOND * vehicle_tick_rate / 60
-								end
+						if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
+							setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
+						end
+					end
+				elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
+					island.capture_timer = g_savedata.settings.CAPTURE_TIME
+					island.faction = FACTION_PLAYER
+
+					server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
+
+					-- update vehicles looking to resupply
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						if squad_index == RESUPPLY_SQUAD_INDEX then
+							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+								resetPath(vehicle_object)
 							end
 						end
 					end
-
-					if island.capture_timer <= 0 then
-						island.capture_timer = 0
-						island.faction = FACTION_AI
-						g_savedata.is_attack = false
-
-						server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
-
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
-								setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
-							end
-						end
-					end
-				end
-			end
-
-			if island.capture_timer < g_savedata.settings.CAPTURE_TIME then
-				if island.faction ~= FACTION_PLAYER then
-					local player_tick_rate = 60
-					local playerList = server.getPlayers()
-
-					for _, player in pairs(playerList) do
-						if isTickID(player.id, player_tick_rate) then
-							local player_transform = server.getPlayerPos(player.id)
-							local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
-
-							if matrix.distance(flag_vehicle_transform, player_transform) < 3 then
-								island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * 100) *  player_tick_rate / 60
-							end
-						end
-					end
-
-					if island.capture_timer >= g_savedata.settings.CAPTURE_TIME then
-						island.capture_timer = g_savedata.settings.CAPTURE_TIME
-						island.faction = FACTION_PLAYER
-
-						server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
-
-						-- update vehicles looking to resupply
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							if squad_index == RESUPPLY_SQUAD_INDEX then
-								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-									resetPath(vehicle_object)
-								end
-							end
-						end
-					end
+				elseif island.capture_timer > g_savedata.settings.CAPTURE_TIME then -- if its over 100% island capture
+					island.capture_timer = g_savedata.settings.CAPTURE_TIME
+				elseif island.capture_timer < 0 then -- if its less than 0% island capture
+					island.capture_timer = 0
 				end
 			end
 
 			if isTickID(island.flag_vehicle.id, 60) then
 				local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-
-				if island.faction ~= FACTION_PLAYER then
-					server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+				if island.is_contested then -- if the point is contested (both teams trying to cap)
+					server.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+				elseif island.faction ~= FACTION_PLAYER then
+					if ai_capturing == 0 and players_capturing == 0 then -- if nobody is capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+					elseif ai_capturing == 0 then -- if players are capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+					else -- if ai are capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					end
 				else
-					server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					if ai_capturing == 0 and players_capturing == 0 then -- if nobody is capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					elseif ai_capturing == 0 then -- if players are capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+					else -- if ai are capping the point
+						server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					end
 				end
 			end
 		end
@@ -1090,7 +1119,9 @@ function updatePeerIslandMapData(peer_id, island)
 
 		local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
 
-		if island.faction == FACTION_AI then
+		if island.is_contested then
+			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
+		elseif island.faction == FACTION_AI then
 			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
 		elseif island.faction == FACTION_PLAYER then
 			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
@@ -1462,14 +1493,6 @@ function tickSquadrons()
 						killVehicle(squad_index, vehicle_id, false)
 					end
 				end
-
-				if squad.ai_type == AI_TYPE_BOAT and vehicle_object.transform[14] < -10 then
-					killVehicle(squad_index, vehicle_id, true)
-				elseif squad.ai_type == AI_TYPE_PLANE and vehicle_object.transform[14] < 10 then
-					killVehicle(squad_index, vehicle_id, true)
-				elseif squad.ai_type == AI_TYPE_HELI and vehicle_object.transform[14] < 10 then
-					killVehicle(squad_index, vehicle_id, true)
-				end
 			end
 
 			-- check if a vehicle needs resupply, removing from current squad and adding to the resupply squad
@@ -1694,10 +1717,11 @@ function tickSquadrons()
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
+						local player_x, player_y, player_z = matrix.position(target_player.last_known_pos)
 
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
-							addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation((vehicle_object.id % 10 * 20), 50 + (vehicle_object.id % 10 * 20), (vehicle_object.id % 10 * 20))))
+							addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, player_y + (vehicle_object.id % 5) + 25, target_player.last_known_pos)))
 						end
 
 						for i, char in pairs(vehicle_object.survivors) do
@@ -1709,10 +1733,11 @@ function tickSquadrons()
 						end
 					elseif vehicle_object.target_vehicle_id ~= -1 then
 						local target_vehicle = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+						local vehicle_x, vehicle_y, vehicle_z = matrix.position(target_vehicle.last_known_pos)
 
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
-							addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation((vehicle_object.id % 10 * 20), 50 + (vehicle_object.id % 10 * 20), (vehicle_object.id % 10 * 20))))
+							addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, vehicle_y + (vehicle_object.id % 5) + 25, target_vehicle.last_known_pos)))
 						end
 
 						for i, char in pairs(vehicle_object.survivors) do
@@ -1879,11 +1904,11 @@ function tickVehicles()
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
 				local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-				if vehicle_y <= -17 then
+				if vehicle_y <= -17 and g_savedata.settings.SINKING_MODE then
 					killVehicle(squad_index, vehicle_id, true);
 				end
 				local ai_target = nil
-				local ai_state = 1
+				if ai_state ~= 2 then ai_state = 1 end
 				local ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
 
 				if(vehicle_object.ai_type ~= AI_TYPE_LAND) then
@@ -1901,39 +1926,48 @@ function tickVehicles()
 						if #vehicle_object.path == 0 then
 							vehicle_object.state.s = VEHICLE_STATE_HOLDING
 						else
-							ai_state = 1
+							if ai_state ~= 2 then ai_state = 1 end
 							ai_target = matrix.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
 							if vehicle_object.ai_type == AI_TYPE_BOAT then ai_target[14] = 0 end
 	
 							local vehicle_pos = vehicle_object.transform
 							local distance = matrix.distance(ai_target, vehicle_pos)
 	
-							if distance < WAYPOINT_CONSUME_DISTANCE then
-								if vehicle_object.ai_type == AI_TYPE_PLANE 
-								or vehicle_object.ai_type == AI_TYPE_HELI then
-									if #vehicle_object.path > 1 then
-										server.removeMapID(0, vehicle_object.path[1].ui_id)
-										table.remove(vehicle_object.path, 1)
-									else
-										-- if we have reached last waypoint start holding there
-										if render_debug then server.announce("dlcw", "set plane " .. vehicle_id .. " to holding") end
-										vehicle_object.state.s = VEHICLE_STATE_HOLDING
-									end
-								elseif vehicle_object.ai_type == AI_TYPE_BOAT then
-									if #vehicle_object.path > 0 then
-										server.removeMapID(0, vehicle_object.path[1].ui_id)
-										table.remove(vehicle_object.path, 1)
-									else
-										-- if we have reached last waypoint start holding there
-										if render_debug then server.announce("dlcw", "set boat " .. vehicle_id .. " to holding") end
-										vehicle_object.state.s = VEHICLE_STATE_HOLDING
-									end
+							if distance < WAYPOINT_CONSUME_DISTANCE * PLANE_SWOOP_MULTIPLIER and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI then
+								if #vehicle_object.path > 1 then
+									server.removeMapID(0, vehicle_object.path[1].ui_id)
+									table.remove(vehicle_object.path, 1)
+								else
+									-- if we have reached last waypoint start holding there
+									if render_debug then server.announce("dlcw", "set plane " .. vehicle_id .. " to holding") end
+									vehicle_object.state.s = VEHICLE_STATE_HOLDING
+								end
+							elseif vehicle_object.ai_type == AI_TYPE_BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
+								if #vehicle_object.path > 0 then
+									server.removeMapID(0, vehicle_object.path[1].ui_id)
+									table.remove(vehicle_object.path, 1)
+								else
+									-- if we have reached last waypoint start holding there
+									if render_debug then server.announce("dlcw", "set boat " .. vehicle_id .. " to holding") end
+									vehicle_object.state.s = VEHICLE_STATE_HOLDING
 								end
 							end
 						end
 						
 						if squad.command == COMMAND_ENGAGE and vehicle_object.ai_type == AI_TYPE_PLANE then
-							ai_state = 2
+							if ai_target then
+								local tar_x, tar_y, tar_z matrix.position(ai_target)
+								if matrix.distance(ai_target, vehicle_object.transform) < PLANE_STRAFE_LOCK_DISTANCE then
+									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set GUN RUN mode", false, false) end
+								elseif ai_state ~= 1 then -- if its low enough and if they aren't too close together
+									ai_state = 1
+									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set to DESTINATION mode", false, false) end
+								else
+									if render_debug then wpDLCDebug("dist: "..matrix.distance(ai_target, vehicle_object.transform), false, false) end
+								end
+							else
+								wpDLCDebug("ai_target is nil (1968)", false, true)
+							end
 						end
 
 						if squad.command == COMMAND_ENGAGE and vehicle_object.ai_type == AI_TYPE_HELI then
@@ -1958,7 +1992,7 @@ function tickVehicles()
 							local vehicle_pos = vehicle_object.transform
 							local distance = matrix.distance(ai_target, vehicle_pos)
 
-							if distance < 100 then
+							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type ~= AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE * PLANE_SWOOP_MULTIPLIER and vehicle_object.ai_type == AI_TYPE_PLANE then
 								vehicle_object.holding_index = 1 + ((vehicle_object.holding_index) % 4);
 							end
 						end
@@ -2014,6 +2048,7 @@ function tickVehicles()
 
 					debug_data = debug_data .. "Squad: " .. squad_index .."\n"
 					debug_data = debug_data .. "Comm: " .. squad.command .."\n"
+					debug_data = debug_data .. "AI State: ".. ai_state .. "\n"
 					if squad.target_island then debug_data = debug_data .. "\n" .. "ISLE: " .. squad.target_island.name .. "\n" end
 
 					debug_data = debug_data .. "TP: " .. vehicle_object.target_player_id .."\n"
