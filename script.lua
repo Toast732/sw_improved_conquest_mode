@@ -88,6 +88,7 @@ type=dlc_weapons,type=wep_boat
 type=dlc_weapons,type=wep_plane
 type=dlc_weapons,type=wep_heli
 type=dlc_weapons,type=wep_land
+type=dlc_weapons,type=wep_turret
 
 Optional tags:
 radar
@@ -116,6 +117,7 @@ local AI_TYPE_BOAT = "boat"
 local AI_TYPE_LAND = "land"
 local AI_TYPE_PLANE = "plane"
 local AI_TYPE_HELI = "heli"
+local AI_TYPE_TURRET = "turret"
 
 local VEHICLE_STATE_PATHING = "pathing"
 local VEHICLE_STATE_HOLDING = "holding"
@@ -126,6 +128,7 @@ local TARGET_VISIBILITY_INVESTIGATE = "investigate"
 local AI_SPEED_PSEUDO_PLANE = 60
 local AI_SPEED_PSEUDO_HELI = 40
 local AI_SPEED_PSEUDO_BOAT = 10
+local AI_SPEED_PSEUDO_LAND = 5
 
 local RESUPPLY_SQUAD_INDEX = 1
 
@@ -140,7 +143,6 @@ local VISIBLE_DISTANCE = 1500
 local WAYPOINT_CONSUME_DISTANCE = 100
 
 -- plane ai tuning settings
-local PLANE_SWOOP_MULTIPLIER = 1
 local PLANE_DOG_FIGHT_HEIGHT = 100
 local PLANE_STRAFE_LOCK_DISTANCE = 800
 
@@ -151,9 +153,14 @@ local BOAT_EXPLOSION_DEPTH = -17
 local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
+local terrain_scanner_prefab = nil
 local is_dlc_weapons = false
 local render_debug = false
 local g_debug_speed_multiplier = 1
+
+local land_spawn_zones = {}
+
+local terrain_scanner_links = {} -- for the terrain scanner, to tell what terrain scanner is for what tank
 
 local playerData = {
 	isDebugging = {}
@@ -178,12 +185,11 @@ local g_holding_pattern = {
 }
 
 local g_patrol_route = {
-	{ x=0, z=0 },
 	{ x=0, z=8000 },
 	{ x=8000, z=0 },
 	{ x=-0, z=-8000 },
 	{ x=-8000, z=0 },
-	{ x=0, z=0 },
+	{ x=0, z=8000}
 }
 
 local g_is_air_ready = true
@@ -204,6 +210,7 @@ g_savedata = {
 	debug_data = {},
 	constructable_vehicles = {},
 	constructable_turrets = {},
+	constructable_terrain_checker = nil,
 	is_attack = false,
 	isError = false,
 }
@@ -213,7 +220,9 @@ g_savedata = {
 --]]
 
 function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
-	if requiresDebugging == true then
+	if type(message) == "table" then
+		printTable(message, requiresDebugging, isError, toPlayer)
+	elseif requiresDebugging == true then
 		if toPlayer ~= -1 and toPlayer ~= nil then
 			if playerData.isDebugging.toPlayer then
 				if isError then
@@ -224,11 +233,11 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 			end
 		else
 			for k, v in pairs(playerData.isDebugging) do
-				if playerData.isDebugging.v then
+				if playerData.isDebugging[k] then
 					if isError then
-						server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, v)
+						server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, k)
 					else
-						server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, v)
+						server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, k)
 					end
 				end
 			end
@@ -275,6 +284,10 @@ function onCreate(is_world_create)
 
 			turret_zones = server.getZones("turret")
 
+			for land_spawn_index, land_spawn in pairs(server.getZones("land_spawn")) do
+				table.insert(land_spawn_zones, land_spawn.transform)
+			end
+
             for i in iterPlaylists() do
                 for j in iterLocations(i) do
                     build_locations(i, j)
@@ -294,7 +307,7 @@ function onCreate(is_world_create)
 				local flag_tile = server.getTile(flagZone.transform)
 				if flag_tile.name == start_island.name or (flag_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					g_savedata.player_base_island = {
-						name = flagZone.name, 
+						name = flagZone.name,
 						transform = flagZone.transform, 
 						faction = FACTION_PLAYER, 
 						faction_prev = FACTION_PLAYER,
@@ -302,7 +315,9 @@ function onCreate(is_world_create)
 						capture_timer = g_savedata.settings.CAPTURE_TIME, 
 						capture_timer_prev = g_savedata.settings.CAPTURE_TIME,
 						map_id = server.getMapID(),
-						assigned_squad_index = -1
+						assigned_squad_index = -1,
+						ai_capturing = 0,
+						players_capturing = 0
 					}
 					flag_zones[flagZone_index] = nil
 				end
@@ -332,7 +347,9 @@ function onCreate(is_world_create)
 				map_id = server.getMapID(), 
 				assigned_squad_index = -1, 
 				production_timer = 0,
-				zones = {}
+				zones = {},
+				ai_capturing = 0,
+				players_capturing = 0
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(matrix.distance(turretZone.transform, flagZone.transform) <= 1000) then
@@ -355,7 +372,9 @@ function onCreate(is_world_create)
 					capture_timer_prev = g_savedata.settings.CAPTURE_TIME / 2,
 					map_id = server.getMapID(), 
 					assigned_squad_index = -1, 
-					zones = {}
+					zones = {},
+					ai_capturing = 0,
+					players_capturing = 0
 				}
 
 				for _, turretZone in pairs(turret_zones) do
@@ -402,9 +421,12 @@ function buildPrefabs(location_index)
 			table.insert(prefab_data.fires, fire)
 		end
 
-		if hasTag(vehicle.tags, "type=wep_land") then
+		if hasTag(vehicle.tags, "type=wep_turret") then
 			table.insert(g_savedata.constructable_turrets, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab turret") end
+		elseif hasTag(vehicle.tags, "type=dlc_terrain_scanner") then
+			g_savedata.constructable_terrain_checker = prefab_data
+			if render_debug then server.announce("dlcw", "prefab terrain scanner") end
 		elseif #prefab_data.survivors > 0 then
 			table.insert(g_savedata.constructable_vehicles, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab vehicle") end
@@ -487,16 +509,18 @@ function spawnTurret(island)
 	end
 end
 
-function spawnAIVehicle(nearPlayer, user_peer_id)
+function spawnAIVehicle(nearPlayer, user_peer_id, type)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
+	local land_count = 0
 	
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-			if vehicle_object.ai_type ~= AI_TYPE_LAND then army_count = army_count + 1 end
+			if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
+			if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
 		end
 	end
 
@@ -540,7 +564,27 @@ function spawnAIVehicle(nearPlayer, user_peer_id)
 			if found_ocean == false then return end
 			spawn_transform = matrix.multiply(boat_spawn_transform, matrix.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 		end
-		
+	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
+		local land_spawn_locations = {}
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.faction == FACTION_AI then
+				wpDLCDebug("is owned by AI", true, false)
+				local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
+				for land_spawn_index, land_spawn in pairs(land_spawn_zones) do
+					wpDLCDebug("Looping spawn", true, false)
+					if matrix.distance(land_spawn, flag_vehicle_transform) <= 1000 then
+						wpDLCDebug("is on island", true, false)
+						table.insert(land_spawn_locations, land_spawn)
+					end
+				end
+			end
+		end
+		if #land_spawn_locations > 0 then
+			spawn_transform = land_spawn_locations[math.random(1, #land_spawn_locations)]
+		else
+			wpDLCDebug("No suitible spawn location found for land vehicle", true, false)
+			return false
+		end
 	end
 
 	-- spawn objects
@@ -553,14 +597,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id)
 	local vehX, vehY, vehZ = matrix.position(spawn_transform)
 	if selected_prefab.vehicle.display_name ~= nil then
 		wpDLCDebug("spawned vehicle: "..selected_prefab.vehicle.display_name.." at X: "..vehX.." Y: "..vehY.." Z: "..vehZ, true, false)
-		for k, v in pairs(playerData.isDebugging) do
-			if playerData.isDebugging.v then
-				server.addMapObject(v, 891752, 0, 2, vehX, vehZ, vehX, vehZ, 0, 0, selected_prefab.vehicle.display_name, 0, selected_prefab.vehicle.tags)
-			end
-		end
 	else
 		wpDLCDebug("the selected vehicle is nil", true, true)
-		
 	end
 
 	if render_debug then server.announce("dlcw", "spawning army vehicle: " .. selected_prefab.location.data.name .. " / " .. selected_prefab.location.playlist_index .. " / " .. selected_prefab.vehicle.display_name) end
@@ -678,10 +716,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			end
 		end
 
-		if command == "?WDLCTE" and is_admin then
-			local matrix, is_success_player = server.getPlayerPos(user_peer_id)
-			local tile_data, is_success_tile server.getTile(matrix)
-			wpDLCDebug("Sea Floor Depth: "..tile_data.sea_floor, false, false, user_peer_id)
+		if command == "?WDLCDE" and is_admin then
+			local terrain_height, success = server.getVehicleDial(arg1, "MEASURED_DISTANCE")
+			printTable(terrain_height, false, false)
+		end
+		
+		if command == "?WDLCST" and is_admin or command == "?WeaponsDLCSpawnTurret" and is_admin then
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				if island.faction == FACTION_AI then
+					spawnTurret(island)
+				end
+			end
 		end
 	end
 end
@@ -706,7 +751,7 @@ end
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
 		vehicleData = server.getVehicleData(incoming_vehicle_id)
-		if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") then
+		if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
 			local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
 			if player_vehicle ~= nil then
@@ -798,7 +843,7 @@ function cleanVehicle(squad_index, vehicle_id)
 		end
 	end
 
-	if vehicle_object.ai_type == AI_TYPE_LAND and vehicle_object.spawnbox_index ~= nil then
+	if vehicle_object.ai_type == AI_TYPE_TURRET and vehicle_object.spawnbox_index ~= nil then
 		for island_index, island in pairs(g_savedata.controllable_islands) do		
 			if island.name == vehicle_object.home_island then
 				island.zones[vehicle_object.spawnbox_index].is_spawned = false
@@ -848,6 +893,12 @@ function onVehicleUnload(incoming_vehicle_id)
 	end
 end
 
+function setLandTarget(vehicle_id, vehicle_object)
+	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
+	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
+	--wpDLCDebug("x: "..vehicle_object.path[1].x.." z: "..vehicle_object.path[1].z, true, false)
+end
+
 function onVehicleLoad(incoming_vehicle_id)
 	if is_dlc_weapons then
 		if render_debug then server.announce("dlcw", "onVehicleLoad: " .. incoming_vehicle_id) end
@@ -871,14 +922,14 @@ function onVehicleLoad(incoming_vehicle_id)
 					end
 
 					for i, char in pairs(vehicle_object.survivors) do
-						if vehicle_object.ai_type == AI_TYPE_LAND then
+						if vehicle_object.ai_type == AI_TYPE_TURRET then
 							--Gunners
 							server.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
 							local c = server.getCharacterData(char.id)
 							server.setCharacterData(char.id, c.hp, true, true)
 						else
 							if i == 1 then
-								if vehicle_object.ai_type == AI_TYPE_BOAT then
+								if vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_object.ai_type == AI_TYPE_LAND then
 									server.setCharacterSeated(char.id, vehicle_id, "Captain")
 								else
 									server.setCharacterSeated(char.id, vehicle_id, "Pilot")
@@ -893,7 +944,26 @@ function onVehicleLoad(incoming_vehicle_id)
 							end
 						end
 					end
-
+					if vehicle_object.ai_type == AI_TYPE_LAND then
+						if(#vehicle_object.path >= 1) then
+							setLandTarget(vehicle_id, vehicle_object)
+						end
+						if terrain_scanner_links[vehicle_id] == nil then
+							local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
+							local get_terrain_matrix = matrix.translation(vehicle_x, 1000, vehicle_z) 
+							local terrain_object, success = server.spawnAddonComponent(get_terrain_matrix, terrain_scanner_prefab.playlist_index, terrain_scanner_prefab.location_index, terrain_scanner_prefab.object_index, 0)
+							if success then
+								server.setVehiclePos(vehicle_id, matrix.translation(vehicle_x, 0, vehicle_z))
+								terrain_scanner_links[vehicle_id] = terrain_object.id
+								wpDLCDebug("terrain | size: "..#terrain_scanner_links, true, false)
+								printTable(terrain_scanner_links, true, false)
+							else
+								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
+							end
+						elseif terrain_scanner_links[vehicle_id] == "Just Teleported" then
+							terrain_scanner_links[vehicle_id] = nil
+						end
+					end
 					refuel(vehicle_id)
 					return
 				end
@@ -911,7 +981,7 @@ function resetPath(vehicle_object)
 end
 
 function addPath(vehicle_object, target_dest)
-	if(vehicle_object.ai_type == AI_TYPE_LAND) then vehicle_object.state.s = "stationary" return end
+	if(vehicle_object.ai_type == AI_TYPE_TURRET) then vehicle_object.state.s = "stationary" return end
 
 	if(vehicle_object.ai_type == AI_TYPE_BOAT) then
 		local dest_x, dest_y, dest_z = matrix.position(target_dest)
@@ -929,6 +999,25 @@ function addPath(vehicle_object, target_dest)
 		for path_index, path in pairs(path_list) do
 			table.insert(vehicle_object.path, { x =  path.x + math.random(-50, 50), y = 0, z = path.z + math.random(-50, 50), ui_id = server.getMapID() })
 		end
+	elseif vehicle_object.ai_type == AI_TYPE_LAND then
+		local dest_x, dest_y, dest_z = matrix.position(target_dest)
+
+		local path_start_pos = nil
+
+		if #vehicle_object.path > 0 then
+			local waypoint_end = vehicle_object.path[#vehicle_object.path]
+			path_start_pos = matrix.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z)
+		else
+			path_start_pos = vehicle_object.transform
+		end
+
+		start_x, start_y, start_z = matrix.position(vehicle_object.transform)
+ 
+		local path_list = server.pathfindOcean(path_start_pos, matrix.translation(dest_x, 1000, dest_z))
+		for path_index, path in pairs(path_list) do
+			table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = server.getMapID() })
+		end
+		setLandTarget(vehicle_id, vehicle_object)
 	else
 		local dest_x, dest_y, dest_z = matrix.position(target_dest)
 		table.insert(vehicle_object.path, { x = dest_x, y = dest_y, z = dest_z, ui_id = server.getMapID() })
@@ -950,48 +1039,54 @@ function tickGamemode()
 
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 
+			if island.ai_capturing == nil then
+				island.ai_capturing = 0
+				island.players_capturing = 0
+			end
+
 			-- spawn turrets at owned islands
 			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 1 then
 				spawnTurret(island)
 			end
 			
 			-- tick capture timers
-			local ai_capturing = 0
-			local players_capturing = 0
 			local tick_rate = 60
-			
-			if isTickID(60, 60) then
-				if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
-					local playerList = server.getPlayers()
-					
-					-- does a check for how many enemy ai are capturing the island
-					if island.capture_timer > 0 then
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
+				local playerList = server.getPlayers()
+				
+				-- does a check for how many enemy ai are capturing the island
+				if island.capture_timer > 0 then
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							if isTickID(vehicle_id, tick_rate) then
 								if matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
-									ai_capturing = ai_capturing + 1
+									island.ai_capturing = island.ai_capturing + 1
 								elseif matrix.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
-									ai_capturing = ai_capturing + 1
+									island.ai_capturing = island.ai_capturing + 1
 								end
 							end
 						end
 					end
+				end
 
-					-- does a check for how many players are capturing the island
-					if g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- if the % captured is not 100% or more
-						for _, player in pairs(playerList) do
+				-- does a check for how many players are capturing the island
+				if g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- if the % captured is not 100% or more
+					for _, player in pairs(playerList) do
+						if isTickID(player.id, tick_rate) then
 							local player_transform = server.getPlayerPos(player.id)
 							local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
 							if matrix.distance(flag_vehicle_transform, player_transform) < 15 then -- if they are within 15 metres of the capture point
-								players_capturing = players_capturing + 1
+								island.players_capturing = island.players_capturing + 1
 							elseif matrix.distance(flag_vehicle_transform, player_transform) < CAPTURE_RADIUS / 5 and island.faction == FACTION_PLAYER then -- if they are within CAPTURE_RADIUS / 5 metres of the capture point and if they own the point, this is their defending radius
-								players_capturing = players_capturing + 1
+								island.players_capturing = island.players_capturing + 1
 							end
 						end
 					end
+				end
 
-					wpDLCDebug("players capping: "..players_capturing.." ai capping: "..ai_capturing.." island name: "..island.name, true, false)
-					if players_capturing > 0 and ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
+
+				if isTickID(60, tick_rate) then
+					if island.players_capturing > 0 and island.ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
 						if island.is_contested == false then -- notifies that an island is being contested
 							server.notify(-1, "ISLAND CONTESTED", "An island is being contested!", 1)
 							island.is_contested = true
@@ -999,13 +1094,50 @@ function tickGamemode()
 						end
 					else
 						island.is_contested = false
-						if players_capturing > 0 then -- tick player progress if theres one or more players capping
-							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(players_capturing, 3)]) *  tick_rate / 60
-						elseif ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
-							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(ai_capturing, 3)] / 100) * tick_rate / 60
+						if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
+							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.players_capturing, 3)] / 5) *  tick_rate / 60
+						elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
+							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)] / 20) * tick_rate / 60
 						end
 					end
-				elseif island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
+					
+					-- displays tooltip on vehicle
+					local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+	
+					if island.is_contested then -- if the point is contested (both teams trying to cap)
+						server.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+	
+					elseif island.faction ~= FACTION_PLAYER then -- if the player doesn't own the point
+	
+						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+	
+						elseif island.ai_capturing == 0 then -- if players are capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+	
+						else -- if ai is capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+	
+						end
+					else -- if the player does own the point
+	
+						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+	
+						elseif island.ai_capturing == 0 then -- if players are capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+	
+						else -- if ai is capping the point
+							server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+	
+						end
+					end
+
+					-- resets amount capping
+					island.ai_capturing = 0
+					island.players_capturing = 0
+				end
+				if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
 					island.capture_timer = 0
 					island.faction = FACTION_AI
 					g_savedata.is_attack = false
@@ -1037,29 +1169,6 @@ function tickGamemode()
 					island.capture_timer = 0
 				end
 			end
-
-			if isTickID(island.flag_vehicle.id, 60) then
-				local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-				if island.is_contested then -- if the point is contested (both teams trying to cap)
-					server.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
-				elseif island.faction ~= FACTION_PLAYER then
-					if ai_capturing == 0 and players_capturing == 0 then -- if nobody is capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
-					elseif ai_capturing == 0 then -- if players are capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
-					else -- if ai are capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-					end
-				else
-					if ai_capturing == 0 and players_capturing == 0 then -- if nobody is capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
-					elseif ai_capturing == 0 then -- if players are capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
-					else -- if ai are capping the point
-						server.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-					end
-				end
-			end
 		end
 
 		if render_debug then
@@ -1070,13 +1179,14 @@ function tickGamemode()
 			local plane_count = 0
 			local heli_count = 0
 			local army_count = 0
-			local turret_count = 0
+			local land_count = 0
 		
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type ~= AI_TYPE_LAND then army_count = army_count + 1 else turret_count = turret_count + 1 end
+					if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
 					if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 					if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
 				end
 			end
 
@@ -1084,6 +1194,7 @@ function tickGamemode()
 			local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
 			debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
 			debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
+			debug_data = debug_data .. "Land_Count: " .. tostring(land_count) .. "\n"
 			debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
 			debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
 			debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
@@ -1126,7 +1237,10 @@ function updatePeerIslandMapData(peer_id, island)
 		if island.is_contested then
 			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
 		elseif island.faction == FACTION_AI then
-			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+			if render_debug then
+			else
+				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+			end
 		elseif island.faction == FACTION_PLAYER then
 			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
 		else
@@ -1216,7 +1330,7 @@ function tickAI()
 
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_LAND then
+					if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET then
 						g_count_squads = g_count_squads + 1
 					end
 		
@@ -1238,6 +1352,8 @@ function tickAI()
 					local boats_total = 0
 					local air_ready = 0
 					local air_total = 0
+					local land_ready = 0
+					local land_total = 0
 
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						if squad.command == COMMAND_STAGE then
@@ -1253,6 +1369,16 @@ function tickAI()
 
 								if dist < air_dist * air_sea_speed_factor then
 									boats_ready = boats_ready + 1
+								end
+							elseif squad.ai_type == AI_TYPE_LAND then
+								land_total = land_total + 1
+
+								local air_dist = matrix.distance(objective_island.transform, ally_island.transform)
+								local dist = matrix.distance(squad_leader_transform, objective_island.transform)
+								local air_sea_speed_factor = AI_SPEED_PSEUDO_LAND/AI_SPEED_PSEUDO_PLANE
+
+								if dist < air_dist * air_sea_speed_factor then
+									land_ready = land_ready + 1
 								end
 							else
 								air_total = air_total + 1
@@ -1395,7 +1521,7 @@ function addToSquadron(vehicle_object)
 		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
 			if squad.ai_type == vehicle_object.ai_type then
 				local _, squad_leader = getSquadLeader(squad)
-				if squad.ai_type ~= AI_TYPE_LAND or vehicle_object.home_island == squad_leader.home_island then
+				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
 					if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 						squad.vehicles[vehicle_object.id] = vehicle_object
 						new_squad = squad
@@ -1503,7 +1629,7 @@ function tickSquadrons()
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if isVehicleNeedsResupply(vehicle_id) then
-						if vehicle_object.ai_type == AI_TYPE_LAND then
+						if vehicle_object.ai_type == AI_TYPE_TURRET then
 							reload(vehicle_id)
 						else
 							g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
@@ -1522,6 +1648,27 @@ function tickSquadrons()
 							end
 
 							squadInitVehicleCommand(squad, vehicle_object)
+						end
+					end
+					-- check if the vehicle simply needs to reload a machine gun
+					local mg_info = isVehicleNeedsReloadMG(vehicle_id)
+					if mg_info[1] and mg_info[2] ~= 0 then
+						local i = 1
+						local successed = false
+						local ammoData = {}
+						repeat
+							local ammo, success = server.getVehicleWeapon(vehicle_id, "Ammo "..mg_info[2].." - "..i)
+							if success then
+								if ammo.ammo > 0 then
+									successed = success
+									ammoData[i] = ammo
+								end
+							end
+							i = i + 1
+						until (not success)
+						if successed then
+							server.setVehicleWeapon(vehicle_id, "Ammo "..mg_info[2].." - "..#ammoData, 0)
+							server.setVehicleWeapon(vehicle_id, "Ammo "..mg_info[2], ammoData[#ammoData].capacity)
 						end
 					end
 				end
@@ -1721,33 +1868,59 @@ function tickSquadrons()
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
-						local player_x, player_y, player_z = matrix.position(target_player.last_known_pos)
+						local target_x, target_y, target_z = matrix.position(target_player.last_known_pos)
+						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
-							addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, player_y + (vehicle_object.id % 5) + 25, target_player.last_known_pos)))
+							if matrix.distance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
+								addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_player.last_known_pos)))
+								vehicle_object.is_strafing = true
+							elseif matrix.distance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 150 and vehicle_object.is_strafing ~= true then
+								addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 75, 100), target_player.last_known_pos)))
+							elseif matrix.distance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) < 250 then
+								addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 15, 25), target_player.last_known_pos)))
+								vehicle_object.is_strafing = false
+							else
+								addPath(vehicle_object, matrix.multiply(target_player.last_known_pos, matrix.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_player.last_known_pos))) 
+							end
 						end
 
 						for i, char in pairs(vehicle_object.survivors) do
 							server.setAITargetCharacter(char.id, vehicle_object.target_player_id)
 
-							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_LAND then
+							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_TURRET then
 								server.setAIState(char.id, 1)
 							end
 						end
 					elseif vehicle_object.target_vehicle_id ~= -1 then
 						local target_vehicle = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-						local vehicle_x, vehicle_y, vehicle_z = matrix.position(target_vehicle.last_known_pos)
+						local target_x, target_y, target_z = matrix.position(target_vehicle.last_known_pos)
+						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 
+						
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
-							addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, vehicle_y + (vehicle_object.id % 5) + 25, target_vehicle.last_known_pos)))
+							if vehicle_object.type == AI_TYPE_PLANE then
+								if matrix.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
+									addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
+									vehicle_object.is_strafing = true
+								elseif matrix.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 150 and vehicle_object.is_strafing ~= true then
+									addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 75, 100), target_vehicle.last_known_pos)))
+								elseif matrix.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) < 250 then
+									addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 15, 25), target_vehicle.last_known_pos)))
+									vehicle_object.is_strafing = false
+								else
+									addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
+								end
+							else
+								addPath(vehicle_object, matrix.multiply(target_vehicle.last_known_pos, matrix.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
+							end
 						end
-
 						for i, char in pairs(vehicle_object.survivors) do
 							server.setAITargetVehicle(char.id, vehicle_object.target_vehicle_id)
 
-							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_LAND then
+							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_TURRET then
 								server.setAIState(char.id, 1)
 							end
 						end
@@ -1915,7 +2088,7 @@ function tickVehicles()
 				if ai_state ~= 2 then ai_state = 1 end
 				local ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
 
-				if(vehicle_object.ai_type ~= AI_TYPE_LAND) then
+				if(vehicle_object.ai_type ~= AI_TYPE_TURRET) then
 
 					if vehicle_object.state.s == VEHICLE_STATE_PATHING then
 
@@ -1923,6 +2096,8 @@ function tickVehicles()
 							ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_HELI then
 							ai_speed_pseudo = AI_SPEED_PSEUDO_HELI * vehicle_update_tickrate / 60
+						elseif vehicle_object.ai_type == AI_TYPE_LAND then
+							ai_speed_pseudo = AI_SPEED_PSEUDO_LAND * vehicle_update_tickrate / 60
 						else
 							ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
 						end
@@ -1931,17 +2106,26 @@ function tickVehicles()
 							vehicle_object.state.s = VEHICLE_STATE_HOLDING
 						else
 							if ai_state ~= 2 then ai_state = 1 end
-							ai_target = matrix.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
+							if vehicle_object.ai_type ~= AI_TYPE_LAND then 
+								ai_target = matrix.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
+							else
+								local veh_x, veh_y, veh_z = matrix.position(vehicle_object.transform)
+								ai_target = matrix.translation(vehicle_object.path[1].x, veh_y, vehicle_object.path[1].z)
+								setLandTarget(vehicle_id, vehicle_object)
+							end
 							if vehicle_object.ai_type == AI_TYPE_BOAT then ai_target[14] = 0 end
 	
 							local vehicle_pos = vehicle_object.transform
 							local distance = matrix.distance(ai_target, vehicle_pos)
 	
-							if distance < WAYPOINT_CONSUME_DISTANCE * PLANE_SWOOP_MULTIPLIER and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI then
+							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 2 then
 								if #vehicle_object.path > 1 then
 									server.removeMapID(0, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
-								else
+									if vehicle_object.ai_type == AI_TYPE_LAND then
+										setLandTarget(vehicle_id, vehicle_object)
+									end
+								elseif vehicle_object.ai_type ~= AI_TYPE_LAND then
 									-- if we have reached last waypoint start holding there
 									if render_debug then server.announce("dlcw", "set plane " .. vehicle_id .. " to holding") end
 									vehicle_object.state.s = VEHICLE_STATE_HOLDING
@@ -1962,15 +2146,10 @@ function tickVehicles()
 							if ai_target then
 								local tar_x, tar_y, tar_z matrix.position(ai_target)
 								if matrix.distance(ai_target, vehicle_object.transform) < PLANE_STRAFE_LOCK_DISTANCE then
-									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set GUN RUN mode", true, false) end
 								elseif ai_state ~= 1 then -- if its low enough and if they aren't too close together
 									ai_state = 1
-									if render_debug then wpDLCDebug("Plane "..vehicle_id.." has been set to DESTINATION mode", true, false) end
 								else
-									if render_debug then wpDLCDebug("dist: "..matrix.distance(ai_target, vehicle_object.transform), true, false) end
 								end
-							else
-								wpDLCDebug("ai_target is nil (1969)", true, true)
 							end
 						end
 
@@ -1996,7 +2175,7 @@ function tickVehicles()
 							local vehicle_pos = vehicle_object.transform
 							local distance = matrix.distance(ai_target, vehicle_pos)
 
-							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type ~= AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE * PLANE_SWOOP_MULTIPLIER and vehicle_object.ai_type == AI_TYPE_PLANE then
+							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type ~= AI_TYPE_LAND or distance < 7 and vehicle_object.ai_type == AI_TYPE_LAND then
 								vehicle_object.holding_index = 1 + ((vehicle_object.holding_index) % 4);
 							end
 						end
@@ -2149,6 +2328,43 @@ function tickUpdateVehicleData()
 	end
 end
 
+function tickTerrainScanners()
+	printTable(terrain_scanner_links, false, false)
+	for vehicle_id, terrain_scanner in pairs(terrain_scanner_links) do
+		local vehicle_data = server.getVehicleData(vehicle_id)
+		local terrain_scanner_data = server.getVehicleData(terrain_scanner)
+		
+		if hasTag(terrain_scanner_data.tags, "type=dlc_terrain_scanner") then
+			wpDLCDebug("terrain scanner loading!", true, false)
+			wpDLCDebug("ter id: "..terrain_scanner, true, false)
+			wpDLCDebug("veh id: "..vehicle_id, true, false)
+			dial_read_attempts = 0
+			repeat
+				dial_read_attempts = dial_read_attempts + 1
+				terrain_height, success = server.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
+				if success and terrain_height.value ~= 0 then
+					printTable(terrain_height, false, false)
+					local new_terrain_height = (1000 - terrain_height.value) + 5
+					local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_data.transform)
+					local new_vehicle_matrix = matrix.translation(vehicle_x, new_terrain_height, vehicle_z)
+					server.setVehiclePos(vehicle_id, new_vehicle_matrix)
+					wpDLCDebug("set land vehicle to new y level!", true, false)
+					terrain_scanner_links[vehicle_id] = "Just Teleported"
+					server.despawnVehicle(terrain_scanner, true)
+				else
+					if success then
+						wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+					else
+						wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+					end
+					
+				end
+				if dial_read_attempts >= 2 then return end
+			until(success and terrain_height.value ~= 0)
+		end
+	end
+end
+
 function onTick(tick_time)
 	g_tick_counter = g_tick_counter + 1
 
@@ -2160,6 +2376,9 @@ function onTick(tick_time)
 		tickAI()
 		tickSquadrons()
 		tickVehicles()
+		if tableLength(terrain_scanner_links) > 0 then
+			tickTerrainScanners()
+		end
 	end
 end
 
@@ -2205,6 +2424,9 @@ function build_locations(playlist_index, location_index)
             if tag_object == "type=dlc_weapons" then
                 is_valid_location = true
             end
+			if tag_object == "type=dlc_terrain_scanner" then
+				terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+			end
 			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
 					flag_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
@@ -2270,8 +2492,15 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 		if hasTag(object.tags, "type=wep_land") then
 			l_ai_type = AI_TYPE_LAND
 		end
+		if hasTag(object.tags, "type=wep_turret") then
+			l_ai_type = AI_TYPE_TURRET
+		end
 		if hasTag(object.tags, "type=dlc_weapons_flag") then
 			l_ai_type = "flag"
+		end
+		if hasTag(object.tags, "type=dlc_terrain_scanner") then
+			wpDLCDebug("terrain scanner!", true, false)
+			l_ai_type = "terrain_scanner"
 		end
 
 		local l_size = "small"
@@ -2312,6 +2541,24 @@ end
 function isVehicleNeedsResupply(vehicle_id)
 	local button_data, success = server.getVehicleButton(vehicle_id, "Resupply")
 	return success and button_data.on
+end
+
+function isVehicleNeedsReloadMG(vehicle_id)
+	local needing_reload = false
+	local mg_id = 0
+	for i=1,6 do
+		local needs_reload, is_success_button = server.getVehicleButton(vehicle_id, "RELOAD_MG"..i)
+		if needs_reload ~= nil then
+			if needs_reload.on and is_success_button then
+				needing_reload = true
+				mg_id = i
+			end
+		end
+	end
+	local returnings = {}
+	returnings[1] = needing_reload
+	returnings[2] = mg_id
+	return returnings
 end
 
 
@@ -2389,7 +2636,6 @@ function squadInitVehicleCommand(squad, vehicle_object)
 		addPath(vehicle_object, matrix.multiply(squad.target_island.transform, matrix.translation(patrol_route[3].x, CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), patrol_route[3].z)))
 		addPath(vehicle_object, matrix.multiply(squad.target_island.transform, matrix.translation(patrol_route[4].x, CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), patrol_route[4].z)))
 		addPath(vehicle_object, matrix.multiply(squad.target_island.transform, matrix.translation(patrol_route[5].x, CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), patrol_route[5].z)))
-		addPath(vehicle_object, matrix.multiply(squad.target_island.transform, matrix.translation(patrol_route[6].x, CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), patrol_route[6].z)))
 	elseif squad.command == COMMAND_ATTACK then
 		-- go to island, once island is captured the command will be cleared
 		resetPath(vehicle_object)
@@ -2568,13 +2814,28 @@ function iterObjects(playlist_index, location_index)
 end
 
 function hasTag(tags, tag)
-	for k, v in pairs(tags) do
-		if v == tag then
-			return true
+	if type(tags) == "table" then
+		for k, v in pairs(tags) do
+			if v == tag then
+				return true
+			end
+		end
+	else
+		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, true)
+	end
+	return false
+end
+
+-- prints all in a table
+function printTable(T, requiresDebugging, isError, toPlayer)
+	for k, v in pairs(T) do
+		if type(v) == "table" then
+			wpDLCDebug("Table: "..k, requiresDebugging, isError, toPlayer)
+			printTable(v, requiresDebugging, isError, toPlayer)
+		else
+			wpDLCDebug("k: "..k.." v: "..v, requiresDebugging, isError, toPlayer)
 		end
 	end
-
-	return false
 end
 
 -- calculates the size of non-contiguous tables and tables that use non-integer keys
