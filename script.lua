@@ -718,7 +718,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 		if command == "?WDLCDE" and is_admin then
 			local terrain_height, success = server.getVehicleDial(arg1, "MEASURED_DISTANCE")
-			printTable(terrain_height, false, false)
+			printTable(terrain_height, true, false)
 		end
 		
 		if command == "?WDLCST" and is_admin or command == "?WeaponsDLCSpawnTurret" and is_admin then
@@ -2329,7 +2329,7 @@ function tickUpdateVehicleData()
 end
 
 function tickTerrainScanners()
-	printTable(terrain_scanner_links, false, false)
+	printTable(terrain_scanner_links, true, false)
 	for vehicle_id, terrain_scanner in pairs(terrain_scanner_links) do
 		local vehicle_data = server.getVehicleData(vehicle_id)
 		local terrain_scanner_data = server.getVehicleData(terrain_scanner)
@@ -2343,7 +2343,7 @@ function tickTerrainScanners()
 				dial_read_attempts = dial_read_attempts + 1
 				terrain_height, success = server.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
 				if success and terrain_height.value ~= 0 then
-					printTable(terrain_height, false, false)
+					printTable(terrain_height, true, false)
 					local new_terrain_height = (1000 - terrain_height.value) + 5
 					local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_data.transform)
 					local new_vehicle_matrix = matrix.translation(vehicle_x, new_terrain_height, vehicle_z)
