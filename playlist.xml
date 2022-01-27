@@ -437,7 +437,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="140" vehicle_parent_id="0" cargo_zone_import_cargo_type="turret" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="-0.999837" 01="0" 02="0.018066" 03="0" 10="0" 11="1" 12="0" 13="0" 20="-0.018066" 21="0" 22="-0.999837" 23="0" 30="98.510658" 31="12.276338" 32="112.560013" 33="1"/>
+						<spawn_transform 00="-0.999837" 01="0" 02="0.018066" 03="0" 10="0" 11="1" 12="0" 13="0" 20="-0.018066" 21="0" 22="-0.999837" 23="0" 30="98.510658" 31="13.579967" 32="112.560013" 33="1"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1124,7 +1124,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="158" vehicle_parent_id="0" cargo_zone_import_cargo_type="turret" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="-0.783901" 01="0" 02="-0.620886" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0.620886" 21="0" 22="-0.783901" 23="0" 30="-164.386566" 31="7.832244" 32="152.280502" 33="1"/>
+						<spawn_transform 00="-0.783901" 01="0" 02="-0.620886" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0.620886" 21="0" 22="-0.783901" 23="0" 30="-164.386566" 31="8.142135" 32="152.280502" 33="1"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -2629,7 +2629,7 @@
 						<spawn_local_offset x="-0" y="-0" z="-0"/>
 						<graph_links/>
 					</c>
-					<c component_type="3" id="72" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_land,size=small,role=general,sight=800" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="72" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_land,size=small,role=general,visibility_range=800" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.103493" 31="2.670889" 32="0.422675" 33="1"/>
 						<spawn_bounds>
 							<min x="-2.125" y="-4.625" z="-2.125"/>
@@ -2671,9 +2671,9 @@
 					</c>
 				</components>
 			</l>
-			<l id="14" tile="" name="BOAT - PATROL" is_env_mod="false" env_mod_spawn_num="1">
+			<l id="14" tile="" name="BOAT - BS-H1" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="67" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=medium,role=defend,sight=700" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="67" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=medium,role=defend,visibility_range=700" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.050188" 31="3.57261" 32="-0.003728" 33="1"/>
 						<spawn_bounds>
 							<min x="-2.625" y="-3.625" z="3.375"/>
@@ -2765,63 +2765,9 @@
 					</c>
 				</components>
 			</l>
-			<l id="15" tile="" name="LAND - AA TANK" is_env_mod="false" env_mod_spawn_num="1">
-				<components>
-					<c component_type="2" id="78" vehicle_parent_id="0" name="id_78" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="5" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-4.120862" 31="0.8" 32="2.482752" 33="1"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
-					<c component_type="3" id="80" vehicle_parent_id="0" name="type=null,type=wep_null,size=small,role=null,sight=0" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_80.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.473398" 31="2.435135" 32="0.304214" 33="1"/>
-						<spawn_bounds>
-							<min x="-2.125" y="-4.625" z="-2.125"/>
-							<max x="2.125" y="0.875" z="7.875"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="1.875" z="-2.875"/>
-						<graph_links/>
-					</c>
-					<c component_type="5" id="302" vehicle_parent_id="80" name="id_102" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="6.1" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="false" is_explosion="true" explosion_magnitude="0.5" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.442221" 31="0.92629" 32="-2.458713" 33="1"/>
-						<spawn_bounds>
-							<min x="-1" y="-1" z="-1"/>
-							<max x="1" y="1" z="1"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0.031177" 31="-1.508845" 32="-2.762927" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="406" vehicle_parent_id="0" name="id_406" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="5" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-4.21554" 31="0.8" 32="1.671891" 33="1"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="407" vehicle_parent_id="0" name="id_407" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="5" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-4.09655" 31="0.8" 32="0.964925" 33="1"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
-				</components>
-			</l>
 			<l id="16" tile="" name="AIR - EUROFIGHTER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="81" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_plane,size=small,role=attack,sight=1750" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="81" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_plane,size=small,role=attack,visibility_range=1750" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-1.599282" 31="8.210866" 32="-0.878728" 33="1"/>
 						<spawn_bounds>
 							<min x="-6.375" y="-1.875" z="-14.875"/>
@@ -2865,7 +2811,7 @@
 			</l>
 			<l id="17" tile="" name="BOAT - DESTROYER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=large,role=general,sight=2300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="84" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=large,role=general,visibility_range=2300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="2.197484" 31="8.672855" 32="-3.847007" 33="1"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.625" z="-26.625"/>
@@ -2929,7 +2875,7 @@
 			</l>
 			<l id="19" tile="" name="HELI - VENOM" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="94" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_heli,size=small,role=general,sight=1400" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="94" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_heli,size=small,role=general,visibility_range=1400" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-4.469353" 31="10.210866" 32="-4.389575" 33="1"/>
 						<spawn_bounds>
 							<min x="-6.625" y="-1.375" z="-15.125"/>
@@ -2983,7 +2929,7 @@
 			</l>
 			<l id="20" tile="" name="HELI - TIGER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="98" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_heli,size=small,role=attack,sight=1300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="98" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_heli,size=small,role=attack,visibility_range=1300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="1.066559" 31="2.949932" 32="-3.003018" 33="1"/>
 						<spawn_bounds>
 							<min x="-3.375" y="-1.125" z="-9.875"/>
@@ -3027,7 +2973,7 @@
 			</l>
 			<l id="21" tile="" name="BOAT - GUIDED MISSILE DESTROYER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="401" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=large,role=general,sight=2300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_401.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="401" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_boat,size=large,role=general,visibility_range=2300" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_401.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="1.122135" 31="9.125" 32="0.453599" 33="1"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.625" z="-26.625"/>
@@ -3069,30 +3015,6 @@
 					</c>
 					<c component_type="2" id="405" vehicle_parent_id="0" name="id_405" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="5" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-7.767707" 31="0.800001" 32="-8.635304" 33="1"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
-				</components>
-			</l>
-			<l id="22" tile="" name="TURRET - PLACEHOLDER" is_env_mod="false" env_mod_spawn_num="1">
-				<components>
-					<c component_type="3" id="417" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_turret,size=small" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_417.xml" vehicle_file_store="4" vehicle_is_static="true" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.221695" 31="1.250401" 32="0.165446" 33="1"/>
-						<spawn_bounds>
-							<min x="-1.625" y="-0.625" z="-1.375"/>
-							<max x="0.625" y="1.875" z="0.875"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="0.5" y="-0.625" z="0.25"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="418" vehicle_parent_id="0" name="id_418" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="5" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-2.550131" 31="0.8" 32="-0.031368" 33="1"/>
 						<spawn_bounds>
 							<min x="-0.11" y="-0.8" z="-0.11"/>
 							<max x="0.11" y="0.8" z="0.11"/>
@@ -3445,7 +3367,7 @@
 			</l>
 			<l id="27" tile="" name="AIR - O-2 SKYMASTER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="597" vehicle_parent_id="0" name="type=disabled,type=disabled,size=small,role=special,special=scout,sight=2500" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="597" vehicle_parent_id="0" name="type=disabled,type=disabled,size=small,role=special,special=scout,visibility_range=2500" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.039262" 31="1.954949" 32="-0.050625" 33="1"/>
 						<spawn_bounds>
 							<min x="-5.625" y="-0.375" z="-5.125"/>
@@ -3469,7 +3391,7 @@
 			</l>
 			<l id="28" tile="" name="LAND - AI-C1" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="599" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_land,size=small,role=general,sight=1600,radar" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="599" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_land,size=small,role=general,visibility_range=1600,radar" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.223219" 31="1.852892" 32="-0.199396" 33="1"/>
 						<spawn_bounds>
 							<min x="-1.875" y="-0.875" z="-7.375"/>
@@ -3513,8 +3435,8 @@
 			</l>
 			<l id="29" tile="" name="TURRET - CD-D1" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="603" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_turret,size=small,sight=3000" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.183271" 31="0.048575" 32="-0.183271" 33="1"/>
+					<c component_type="3" id="603" vehicle_parent_id="0" name="type=dlc_weapons,type=wep_turret,size=small,visibility_range=3000" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.183271" 31="0.143647" 32="-0.183271" 33="1"/>
 						<spawn_bounds>
 							<min x="-4.375" y="-4.125" z="-5.125"/>
 							<max x="2.375" y="2.125" z="-0.125"/>

@@ -212,7 +212,6 @@ g_savedata = {
 	constructable_turrets = {},
 	constructable_terrain_checker = nil,
 	is_attack = false,
-	isError = false,
 }
 
 --[[
@@ -220,46 +219,24 @@ g_savedata = {
 --]]
 
 function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
-	local debug_str = isError and " Error:" or " Debug:"
-	local debugTitle = server.getAddonData((server.getAddonIndex())).name.." Debug:"
-	if isError then debugTitle = server.getAddonData((server.getAddonIndex())).name.." Error:" end
+	local deb_err = server.getAddonData((server.getAddonIndex())).name..(isError and " Error:" or " Debug:")
 	
 	if type(message) == "table" then
 		printTable(message, requiresDebugging, isError, toPlayer)
 	elseif requiresDebugging == true then
 		if toPlayer ~= -1 and toPlayer ~= nil then
 			if playerData.isDebugging.toPlayer then
-				if isError then
-					server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, toPlayer)
-				else
-					server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, toPlayer)
-				end
+				server.announce(deb_err, message, toPlayer)
 			end
 		else
 			for k, v in pairs(playerData.isDebugging) do
 				if playerData.isDebugging[k] then
-					if isError then
-						server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, k)
-					else
-						server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, k)
-					end
+					server.announce(deb_err, message, k)
 				end
 			end
 		end
 	else
-		if toPlayer ~= -1 and toPlayer ~= nil then
-			if isError then
-				server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, toPlayer)
-			else
-				server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, toPlayer)
-			end
-		else
-			if isError then
-				server.announce(server.getAddonData((server.getAddonIndex())).name.." Error:", message, 0)
-			else
-				server.announce(server.getAddonData((server.getAddonIndex())).name.." Debug:", message, 0)
-			end
-		end
+		server.announce(deb_err, message, toPlayer or "-1")
 	end
 end
 
@@ -956,7 +933,8 @@ function onVehicleLoad(incoming_vehicle_id)
 						end
 						if terrain_scanner_links[vehicle_id] == nil then
 							local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-							local get_terrain_matrix = matrix.translation(vehicle_x, 1000, vehicle_z) 
+							local get_terrain_matrix = matrix.translation(vehicle_x, 1000, vehicle_z)
+							local terrain_scanner_prefab = g_savedata.constructable_terrain_checker
 							local terrain_object, success = server.spawnAddonComponent(get_terrain_matrix, terrain_scanner_prefab.playlist_index, terrain_scanner_prefab.location_index, terrain_scanner_prefab.object_index, 0)
 							if success then
 								server.setVehiclePos(vehicle_id, matrix.translation(vehicle_x, 0, vehicle_z))
