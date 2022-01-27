@@ -210,7 +210,7 @@ g_savedata = {
 	debug_data = {},
 	constructable_vehicles = {},
 	constructable_turrets = {},
-	constructable_terrain_checker = nil,
+	constructable_terrain_checker = {},
 	is_attack = false,
 }
 
@@ -406,7 +406,7 @@ function buildPrefabs(location_index)
 			table.insert(g_savedata.constructable_turrets, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab turret") end
 		elseif hasTag(vehicle.tags, "type=dlc_terrain_scanner") then
-			g_savedata.constructable_terrain_checker = prefab_data
+			table.insert(g_savedata.constructable_terrain_checker, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab terrain scanner") end
 		elseif #prefab_data.survivors > 0 then
 			table.insert(g_savedata.constructable_vehicles, prefab_data)
@@ -934,7 +934,7 @@ function onVehicleLoad(incoming_vehicle_id)
 						if terrain_scanner_links[vehicle_id] == nil then
 							local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 							local get_terrain_matrix = matrix.translation(vehicle_x, 1000, vehicle_z)
-							local terrain_scanner_prefab = g_savedata.constructable_terrain_checker
+							local terrain_scanner_prefab = g_savedata.constructable_terrain_checker[1].vehicle
 							local terrain_object, success = server.spawnAddonComponent(get_terrain_matrix, terrain_scanner_prefab.playlist_index, terrain_scanner_prefab.location_index, terrain_scanner_prefab.object_index, 0)
 							if success then
 								server.setVehiclePos(vehicle_id, matrix.translation(vehicle_x, 0, vehicle_z))
@@ -2815,7 +2815,7 @@ function getTagValue(tags, tag)
 	if type(tags) == "table" then
 		for k, v in pairs(tags) do
 			if string.match(v, tag.."=") then
-				return tonumber(string.gsub(v, tag.."=", ""))
+				return tonumber(tostring(string.gsub(v, tag.."=", "")))
 			end
 		end
 	else
