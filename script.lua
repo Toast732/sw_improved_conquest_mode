@@ -220,6 +220,10 @@ g_savedata = {
 --]]
 
 function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
+	local debug_str = isError and " Error:" or " Debug:"
+	local debugTitle = server.getAddonData((server.getAddonIndex())).name.." Debug:"
+	if isError then debugTitle = server.getAddonData((server.getAddonIndex())).name.." Error:" end
+	
 	if type(message) == "table" then
 		printTable(message, requiresDebugging, isError, toPlayer)
 	elseif requiresDebugging == true then
@@ -485,7 +489,8 @@ function spawnTurret(island)
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			vision = {
-				radius = VISIBLE_DISTANCE,
+				radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
+				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				is_radar = hasTag(selected_prefab.vehicle.tags, "radar"),
 				is_sonar = hasTag(selected_prefab.vehicle.tags, "sonar")
 			},
@@ -635,7 +640,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1, 
 			vision = { 
-				radius = VISIBLE_DISTANCE, 
+				radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
+				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				is_radar = hasTag(selected_prefab.vehicle.tags, "radar"),
 				is_sonar = hasTag(selected_prefab.vehicle.tags, "sonar")
 			},
@@ -707,12 +713,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 		if command == "?enableWeaponsDLCDebug" and is_admin or command == "?WDLCD" and is_admin then
 			render_debug = not render_debug
+			playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+
 			if playerData.isDebugging.user_peer_id ~= true then
-				playerData.isDebugging.user_peer_id = true
-				wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
-			else
-				playerData.isDebugging.user_peer_id = false
 				wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
+			else
+				wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
 			end
 		end
 
@@ -1944,7 +1950,7 @@ function tickVisionRadius()
 				local weather = server.getWeather(vehicle_transform)
 				local clock = server.getTime()
 
-				vehicle_object.vision.radius = VISIBLE_DISTANCE * (1 - (weather.fog * 0.6)) * (0.4 + (clock.daylight_factor * 0.6))
+				vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.6)) * (0.4 + (clock.daylight_factor * 0.6))
 			end
 		end
 	end
@@ -2824,6 +2830,21 @@ function hasTag(tags, tag)
 		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, true)
 	end
 	return false
+end
+
+-- gets the value of the specifed tag, returns nil if tag not found
+function getTagValue(tags, tag)
+	if type(tags) == "table" then
+		for k, v in pairs(tags) do
+			if string.match(v, tag.."=") then
+				return tonumber(string.gsub(v, tag.."=", ""))
+			end
+		end
+	else
+		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, true)
+	end
+	wpDLCDebug("getTagValue() was unable to find the tag "..tostring(tag), true, true)
+	return nil
 end
 
 -- prints all in a table
