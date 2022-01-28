@@ -746,7 +746,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 						end
 					end
 					if not is_island then
-						wpDLCDebug(arg1.." is not a valid island! note: required to use ""_"" instead of "" "" in its name", false, true, user_peer_id)
+						wpDLCDebug(arg1.." is not a valid island! note: required to use \"_\" instead of \" \" in its name", false, true, user_peer_id)
 					end
 				else
 					wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
@@ -888,13 +888,6 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 							elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
 								killVehicle(squad_index, vehicle_id, false)
 							end
-						else
-							if vehicle_object.size == "large" then
-								enemy_hp = enemy_hp * 4
-							elseif vehicle_object.size == "medium" then
-								enemy_hp = enemy_hp * 2
-							end
-							enemy_hp = enemy_hp * 8
 						end
 					end
 				end
@@ -1076,7 +1069,7 @@ function onVehicleLoad(incoming_vehicle_id)
 						end
 					elseif vehicle_object.ai_type == AI_TYPE_BOAT then
 						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-						if vehicle_y > 10 vehicle_object. then -- if its above y 10
+						if vehicle_y > 10 and vehicle_object.current_damage ~= 0 then -- if its above y 10 and if it has taken any damage
 							killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
 						end
 					end
