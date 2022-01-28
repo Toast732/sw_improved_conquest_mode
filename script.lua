@@ -150,6 +150,8 @@ local PLANE_EXPLOSION_DEPTH = -4
 local HELI_EXPLOSION_DEPTH = -4
 local BOAT_EXPLOSION_DEPTH = -17
 
+local DEFAULT_SPAWNING_DISTANCE = 10 -- the fallback option for how far a vehicle must be away from another in order to not collide, highly reccomended to set tag
+
 local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
@@ -466,6 +468,9 @@ function spawnTurret(island)
 				is_radar = hasTag(selected_prefab.vehicle.tags, "radar"),
 				is_sonar = hasTag(selected_prefab.vehicle.tags, "sonar")
 			},
+			spawning_transform = {
+				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
+			},
 			transform = spawn_transform,
 			target_player_id = -1,
 			target_vehicle_id = -1,
@@ -564,6 +569,16 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 		end
 	end
 
+	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if matrix.distance(spawn_transform, vehicle_object.transform) < (getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
+				wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, false, true)
+				return false
+			end
+		end
+	end
+
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
@@ -616,6 +631,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				is_radar = hasTag(selected_prefab.vehicle.tags, "radar"),
 				is_sonar = hasTag(selected_prefab.vehicle.tags, "sonar")
+			},
+			spawning_transform = {
+				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			is_resupply_on_load = false,
 			transform = spawn_transform,
@@ -933,8 +951,6 @@ function onVehicleLoad(incoming_vehicle_id)
 							if success then
 								server.setVehiclePos(vehicle_id, matrix.translation(vehicle_x, 0, vehicle_z))
 								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
-								wpDLCDebug("terrain | size: "..#terrain_scanner_links, true, false)
-								printTable(terrain_scanner_links, true, false)
 							else
 								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
 							end
@@ -1921,8 +1937,11 @@ function tickVisionRadius()
 				local vehicle_transform = vehicle_object.transform
 				local weather = server.getWeather(vehicle_transform)
 				local clock = server.getTime()
-
-				vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.6)) * (0.4 + (clock.daylight_factor * 0.6))
+				if vehicle_object.vision.is_radar then
+					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.2)) * (0.6 + (clock.daylight_factor * 0.2)) * (1 - (weather.rain * 0.2))
+				else
+					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.6)) * (0.2 + (clock.daylight_factor * 0.6)) * (1 - (weather.rain * 0.6))
+				end
 			end
 		end
 	end
@@ -2817,7 +2836,6 @@ function getTagValue(tags, tag)
 	else
 		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, true)
 	end
-	wpDLCDebug("getTagValue() was unable to find the tag "..tostring(tag), true, true)
 	return nil
 end
 
