@@ -551,10 +551,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				wpDLCDebug("is owned by AI", true, false)
-				local flag_vehicle_transform = server.getVehiclePos(island.flag_vehicle.id)
 				for land_spawn_index, land_spawn in pairs(land_spawn_zones) do
 					wpDLCDebug("Looping spawn", true, false)
-					if matrix.distance(land_spawn, flag_vehicle_transform) <= 1000 then
+					if matrix.distance(land_spawn, island.transform) <= 1000 then
 						wpDLCDebug("is on island", true, false)
 						table.insert(land_spawn_locations, land_spawn)
 					end
