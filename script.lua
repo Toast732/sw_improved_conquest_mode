@@ -702,7 +702,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			elseif command == "?spawnEnemyAI" or command == "?SEAI" then
 				spawnAIVehicle(true, user_peer_id)
 
-			elseif command == "?enableWeaponsDLCDebug" or command == "?WDLCD" then
+			elseif command == "?WeaponsDLCDebug" or command == "?WDLCD" then
 				render_debug = not render_debug
 				playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
 
@@ -719,7 +719,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				end
 			
 			elseif command == "?WDLCST" or command == "?WeaponsDLCSpawnTurret" then
-				local turrets_spawned = 0
+				local turrets_spawned = 1
+				spawnTurret(g_savedata.ai_base_island)
 				for island_index, island in pairs(g_savedata.controllable_islands) do
 					if island.faction == FACTION_AI then
 						spawnTurret(island)
