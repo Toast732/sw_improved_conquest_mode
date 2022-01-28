@@ -856,38 +856,37 @@ end
 
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
-		vehicleData = server.getVehicleData(incoming_vehicle_id)
-			local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
+	vehicleData = server.getVehicleData(incoming_vehicle_id)
+		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
-			if player_vehicle ~= nil then
-				local damage_prev = player_vehicle.current_damage
-				player_vehicle.current_damage = player_vehicle.current_damage + amount
+		if player_vehicle ~= nil then
+			local damage_prev = player_vehicle.current_damage
+			player_vehicle.current_damage = player_vehicle.current_damage + amount
 
-				if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
-					player_vehicle.death_pos = player_vehicle.transform
-				end
+			if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
+				player_vehicle.death_pos = player_vehicle.transform
 			end
+		end
 
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_id == incoming_vehicle_id and body_id == 0 then
-						if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
-						local damage_prev = vehicle_object.current_damage
-						vehicle_object.current_damage = vehicle_object.current_damage + amount
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+				if vehicle_id == incoming_vehicle_id and body_id == 0 then
+					if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
+					local damage_prev = vehicle_object.current_damage
+					vehicle_object.current_damage = vehicle_object.current_damage + amount
 
-						local enemy_hp = g_savedata.settings.ENEMY_HP
-						if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
-							if vehicle_object.size == "large" then
-								enemy_hp = enemy_hp * 4
-							elseif vehicle_object.size == "medium" then
-								enemy_hp = enemy_hp * 2
-							end
+					local enemy_hp = g_savedata.settings.ENEMY_HP
+					if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
+						if vehicle_object.size == "large" then
+							enemy_hp = enemy_hp * 4
+						elseif vehicle_object.size == "medium" then
+							enemy_hp = enemy_hp * 2
+						end
 
-							if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
-								killVehicle(squad_index, vehicle_id, true)
-							elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
-								killVehicle(squad_index, vehicle_id, false)
-							end
+						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+							killVehicle(squad_index, vehicle_id, true)
+						elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
+							killVehicle(squad_index, vehicle_id, false)
 						end
 					end
 				end
