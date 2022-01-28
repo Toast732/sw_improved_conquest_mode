@@ -381,6 +381,12 @@ function onCreate(is_world_create)
 			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT do
 				spawnAIVehicle() -- spawn initial ai
 			end
+		else
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					server.removeMapObject(0,vehicle_object.map_id)
+				end
+			end
 		end
 	end
 end
@@ -651,78 +657,183 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 end
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command, arg1, arg2, arg3, arg4)
-
 	if is_dlc_weapons then
-		if command == "?wep_reset" and is_admin then
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					setSquadCommand(squad, COMMAND_NONE)
-				end
-			end
-			g_is_air_ready = true
-			g_is_boats_ready = false
-			g_savedata.is_attack = false
-		end
 
-		if command == "?wep_debug_vehicle" and is_admin then
-			g_debug_vehicle_id = arg1
-		end
+		-- non admin commands
 
-		if command == "?wep_debug" and is_admin then
-			wpDLCDebug("?wep_debug has been disabled, use ?WDLCD instead, or ?enableWeaponsDLCDebug", false, true, user_peer_id)
-
-			--[[for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					server.removeMapObject(0,vehicle_object.map_id)
-				end
-			end--]]
-		end
-
-		if command == "?wep_debug_speed" and is_admin then
-			g_debug_speed_multiplier = arg1
-		end
-
-		if command == "?wep_vreset" and is_admin then
-			server.resetVehicleState(arg1)
-		end	
-
-		if command == "?target" and is_admin then
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					for i, char in  pairs(vehicle_object.survivors) do
-						server.setAITargetVehicle(char.id, arg1)
+		-- admin commands
+		if is_admin then
+			if command == "?wep_reset" then
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					if squad_index ~= RESUPPLY_SQUAD_INDEX then
+						setSquadCommand(squad, COMMAND_NONE)
 					end
 				end
+				g_is_air_ready = true
+				g_is_boats_ready = false
+				g_savedata.is_attack = false
+
+			elseif command == "?wep_debug_vehicle" then
+				g_debug_vehicle_id = arg1
+
+
+			elseif command == "?wep_debug" then
+				wpDLCDebug("?wep_debug has been disabled, use ?WDLCD instead, or ?enableWeaponsDLCDebug", false, true, user_peer_id)
+
+				--[[--]]
+
+
+			elseif command == "?wep_debug_speed" then
+					g_debug_speed_multiplier = arg1
+
+
+			elseif command == "?wep_vreset" then
+					server.resetVehicleState(arg1)
+
+			elseif command == "?target" then
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						for i, char in  pairs(vehicle_object.survivors) do
+							server.setAITargetVehicle(char.id, arg1)
+						end
+					end
+				end
+
+			elseif command == "?spawnEnemyAI" or command == "?SEAI" then
+				spawnAIVehicle(true, user_peer_id)
+
+			elseif command == "?enableWeaponsDLCDebug" or command == "?WDLCD" then
+				render_debug = not render_debug
+				playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+
+				if playerData.isDebugging.user_peer_id ~= true then
+					wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
+				else
+					wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
+				end
+
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						server.removeMapObject(0,vehicle_object.map_id)
+					end
+				end
+			
+			elseif command == "?WDLCST" or command == "?WeaponsDLCSpawnTurret" then
+				local turrets_spawned = 0
+				for island_index, island in pairs(g_savedata.controllable_islands) do
+					if island.faction == FACTION_AI then
+						spawnTurret(island)
+						turrets_spawned = turrets_spawned + 1
+					end
+				end
+				wpDLCDebug("attempted to spawn "..turrets_spawned.." turrets", false, false, user_peer_id)
+
+			elseif command == "?WDLCCP" or command == "?WeaponsDLCCapturePoint" then
+				if arg1 and arg2 then
+					local is_island = false
+					for island_index, island in pairs(g_savedata.controllable_islands) do
+						if island.name == string.gsub(arg1, "_", " ") then
+							is_island = true
+							if island.faction ~= arg2 then
+								if arg2 == FACTION_AI or arg2 == FACTION_NEUTRAL or arg2 == FACTION_PLAYER then
+									captureIsland(island, arg2, user_peer_id)
+								else
+									wpDLCDebug(arg2.." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
+								end
+							else
+								wpDLCDebug(island.name.." is already set to "..island.faction..".", false, true, user_peer_id)
+							end
+						end
+					end
+					if not is_island then
+						wpDLCDebug(arg1.." is not a valid island! note: required to use ""_"" instead of "" "" in its name", false, true, user_peer_id)
+					end
+				else
+					wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
+				end
+			end
+		else
+			wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
+		end
+	end
+end
+
+function captureIsland(island, override, peer_id)
+	local faction_to_set = nil
+
+	if override ~= nil then
+		if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
+			faction_to_set = FACTION_AI
+		elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
+			faction_to_set = FACTION_PLAYER
+		end
+	end
+
+	-- set it to the override, otherwise if its supposted to be capped then set it to the specified, otherwise set it to ignore
+	faction_to_set = override or faction_to_set or "ignore"
+
+	-- set it to ai
+	if faction_to_set == FACTION_AI then
+		island.capture_timer = 0
+		island.faction = FACTION_AI
+		g_savedata.is_attack = false
+
+		if peer_id then
+			name = server.getPlayerName(peer_id)
+			server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island. (set manually by "..name.." via command)", 1)
+		else
+			server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
+		end
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
+				setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
 			end
 		end
+	-- set it to player
+	elseif faction_to_set == FACTION_PLAYER then
+		island.capture_timer = g_savedata.settings.CAPTURE_TIME
+		island.faction = FACTION_PLAYER
 
-		if command == "?spawnEnemyAI" and is_admin or command == "?SEAI" and is_admin then
-			spawnAIVehicle(true, user_peer_id)
+		if peer_id then
+			name = server.getPlayerName(peer_id)
+			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island. (set manually by "..name.." via command)", 1)
+		else
+			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
 		end
 
-		if command == "?enableWeaponsDLCDebug" and is_admin or command == "?WDLCD" and is_admin then
-			render_debug = not render_debug
-			playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
-
-			if playerData.isDebugging.user_peer_id ~= true then
-				wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
-			else
-				wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
-			end
-		end
-
-		if command == "?WDLCDE" and is_admin then
-			local terrain_height, success = server.getVehicleDial(arg1, "MEASURED_DISTANCE")
-			printTable(terrain_height, true, false)
-		end
-		
-		if command == "?WDLCST" and is_admin or command == "?WeaponsDLCSpawnTurret" and is_admin then
-			for island_index, island in pairs(g_savedata.controllable_islands) do
-				if island.faction == FACTION_AI then
-					spawnTurret(island)
+		-- update vehicles looking to resupply
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad_index == RESUPPLY_SQUAD_INDEX then
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					resetPath(vehicle_object)
 				end
 			end
 		end
+	-- set it to neutral
+	elseif faction_to_set == FACTION_NEUTRAL then
+		island.capture_timer = g_savedata.settings.CAPTURE_TIME/2
+		island.faction = FACTION_NEUTRAL
+
+		if peer_id then
+			name = server.getPlayerName(peer_id)
+			server.notify(-1, "ISLAND SET NEUTRAL", "Successfully set an island to neutral. (set manually by "..name.." via command)", 1)
+		else
+			server.notify(-1, "ISLAND SET NEUTRAL", "Successfully set an island to neutral.", 1)
+		end
+
+		-- update vehicles looking to resupply
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad_index == RESUPPLY_SQUAD_INDEX then
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					resetPath(vehicle_object)
+				end
+			end
+		end
+	elseif island.capture_timer > g_savedata.settings.CAPTURE_TIME then -- if its over 100% island capture
+		island.capture_timer = g_savedata.settings.CAPTURE_TIME
+	elseif island.capture_timer < 0 then -- if its less than 0% island capture
+		island.capture_timer = 0
 	end
 end
 
@@ -746,7 +857,6 @@ end
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
 		vehicleData = server.getVehicleData(incoming_vehicle_id)
-		if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
 			local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
 			if player_vehicle ~= nil then
@@ -766,17 +876,25 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 						vehicle_object.current_damage = vehicle_object.current_damage + amount
 
 						local enemy_hp = g_savedata.settings.ENEMY_HP
+						if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
+							if vehicle_object.size == "large" then
+								enemy_hp = enemy_hp * 4
+							elseif vehicle_object.size == "medium" then
+								enemy_hp = enemy_hp * 2
+							end
 
-						if vehicle_object.size == "large" then
-							enemy_hp = enemy_hp * 4
-						elseif vehicle_object.size == "medium" then
-							enemy_hp = enemy_hp * 2
-						end
-
-						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
-							killVehicle(squad_index, vehicle_id, true)
-						elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
-							killVehicle(squad_index, vehicle_id, false)
+							if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+								killVehicle(squad_index, vehicle_id, true)
+							elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
+								killVehicle(squad_index, vehicle_id, false)
+							end
+						else
+							if vehicle_object.size == "large" then
+								enemy_hp = enemy_hp * 4
+							elseif vehicle_object.size == "medium" then
+								enemy_hp = enemy_hp * 2
+							end
+							enemy_hp = enemy_hp * 8
 						end
 					end
 				end
@@ -956,6 +1074,11 @@ function onVehicleLoad(incoming_vehicle_id)
 						elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
 							g_savedata.terrain_scanner_links[vehicle_id] = nil
 						end
+					elseif vehicle_object.ai_type == AI_TYPE_BOAT then
+						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
+						if vehicle_y > 10 vehicle_object. then -- if its above y 10
+							killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
+						end
 					end
 					refuel(vehicle_id)
 					return
@@ -1130,6 +1253,8 @@ function tickGamemode()
 					island.ai_capturing = 0
 					island.players_capturing = 0
 				end
+				captureIsland(island)
+				--[[
 				if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
 					island.capture_timer = 0
 					island.faction = FACTION_AI
@@ -1161,6 +1286,7 @@ function tickGamemode()
 				elseif island.capture_timer < 0 then -- if its less than 0% island capture
 					island.capture_timer = 0
 				end
+				]]
 			end
 		end
 
@@ -1544,7 +1670,7 @@ function addToSquadron(vehicle_object)
 	return new_squad
 end
 
-function killVehicle(squad_index, vehicle_id, instant)
+function killVehicle(squad_index, vehicle_id, instant, delete)
 
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
@@ -1563,7 +1689,7 @@ function killVehicle(squad_index, vehicle_id, instant)
 
 			if render_debug then server.announce("dlcw", "explosion spawned") end
 			server.spawnExplosion(vehicle_object.transform, explosion_size)]]--
-		if not instant then
+		if not instant and delete ~= true then
 			local fire_id = vehicle_object.fire_id
 			if fire_id ~= nil then
 				if render_debug then server.announce("dlcw", "explosion fire enabled") end
@@ -1581,7 +1707,7 @@ function killVehicle(squad_index, vehicle_id, instant)
 			server.despawnObject(vehicle_object.fire_id, instant)
 		end
 
-		if instant == true then
+		if instant == true and delete ~= true then
 			local explosion_size = 2
 			if vehicle_object.size == "small" then
 				explosion_size = 0.5
