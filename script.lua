@@ -578,7 +578,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if matrix.distance(spawn_transform, vehicle_object.transform) < (getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
-				wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, false, true)
+				wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
 				return false
 			end
 		end
