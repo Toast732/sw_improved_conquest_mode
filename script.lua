@@ -153,14 +153,11 @@ local BOAT_EXPLOSION_DEPTH = -17
 local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
-local terrain_scanner_prefab = nil
 local is_dlc_weapons = false
 local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local land_spawn_zones = {}
-
-local terrain_scanner_links = {} -- for the terrain scanner, to tell what terrain scanner is for what tank
 
 local playerData = {
 	isDebugging = {}
@@ -210,7 +207,8 @@ g_savedata = {
 	debug_data = {},
 	constructable_vehicles = {},
 	constructable_turrets = {},
-	constructable_terrain_checker = {},
+	terrain_scanner_prefab = {},
+	terrain_scanner_links = {},
 	is_attack = false,
 }
 
@@ -405,9 +403,6 @@ function buildPrefabs(location_index)
 		if hasTag(vehicle.tags, "type=wep_turret") then
 			table.insert(g_savedata.constructable_turrets, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab turret") end
-		elseif hasTag(vehicle.tags, "type=dlc_terrain_scanner") then
-			table.insert(g_savedata.constructable_terrain_checker, prefab_data)
-			if render_debug then server.announce("dlcw", "prefab terrain scanner") end
 		elseif #prefab_data.survivors > 0 then
 			table.insert(g_savedata.constructable_vehicles, prefab_data)
 			if render_debug then server.announce("dlcw", "prefab vehicle") end
@@ -931,21 +926,20 @@ function onVehicleLoad(incoming_vehicle_id)
 						if(#vehicle_object.path >= 1) then
 							setLandTarget(vehicle_id, vehicle_object)
 						end
-						if terrain_scanner_links[vehicle_id] == nil then
+						if g_savedata.terrain_scanner_links[vehicle_id] == nil then
 							local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 							local get_terrain_matrix = matrix.translation(vehicle_x, 1000, vehicle_z)
-							local terrain_scanner_prefab = g_savedata.constructable_terrain_checker[1].vehicle
-							local terrain_object, success = server.spawnAddonComponent(get_terrain_matrix, terrain_scanner_prefab.playlist_index, terrain_scanner_prefab.location_index, terrain_scanner_prefab.object_index, 0)
+							local terrain_object, success = server.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
 							if success then
 								server.setVehiclePos(vehicle_id, matrix.translation(vehicle_x, 0, vehicle_z))
-								terrain_scanner_links[vehicle_id] = terrain_object.id
+								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 								wpDLCDebug("terrain | size: "..#terrain_scanner_links, true, false)
 								printTable(terrain_scanner_links, true, false)
 							else
 								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
 							end
-						elseif terrain_scanner_links[vehicle_id] == "Just Teleported" then
-							terrain_scanner_links[vehicle_id] = nil
+						elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
+							g_savedata.terrain_scanner_links[vehicle_id] = nil
 						end
 					end
 					refuel(vehicle_id)
@@ -2313,12 +2307,12 @@ function tickUpdateVehicleData()
 end
 
 function tickTerrainScanners()
-	printTable(terrain_scanner_links, true, false)
-	for vehicle_id, terrain_scanner in pairs(terrain_scanner_links) do
+	printTable(g_savedata.terrain_scanner_links, true, false)
+	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
 		local vehicle_data = server.getVehicleData(vehicle_id)
 		local terrain_scanner_data = server.getVehicleData(terrain_scanner)
 		
-		if hasTag(terrain_scanner_data.tags, "type=dlc_terrain_scanner") then
+		if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
 			wpDLCDebug("terrain scanner loading!", true, false)
 			wpDLCDebug("ter id: "..terrain_scanner, true, false)
 			wpDLCDebug("veh id: "..vehicle_id, true, false)
@@ -2333,7 +2327,7 @@ function tickTerrainScanners()
 					local new_vehicle_matrix = matrix.translation(vehicle_x, new_terrain_height, vehicle_z)
 					server.setVehiclePos(vehicle_id, new_vehicle_matrix)
 					wpDLCDebug("set land vehicle to new y level!", true, false)
-					terrain_scanner_links[vehicle_id] = "Just Teleported"
+					g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
 					server.despawnVehicle(terrain_scanner, true)
 				else
 					if success then
@@ -2360,7 +2354,7 @@ function onTick(tick_time)
 		tickAI()
 		tickSquadrons()
 		tickVehicles()
-		if tableLength(terrain_scanner_links) > 0 then
+		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
 		end
 	end
@@ -2408,8 +2402,10 @@ function build_locations(playlist_index, location_index)
             if tag_object == "type=dlc_weapons" then
                 is_valid_location = true
             end
-			if tag_object == "type=dlc_terrain_scanner" then
-				terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+			if tag_object == "type=dlc_weapons_terrain_scanner" then
+				if object_data.type == "vehicle" then
+					g_savedata.terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+				end
 			end
 			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
@@ -2482,7 +2478,7 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 		if hasTag(object.tags, "type=dlc_weapons_flag") then
 			l_ai_type = "flag"
 		end
-		if hasTag(object.tags, "type=dlc_terrain_scanner") then
+		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
 			wpDLCDebug("terrain scanner!", true, false)
 			l_ai_type = "terrain_scanner"
 		end
