@@ -780,7 +780,7 @@ function captureIsland(island, override, peer_id)
 
 		if peer_id then
 			name = server.getPlayerName(peer_id)
-			server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island. (set manually by "..name.." via command)", 1)
+			server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island. (set manually by "..name.." via command)", 3)
 		else
 			server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
 		end
