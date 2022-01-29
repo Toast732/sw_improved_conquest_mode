@@ -162,7 +162,8 @@ local g_debug_speed_multiplier = 1
 local land_spawn_zones = {}
 
 local playerData = {
-	isDebugging = {}
+	isDebugging = {},
+	isDoAsISay = {}
 }
 
 if render_debug then
@@ -240,7 +241,7 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 	end
 end
 
-function onCreate(is_world_create)
+function onCreate(is_world_create, do_as_i_say, peer_id)
 	if g_savedata.settings == nil then
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
@@ -262,6 +263,26 @@ function onCreate(is_world_create)
 		server.announce("Loading Script: " .. server.getAddonData((server.getAddonIndex())).name, "Complete", 0)
 
         if is_world_create then
+
+			-- allows the player to make the scripts reload as if the world was just created
+			-- this command is very dangerous
+			if do_as_i_say then
+				if peer_id then
+					playerData = {
+						isDebugging = {},
+						isDoAsISay = {}
+					}
+					wpDLCDebug(server.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, false)
+					land_spawn_zones = {}
+					g_savedata.ai_base_island.zones = {}
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							killVehicle(squad_index, vehicle_id, true, true)
+						end
+					end
+				end
+				wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
+			end
 
 			turret_zones = server.getZones("turret")
 
@@ -385,6 +406,11 @@ function onCreate(is_world_create)
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					server.removeMapObject(0,vehicle_object.map_id)
+					server.removeMapLine(0,vehicle_object.map_id)
+					for i = 1, #vehicle_object.path - 1 do
+						local waypoint = vehicle_object.path[i]
+						server.removeMapLine(0, waypoint.ui_id)
+					end
 				end
 			end
 		end
@@ -732,6 +758,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						server.removeMapObject(0,vehicle_object.map_id)
+						server.removeMapLine(0,vehicle_object.map_id)
+						for i = 1, #vehicle_object.path - 1 do
+							local waypoint = vehicle_object.path[i]
+							server.removeMapLine(0, waypoint.ui_id)
+						end
 					end
 				end
 			
@@ -768,6 +799,18 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 				else
 					wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
+				end
+
+			elseif command == "?WDLCRELOAD_ADDON" or command == "?WeaponsDLCRELOAD_ADDON" then
+				if playerData.isDoAsISay.user_peer_id == true and arg1 == "do_as_i_say" then
+					wpDLCDebug(server.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
+					onCreate(true, true, user_peer_id)
+				elseif playerData.isDoAsISay.user_peer_id == true and not arg1 then
+					wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
+					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+				elseif not arg1 then
+					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLCRELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLCRELOAD_ADDON", false, false, user_peer_id)
+					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 				end
 			end
 		else
