@@ -497,7 +497,7 @@ function spawnTurret(island)
 	end
 end
 
-function spawnAIVehicle(nearPlayer, user_peer_id, type)
+function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
@@ -518,11 +518,11 @@ function spawnAIVehicle(nearPlayer, user_peer_id, type)
 	local spawn_attempts = 0
 	local selected_prefab = nil
 	repeat
-		selected_prefab = g_savedata.constructable_vehicles[math.random(1, #g_savedata.constructable_vehicles)]
+		selected_prefab = requested_prefab or g_savedata.constructable_vehicles[math.random(1, #g_savedata.constructable_vehicles)]
 		spawn_attempts = spawn_attempts + 1
 
-		if hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE then can_spawn = false end
-		if hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE then can_spawn = false end
+		if hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab then can_spawn = false end
+		if hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab then can_spawn = false end
 
 		if (spawn_attempts > 10) then return end -- Failed to spawn
 	until (can_spawn)
@@ -676,16 +676,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			elseif command == "?wep_debug_vehicle" then
 				g_debug_vehicle_id = arg1
 
-
-			elseif command == "?wep_debug" then
-				wpDLCDebug("?wep_debug has been disabled, use ?WDLCD instead, or ?enableWeaponsDLCDebug", false, true, user_peer_id)
-
-				--[[--]]
-
-
 			elseif command == "?wep_debug_speed" then
 					g_debug_speed_multiplier = arg1
-
 
 			elseif command == "?wep_vreset" then
 					server.resetVehicleState(arg1)
@@ -699,8 +691,33 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 				end
 
-			elseif command == "?spawnEnemyAI" or command == "?SEAI" then
-				spawnAIVehicle(true, user_peer_id)
+			elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
+				if arg1 then
+					local valid_vehicle = false
+					for vehicle_index, vehicle_object in pairs(g_savedata.constructable_vehicles) do
+						if vehicle_object.location.data.name == string.gsub(arg1, "_", " ") then
+							valid_vehicle = true
+							wpDLCDebug("Spawning \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
+							wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
+							wpDLCDebug("name from index: \""..g_savedata.constructable_vehicles[vehicle_index].location.data.name.."\"", false, false, user_peer_id)
+							spawnAIVehicle(true, user_peer_id, vehicle_object.vehicle_index)
+						end
+					end
+					if not valid_vehicle then
+						wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores")
+					end
+				else
+					wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
+					spawnAIVehicle(true, user_peer_id)
+				end
+
+			elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
+				wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
+				for vehicle_index, vehicle_object in pairs(g_savedata.constructable_vehicles) do
+					wpDLCDebug(" ", false, false, user_peer_id)
+					wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
+					wpDLCDebug("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, false, user_peer_id)
+				end
 
 			elseif command == "?WeaponsDLCDebug" or command == "?WDLCD" then
 				render_debug = not render_debug
