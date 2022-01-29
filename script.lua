@@ -268,20 +268,29 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			-- this command is very dangerous
 			if do_as_i_say then
 				if peer_id then
+					wpDLCDebug(server.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, false)
+					-- reset savedata
 					playerData = {
 						isDebugging = {},
 						isDoAsISay = {}
 					}
-					wpDLCDebug(server.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, false)
 					land_spawn_zones = {}
+					g_savedata.ai_army.squadrons = {}
 					g_savedata.ai_base_island.zones = {}
+					g_savedata.player_base_island = nil
+					g_savedata.ai_base_island = nil
+					g_savedata.controllable_islands = {}
+					g_savedata.constructable_vehicles = {}
+					g_savedata.constructable_turrets = {}
+					g_savedata.is_attack = {}
+					-- removes all ai vehicles
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							killVehicle(squad_index, vehicle_id, true, true)
 						end
 					end
+					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 				end
-				wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 			end
 
 			turret_zones = server.getZones("turret")
