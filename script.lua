@@ -246,13 +246,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
 			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
+			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main base)", 0, 15, 1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
 			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 17, 1, 17),
 			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
 			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 10),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 300) * 60 * 60,
-			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this", 0, 2500, 1, 325),
+			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this, then 8x if in sinking mode", 0, 2500, 1, 325),
 		}
 	end
 
@@ -402,13 +403,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			end
 
 			-- game setup
-
-			local t, a = getObjectiveIsland()
-
-			t.capture_timer = 0 -- capture nearest ally
-			t.faction = FACTION_AI
-
-			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT do
+			for i = 1, g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT do
+				if i <= #g_savedata.controllable_islands - 2 then
+					local t, a = getObjectiveIsland()
+					t.capture_timer = 0 -- capture nearest ally
+					t.faction = FACTION_AI
+				end
+			end
+			
+			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
 				spawnAIVehicle() -- spawn initial ai
 			end
 		else
@@ -425,7 +428,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		end
 	end
 end
-
 
 function buildPrefabs(location_index)
     local location = built_locations[location_index]
@@ -741,7 +743,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					if not valid_vehicle then
 						wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores")
 					end
-				else
+				else -- if vehicle not specified, spawn random vehicle
 					wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
 					spawnAIVehicle(true, user_peer_id)
 				end
