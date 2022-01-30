@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.8)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.9)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -299,13 +299,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
-					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION)
+					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..server.getPlayerName(peer_id).."\")")
 				end
-			else 
-				-- things that should never be changed even after this command
-				-- such as changing what version the world was created in, as this could lead to issues when trying to debug
-				if g_savedata.info.creation_version == nil then
-					g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
+			else
+				if not peer_id then
+					-- things that should never be changed even after this command
+					-- such as changing what version the world was created in, as this could lead to issues when trying to debug
+					if g_savedata.info.creation_version == nil then
+						g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
+					end
 				end
 			end
 
@@ -844,10 +846,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
 				wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
 				wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
-				if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil then
+				if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
 					wpDLCDebug("Fully Reloaded Versions: ", false, false, user_peer_id)
-					for i = 1, g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0 do
-						wpDLCDebug(g_savedata.info.full_reload_versions[i])
+					for i = 1, #g_savedata.info.full_reload_versions do
+						wpDLCDebug(g_savedata.info.full_reload_versions[i], false, false, user_peer_id)
 					end
 				end
 			end
