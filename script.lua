@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.7)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.8)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -215,7 +215,10 @@ g_savedata = {
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
 	is_attack = false,
-	info = {},
+	info = {
+		creation_version = nil,
+		full_reload_versions = {},
+	},
 }
 
 --[[
