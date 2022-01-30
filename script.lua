@@ -99,6 +99,8 @@ sonar
 Characters should be placed as needed
 ]]
 
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.7)"
+
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
 local MAX_ATTACKING_SQUADS = 3
@@ -213,6 +215,7 @@ g_savedata = {
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
 	is_attack = false,
+	info = {},
 }
 
 --[[
@@ -291,6 +294,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						end
 					end
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
+
+					-- save that this happened, as to aid in debugging errors
+					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION)
+				end
+			else 
+				-- things that should never be changed even after this command
+				-- such as changing what version the world was created in, as this could lead to issues when trying to debug
+				if g_savedata.info.creation_version == nil then
+					g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
 				end
 			end
 
@@ -812,7 +824,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
 				end
 
-			elseif command == "?WDLCRELOAD_ADDON" or command == "?WeaponsDLCRELOAD_ADDON" then
+			elseif command == "?WDLC_RELOAD_ADDON" or command == "?WeaponsDLC_RELOAD_ADDON" then
 				if playerData.isDoAsISay.user_peer_id == true and arg1 == "do_as_i_say" then
 					wpDLCDebug(server.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 					onCreate(true, true, user_peer_id)
@@ -820,8 +832,20 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
 					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 				elseif not arg1 then
-					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLCRELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLCRELOAD_ADDON", false, false, user_peer_id)
+					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLCRELOAD_ADDON", false, false, user_peer_id)
 					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+				end
+
+			elseif command == "?WDLCI" or command == "?WeaponsDLCInfo" then
+				wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
+				wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
+				wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
+				wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
+				if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil then
+					wpDLCDebug("Fully Reloaded Versions: ", false, false, user_peer_id)
+					for i = 1, g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0 do
+						wpDLCDebug(g_savedata.info.full_reload_versions[i])
+					end
 				end
 			end
 		else
