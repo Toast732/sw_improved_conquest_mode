@@ -3042,7 +3042,9 @@ end
 
 -- calculates the size of non-contiguous tables and tables that use non-integer keys
 function tableLength(T)
-	local count = 0
-	for _ in pairs(T) do count = count + 1 end
-	return count
+	if T ~= nil then
+		local count = 0
+		for _ in pairs(T) do count = count + 1 end
+		return count
+	else return 0 end
 end
