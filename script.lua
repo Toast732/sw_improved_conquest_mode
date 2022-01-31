@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.9)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.10)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -276,6 +276,20 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			if do_as_i_say then
 				if peer_id then
 					wpDLCDebug(server.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, false)
+					-- removes all ai vehicles
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							killVehicle(squad_index, vehicle_id, true, true)
+						end
+					end
+					-- resets some island data
+					for island_index, island in pairs(g_savedata.controllable_islands) do
+						-- resets map icons
+						updatePeerIslandMapData(-1, island, true)
+
+						-- removes all flags/capture point vehicles
+						server.despawnVehicle(island.flag_vehicle.id, true)
+					end
 					-- reset savedata
 					playerData = {
 						isDebugging = {},
@@ -290,12 +304,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.constructable_vehicles = {}
 					g_savedata.constructable_turrets = {}
 					g_savedata.is_attack = {}
-					-- removes all ai vehicles
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							killVehicle(squad_index, vehicle_id, true, true)
-						end
-					end
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
@@ -1293,7 +1301,6 @@ function tickGamemode()
 					end
 				end
 
-
 				if isTickID(60, tick_rate) then
 					if island.players_capturing > 0 and island.ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
 						if island.is_contested == false then -- notifies that an island is being contested
@@ -1304,7 +1311,7 @@ function tickGamemode()
 					else
 						island.is_contested = false
 						if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
-							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.players_capturing, 3)] / 5) *  tick_rate / 60
+							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.players_capturing, 3)] / 5) * tick_rate / 60
 						elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
 							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)] / 20) * tick_rate / 60
 						end
@@ -1347,39 +1354,6 @@ function tickGamemode()
 					island.players_capturing = 0
 				end
 				captureIsland(island)
-				--[[
-				if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
-					island.capture_timer = 0
-					island.faction = FACTION_AI
-					g_savedata.is_attack = false
-
-					server.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
-
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
-							setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
-						end
-					end
-				elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
-					island.capture_timer = g_savedata.settings.CAPTURE_TIME
-					island.faction = FACTION_PLAYER
-
-					server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
-
-					-- update vehicles looking to resupply
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad_index == RESUPPLY_SQUAD_INDEX then
-							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-								resetPath(vehicle_object)
-							end
-						end
-					end
-				elseif island.capture_timer > g_savedata.settings.CAPTURE_TIME then -- if its over 100% island capture
-					island.capture_timer = g_savedata.settings.CAPTURE_TIME
-				elseif island.capture_timer < 0 then -- if its less than 0% island capture
-					island.capture_timer = 0
-				end
-				]]
 			end
 		end
 
@@ -1439,24 +1413,25 @@ function tickGamemode()
 	end
 end
 
-function updatePeerIslandMapData(peer_id, island)
+function updatePeerIslandMapData(peer_id, island, is_reset)
 	if is_dlc_weapons then
 		local ts_x, ts_y, ts_z = matrix.position(island.transform)
 		server.removeMapObject(peer_id, island.map_id)
+		if not is_reset then
+			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
 
-		local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-
-		if island.is_contested then
-			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
-		elseif island.faction == FACTION_AI then
-			if render_debug then
+			if island.is_contested then
+				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
+			elseif island.faction == FACTION_AI then
+				if render_debug then
+				else
+					server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+				end
+			elseif island.faction == FACTION_PLAYER then
+				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
 			else
-				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 75, 75, 75, 255)
 			end
-		elseif island.faction == FACTION_PLAYER then
-			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
-		else
-			server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 75, 75, 75, 255)
 		end
 	end
 end
