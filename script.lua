@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.11)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.12)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -139,7 +139,7 @@ local FACTION_AI = "ai"
 local FACTION_PLAYER = "player"
 
 local CAPTURE_RADIUS = 1500
-local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 60
+local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 
 local VISIBLE_DISTANCE = 1500
 local WAYPOINT_CONSUME_DISTANCE = 100
@@ -174,9 +174,9 @@ if render_debug then
 end
 
 local capture_speeds = {
-	100,
-	150,
-	175
+	1,
+	1.5,
+	1.75
 }
 
 local g_holding_pattern = {
@@ -258,8 +258,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
 			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 300) * 60 * 60,
-			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this, then 8x if in sinking mode", 0, 2500, 1, 325),
+			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
+			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this, then 8x if in sinking mode", 0, 2500, 5, 325),
 		}
 	end
 
@@ -1311,9 +1311,10 @@ function tickGamemode()
 					else
 						island.is_contested = false
 						if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
-							island.capture_timer = island.capture_timer + (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.players_capturing, 3)] / 5) * tick_rate / 60
+
+							island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)])
 						elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
-							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)] / 20) * tick_rate / 60
+							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)])
 						end
 					end
 					
