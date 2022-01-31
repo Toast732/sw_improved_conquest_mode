@@ -1,4 +1,5 @@
 
+require([[_build._buildactions]])
 --- @diagnostic disable: undefined-global
 
 require("LifeBoatAPI.Tools.Build.Builder")
@@ -28,12 +29,12 @@ end
 
 local _builder = LifeBoatAPI.Tools.Builder:new(rootDirs, outputDir, luaDocsMCPath, luaDocsAddonPath)
 
-if onLBBuildStarted then onLBBuildStarted(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai]])) end
+if onLBBuildStarted then onLBBuildStarted(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode]])) end
 
-if onLBBuildFileStarted then onLBBuildFileStarted(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai]]), [[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai\script.lua]])) end
+if onLBBuildFileStarted then onLBBuildFileStarted(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode]]), [[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode\script.lua]])) end
 
-local combinedText, outText, outFile = _builder:buildAddonScript([[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai\script.lua]]), params)
-if onLBBuildFileComplete then onLBBuildFileComplete(LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai]]), [[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai\script.lua]]), outFile, combinedText, outText) end
+local combinedText, outText, outFile = _builder:buildAddonScript([[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode\script.lua]]), params)
+if onLBBuildFileComplete then onLBBuildFileComplete(LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode]]), [[script.lua]], LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode\script.lua]]), outFile, combinedText, outText) end
 
-if onLBBuildComplete then onLBBuildComplete(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\SteamLibrary\steamapps\common\Stormworks\rom\data\missions\dlc_weapons_ai]])) end
+if onLBBuildComplete then onLBBuildComplete(_builder, params, LifeBoatAPI.Tools.Filepath:new([[d:\Documents\GitHub\improved_conquest_mode]])) end
 --- @diagnostic enable: undefined-global

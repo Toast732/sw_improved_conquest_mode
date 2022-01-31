@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.1)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -161,8 +161,6 @@ local is_dlc_weapons = false
 local render_debug = false
 local g_debug_speed_multiplier = 1
 
-local land_spawn_zones = {}
-
 local playerData = {
 	isDebugging = {},
 	isDoAsISay = {}
@@ -219,6 +217,7 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 	},
+	land_spawn_zones = {},
 }
 
 --[[
@@ -295,7 +294,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						isDebugging = {},
 						isDoAsISay = {}
 					}
-					land_spawn_zones = {}
+					g_savedata.land_spawn_zones = {}
 					g_savedata.ai_army.squadrons = {}
 					g_savedata.ai_base_island.zones = {}
 					g_savedata.player_base_island = nil
@@ -322,7 +321,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			turret_zones = server.getZones("turret")
 
 			for land_spawn_index, land_spawn in pairs(server.getZones("land_spawn")) do
-				table.insert(land_spawn_zones, land_spawn.transform)
+				table.insert(g_savedata.land_spawn_zones, land_spawn.transform)
 			end
 
             for i in iterPlaylists() do
@@ -580,7 +579,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	local spawn_attempts = 0
 	local selected_prefab = nil
 	repeat
-		selected_prefab = requested_prefab or g_savedata.constructable_vehicles[math.random(1, #g_savedata.constructable_vehicles)]
+		selected_prefab = g_savedata.constructable_vehicles[requested_prefab] or g_savedata.constructable_vehicles[math.random(1, #g_savedata.constructable_vehicles)]
 		spawn_attempts = spawn_attempts + 1
 
 		if hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab then can_spawn = false end
@@ -619,11 +618,13 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				wpDLCDebug("is owned by AI", true, false)
-				for land_spawn_index, land_spawn in pairs(land_spawn_zones) do
-					wpDLCDebug("Looping spawn", true, false)
-					if matrix.distance(land_spawn, island.transform) <= 1000 then
-						wpDLCDebug("is on island", true, false)
-						table.insert(land_spawn_locations, land_spawn)
+				if g_savedata.land_spawn_zones then
+					for land_spawn_index, land_spawn in pairs(g_savedata.land_spawn_zones) do
+						wpDLCDebug("Looping spawn", true, false)
+						if matrix.distance(land_spawn, island.transform) <= 1000 or matrix.distance(land_spawn, g_savedata.ai_base_island.transform) <= 1000 then
+							wpDLCDebug("is on island", true, false)
+							table.insert(land_spawn_locations, land_spawn)
+						end
 					end
 				end
 			end
@@ -762,7 +763,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 							wpDLCDebug("Spawning \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
 							wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
 							wpDLCDebug("name from index: \""..g_savedata.constructable_vehicles[vehicle_index].location.data.name.."\"", false, false, user_peer_id)
-							spawnAIVehicle(true, user_peer_id, vehicle_object.vehicle_index)
+							spawnAIVehicle(true, user_peer_id, vehicle_index)
 						end
 					end
 					if not valid_vehicle then
