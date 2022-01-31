@@ -259,7 +259,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
-			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this, then 8x if in sinking mode", 0, 2500, 5, 325),
+			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
 		}
 	end
 
