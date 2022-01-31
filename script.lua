@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.12)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.13)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -845,7 +845,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
 					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 				elseif not arg1 then
-					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLCRELOAD_ADDON", false, false, user_peer_id)
+					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
 					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 				end
 
