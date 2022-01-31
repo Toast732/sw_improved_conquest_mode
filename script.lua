@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.1.2.10)"
+local IMPROVED_CONQUEST_VERSION = "(0.1.2.11)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -870,7 +870,7 @@ end
 function captureIsland(island, override, peer_id)
 	local faction_to_set = nil
 
-	if override ~= nil then
+	if not override then
 		if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
 			faction_to_set = FACTION_AI
 		elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
@@ -1352,8 +1352,8 @@ function tickGamemode()
 					-- resets amount capping
 					island.ai_capturing = 0
 					island.players_capturing = 0
+					captureIsland(island)
 				end
-				captureIsland(island)
 			end
 		end
 
