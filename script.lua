@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.3)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -2088,7 +2088,7 @@ function tickSquadrons()
 						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 
 						
-						if #vehicle_object.path <= 1 then
+						if #vehicle_object.path < 1 then
 							resetPath(vehicle_object)
 							if vehicle_object.type == AI_TYPE_PLANE then
 								if matrix.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
@@ -2310,8 +2310,8 @@ function tickVehicles()
 							local vehicle_pos = vehicle_object.transform
 							local distance = matrix.distance(ai_target, vehicle_pos)
 	
-							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 2 then
-								if #vehicle_object.path > 1 then
+							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 6 then
+								if #vehicle_object.path > 1 or #vehicle_object.path >= 1 and vehicle_object.ai_type == AI_TYPE_LAND then
 									server.removeMapID(0, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 									if vehicle_object.ai_type == AI_TYPE_LAND then
