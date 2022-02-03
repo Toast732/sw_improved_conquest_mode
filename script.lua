@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.5)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.6)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1257,7 +1257,8 @@ function addPath(vehicle_object, target_dest)
  
 		local path_list = server.pathfindOcean(path_start_pos, matrix.translation(dest_x, 1000, dest_z))
 		for path_index, path in pairs(path_list) do
-			if matrix.distance(vehicle_object.transform, matrix.translation(path.x, path.y, path.z)) >= 6 then
+			veh_x, veh_y, veh_z = matrix.position(vehicle_object.transform)
+			if matrix.distance(vehicle_object.transform, matrix.translation(path.x, veh_y, path.z)) >= 6 then
 				table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = server.getMapID() })
 			end
 		end
