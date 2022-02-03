@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.3)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.4)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -538,6 +538,18 @@ function spawnTurret(island)
 			spawning_transform = {
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
+			speed = {
+				normal = {
+					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or 0,
+					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or 0,
+					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or 0
+				},
+				aggressive = {
+					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or 0,
+					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or 0,
+					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
+				}
+			},
 			transform = spawn_transform,
 			target_player_id = -1,
 			target_vehicle_id = -1,
@@ -702,6 +714,18 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			},
 			spawning_transform = {
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
+			},
+			speed = {
+				normal = {
+					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal"),
+					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal"),
+					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal")
+				},
+				aggressive = {
+					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive"),
+					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
+					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
+				}
 			},
 			is_resupply_on_load = false,
 			transform = spawn_transform,
@@ -1233,7 +1257,9 @@ function addPath(vehicle_object, target_dest)
  
 		local path_list = server.pathfindOcean(path_start_pos, matrix.translation(dest_x, 1000, dest_z))
 		for path_index, path in pairs(path_list) do
-			table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = server.getMapID() })
+			if matrix.distance(vehicle_object.transform, target_dest) >= 6 then
+				table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = server.getMapID() })
+			end
 		end
 		setLandTarget(vehicle_id, vehicle_object)
 	else
@@ -2289,7 +2315,20 @@ function tickVehicles()
 						elseif vehicle_object.ai_type == AI_TYPE_HELI then
 							ai_speed_pseudo = AI_SPEED_PSEUDO_HELI * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
-							ai_speed_pseudo = AI_SPEED_PSEUDO_LAND * vehicle_update_tickrate / 60
+							local terrain_type = "offroad"
+							local is_aggressive = "normal"
+
+							if squad.command == COMMAND_ENGAGE or squad.command == COMMAND_RESUPPLY or squad.command == COMMAND_STAGE then
+								is_aggressive = "aggressive"
+							end
+
+							if server.isInZone(vehicle_object.transform, "land_ai_road") then
+								terrain_type = "road"
+							elseif server.isInZone(vehicle_object.transform, "land_ai_bridge") then
+								terrain_type = "bridge"
+							end
+
+							ai_speed_pseudo = (vehicle_object.speed[is_aggressive][terrain_type] or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
 						else
 							ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
 						end
