@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.7)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.8)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1487,10 +1487,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 			if island.is_contested then
 				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
 			elseif island.faction == FACTION_AI then
-				if render_debug then
-				else
-					server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
-				end
+				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
 			elseif island.faction == FACTION_PLAYER then
 				server.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
 			else
