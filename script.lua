@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.6)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.7)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -599,9 +599,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 
 		if (spawn_attempts > 10) then return end -- Failed to spawn
 	until (can_spawn)
-
-	local spawn_transform = matrix.multiply(g_savedata.ai_base_island.transform, matrix.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
-
+	
+	local spawn_transform = matrix.translation(0, 0, 0)
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
 		if nearPlayer ~= true then
 			local boat_spawn_transform, found_ocean = server.getOceanTransform(g_savedata.ai_base_island.transform, 500, 1500)
@@ -638,6 +637,10 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 							table.insert(land_spawn_locations, land_spawn)
 						end
 					end
+				else
+					for land_spawn_index, land_spawn in pairs(server.getZones("land_spawn")) do
+						table.insert(g_savedata.land_spawn_zones, land_spawn.transform)
+					end
 				end
 			end
 		end
@@ -647,6 +650,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			wpDLCDebug("No suitible spawn location found for land vehicle", true, false)
 			return false
 		end
+	else
+		local spawn_transform = matrix.multiply(g_savedata.ai_base_island.transform, matrix.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 	end
 
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -911,6 +916,7 @@ function captureIsland(island, override, peer_id)
 		island.capture_timer = 0
 		island.faction = FACTION_AI
 		g_savedata.is_attack = false
+		updatePeerIslandMapData(-1, island)
 
 		if peer_id then
 			name = server.getPlayerName(peer_id)
@@ -928,6 +934,7 @@ function captureIsland(island, override, peer_id)
 	elseif faction_to_set == FACTION_PLAYER then
 		island.capture_timer = g_savedata.settings.CAPTURE_TIME
 		island.faction = FACTION_PLAYER
+		updatePeerIslandMapData(-1, island)
 
 		if peer_id then
 			name = server.getPlayerName(peer_id)
@@ -948,6 +955,7 @@ function captureIsland(island, override, peer_id)
 	elseif faction_to_set == FACTION_NEUTRAL then
 		island.capture_timer = g_savedata.settings.CAPTURE_TIME/2
 		island.faction = FACTION_NEUTRAL
+		updatePeerIslandMapData(-1, island)
 
 		if peer_id then
 			name = server.getPlayerName(peer_id)
@@ -1135,6 +1143,21 @@ end
 function setLandTarget(vehicle_id, vehicle_object)
 	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
 	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
+	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_X", vehicle_object.path[#vehicle_object.path].x)
+	server.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_Z", vehicle_object.path[#vehicle_object.path].z)
+	local terrain_type = 2
+	if vehicle_object.terrain_type == "road" then
+		terrain_type = 1
+	elseif vehicle_object.terrain_type == "bridge" then
+		terrain_type = 3
+	end
+
+	local is_aggressive = 0
+	if vehicle_object.is_aggressive == "aggressive" then
+		is_aggressive = 1
+	end
+	server.setVehicleKeypad(vehicle_id, "AI_ROAD_TYPE", terrain_type)
+	server.setVehicleKeypad(vehicle_id, "AI_AGR_STATUS", is_aggressive)
 	--wpDLCDebug("x: "..vehicle_object.path[1].x.." z: "..vehicle_object.path[1].z, true, false)
 end
 
@@ -1202,8 +1225,19 @@ function onVehicleLoad(incoming_vehicle_id)
 						end
 					elseif vehicle_object.ai_type == AI_TYPE_BOAT then
 						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-						if vehicle_y > 10 and vehicle_object.current_damage ~= 0 then -- if its above y 10 and if it has taken any damage
-							killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
+						if vehicle_y > 10 then -- if its above y 10
+							local playerList = server.getPlayers()
+							local is_player_close = false
+							-- checks if any players are within 750m of the vehicle
+							for _, player in pairs(playerList) do
+								local player_transform = server.getPlayerPos(player.id)
+								if matrix.distance(player_transform, vehicle_object.transform) < 750 then
+									is_player_close = true
+								end
+							end
+							if not is_player_close then
+								killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
+							end
 						end
 					end
 					refuel(vehicle_id)
@@ -1258,6 +1292,7 @@ function addPath(vehicle_object, target_dest)
 		local path_list = server.pathfindOcean(path_start_pos, matrix.translation(dest_x, 1000, dest_z))
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = matrix.position(vehicle_object.transform)
+			wpDLCDebug(matrix.distance(vehicle_object.transform, matrix.translation(path.x, veh_y, path.z)), false, false)
 			if matrix.distance(vehicle_object.transform, matrix.translation(path.x, veh_y, path.z)) >= 6 then
 				table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = server.getMapID() })
 			end
@@ -2115,7 +2150,7 @@ function tickSquadrons()
 						local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
 
 						
-						if #vehicle_object.path < 1 then
+						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
 							if vehicle_object.type == AI_TYPE_PLANE then
 								if matrix.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
@@ -2300,8 +2335,8 @@ function tickVehicles()
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
 				local vehicle_x, vehicle_y, vehicle_z = matrix.position(vehicle_object.transform)
-				if vehicle_y <= BOAT_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_y <= HELI_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_y <= PLANE_EXPLOSION_DEPTH and g_savedata.settings.SINKING_MODE and vehicle_object.ai_type == AI_TYPE_PLANE then
-					killVehicle(squad_index, vehicle_id, true);
+				if vehicle_y <= BOAT_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_y <= HELI_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_y <= PLANE_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_PLANE then
+					killVehicle(squad_index, vehicle_id, true)
 				end
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
@@ -2316,20 +2351,20 @@ function tickVehicles()
 						elseif vehicle_object.ai_type == AI_TYPE_HELI then
 							ai_speed_pseudo = AI_SPEED_PSEUDO_HELI * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
-							local terrain_type = "offroad"
-							local is_aggressive = "normal"
+							vehicle_object.terrain_type = "offroad"
+							vehicle_object.is_aggressive = "normal"
 
 							if squad.command == COMMAND_ENGAGE or squad.command == COMMAND_RESUPPLY or squad.command == COMMAND_STAGE then
-								is_aggressive = "aggressive"
+								vehicle_object.is_aggressive = "aggressive"
 							end
 
 							if server.isInZone(vehicle_object.transform, "land_ai_road") then
-								terrain_type = "road"
+								vehicle_object.terrain_type = "road"
 							elseif server.isInZone(vehicle_object.transform, "land_ai_bridge") then
-								terrain_type = "bridge"
+								vehicle_object.terrain_type = "bridge"
 							end
 
-							ai_speed_pseudo = (vehicle_object.speed[is_aggressive][terrain_type] or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
 						else
 							ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
 						end
@@ -2351,7 +2386,7 @@ function tickVehicles()
 							local distance = matrix.distance(ai_target, vehicle_pos)
 	
 							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 6 then
-								if #vehicle_object.path > 1 or #vehicle_object.path >= 1 and vehicle_object.ai_type == AI_TYPE_LAND then
+								if #vehicle_object.path > 1 then
 									server.removeMapID(0, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 									if vehicle_object.ai_type == AI_TYPE_LAND then
