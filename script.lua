@@ -99,7 +99,7 @@ sonar
 Characters should be placed as needed
 ]]
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.8)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.9)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -938,9 +938,9 @@ function captureIsland(island, override, peer_id)
 
 		if peer_id then
 			name = server.getPlayerName(peer_id)
-			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island. (set manually by "..name.." via command)", 1)
+			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island. (set manually by "..name.." via command)", 4)
 		else
-			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 1)
+			server.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 4)
 		end
 
 		-- update vehicles looking to resupply
