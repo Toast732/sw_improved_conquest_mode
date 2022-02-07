@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode" folder_path="data/missions/Improved_Conquest_Mode" file_store="4" name="Improved Conquest Mode">
-	<locations location_id_counter="121" component_id_counter="2230">
+	<locations location_id_counter="121" component_id_counter="2233">
 		<locations>
 			<l id="75" tile="" name="Flag" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
@@ -654,19 +654,6 @@
 							<l value="553"/>
 						</graph_links>
 					</c>
-					<c component_type="11" id="555" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="60.004036" 31="1000" 32="222.596527" 33="1"/>
-						<spawn_bounds>
-							<min x="-10" y="-10" z="-10"/>
-							<max x="10" y="10" z="10"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links>
-							<l value="551"/>
-							<l value="552"/>
-						</graph_links>
-					</c>
 					<c component_type="11" id="556" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="144.838837" 31="1000" 32="298.027405" 33="1"/>
 						<spawn_bounds>
@@ -1091,6 +1078,16 @@
 					</c>
 					<c component_type="10" id="593" vehicle_parent_id="0" cargo_zone_import_cargo_type="land_spawn" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="91.20694" 31="5.712409" 32="290.418884" 33="1"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
+						<spawn_local_offset x="-0" y="-0" z="-0"/>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="2231" vehicle_parent_id="0" cargo_zone_import_cargo_type="land_spawn" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="98.113533" 31="10.167488" 32="239.718567" 33="1"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1689,16 +1686,6 @@
 						<spawn_local_offset x="-0" y="-0" z="-0"/>
 						<graph_links/>
 					</c>
-					<c component_type="11" id="421" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
-						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="203.762817" 31="1000" 32="237.250778" 33="1"/>
-						<spawn_bounds>
-							<min x="-10" y="-10" z="-10"/>
-							<max x="10" y="10" z="10"/>
-						</spawn_bounds>
-						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
-						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links/>
-					</c>
 					<c component_type="11" id="422" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="239.079498" 31="1000" 32="240.077438" 33="1"/>
 						<spawn_bounds>
@@ -1707,9 +1694,7 @@
 						</spawn_bounds>
 						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
 						<spawn_local_offset x="-0" y="-0" z="-0"/>
-						<graph_links>
-							<l value="421"/>
-						</graph_links>
+						<graph_links/>
 					</c>
 					<c component_type="11" id="425" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="267.787384" 31="1000" 32="271.489532" 33="1"/>
@@ -1792,7 +1777,7 @@
 						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
 						<spawn_local_offset x="-0" y="-0" z="-0"/>
 						<graph_links>
-							<l value="421"/>
+							<l value="422"/>
 						</graph_links>
 					</c>
 					<c component_type="11" id="432" vehicle_parent_id="0" name="ocean_path" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
@@ -1989,6 +1974,26 @@
 					</c>
 					<c component_type="10" id="448" vehicle_parent_id="0" cargo_zone_import_cargo_type="land_spawn" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="262.959442" 31="7.155019" 32="242.533096" 33="1"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
+						<spawn_local_offset x="-0" y="-0" z="-0"/>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="2232" vehicle_parent_id="0" cargo_zone_import_cargo_type="turret" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="367.589508" 31="1.848493" 32="394.394501" 33="1"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<vehicle_parent_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="0" 31="0" 32="0" 33="1"/>
+						<spawn_local_offset x="-0" y="-0" z="-0"/>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="2233" vehicle_parent_id="0" cargo_zone_import_cargo_type="turret" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="" vehicle_file_store="1" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="60.226532" 31="17.463879" 32="394.710541" 33="1"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
