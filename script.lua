@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.11)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.12)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -561,6 +561,7 @@ function spawnTurret(island)
 					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
 				}
 			},
+			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy") or "general",
 			transform = spawn_transform,
 			target_player_id = -1,
 			target_vehicle_id = -1,
@@ -1254,7 +1255,7 @@ function onVehicleLoad(incoming_vehicle_id)
 							-- checks if any players are within 750m of the vehicle
 							for _, player in pairs(playerList) do
 								local player_transform = s.getPlayerPos(player.id)
-								if m.distance(player_transform, vehicle_object.transform) < 750 then
+								if m.distance(player_transform, vehicle_object.transform) < 250 then
 									is_player_close = true
 								end
 							end
