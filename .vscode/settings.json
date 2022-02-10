@@ -1,7 +1,7 @@
 {
     "lifeboatapi.stormworks.isMicrocontrollerProject": false,
     "lifeboatapi.stormworks.isAddonProject": true,
-    "lifeboatapi.stormworks.minimizer.removeComments": false,
+    "lifeboatapi.stormworks.minimizer.removeComments": true,
     "lifeboatapi.stormworks.minimizer.reduceAllWhitespace": true,
     "lifeboatapi.stormworks.minimizer.reduceNewlines": true,
     "lifeboatapi.stormworks.minimizer.removeRedundancies": true,

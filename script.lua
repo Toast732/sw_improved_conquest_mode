@@ -84,11 +84,11 @@ Playlist Specific Tags/Requirements:
 ====================================
 
 Required type tag:
-type=dlc_weapons,type=wep_boat
-type=dlc_weapons,type=wep_plane
-type=dlc_weapons,type=wep_heli
-type=dlc_weapons,type=wep_land
-type=dlc_weapons,type=wep_turret
+from=dlc_weapons,type=wep_boat
+from=dlc_weapons,type=wep_plane
+from=dlc_weapons,type=wep_heli
+from=dlc_weapons,type=wep_land
+from=dlc_weapons,type=wep_turret
 
 Optional tags:
 radar
@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.12)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.13)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -166,6 +166,31 @@ local g_debug_speed_multiplier = 1
 
 local vehicles_debugging = {}
 
+local default_mods = {
+	attack = 0,
+	general = 1,
+	defend = 0,
+	roaming = 0.1,
+	stealth = 0.05
+}
+
+local ai_training = {
+	punishments = {
+		-0.02,
+		-0.05,
+		-0.1,
+		-0.15,
+		-0.5
+	},
+	rewards = {
+		0.01,
+		0.05,
+		0.15,
+		0.4,
+		1
+	}
+}
+
 local playerData = {
 	isDebugging = {},
 	isDoAsISay = {}
@@ -214,6 +239,7 @@ g_savedata = {
 	player_vehicles = {},
 	debug_data = {},
 	constructable_vehicles = {},
+	spawn_modifiers = {},
 	constructable_turrets = {},
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
@@ -344,6 +370,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
             for i = 1, #built_locations do
 				buildPrefabs(i)
             end
+
+			spawnModifiers("create")
 
 			local start_island = s.getStartIsland()
 
@@ -480,12 +508,30 @@ function buildPrefabs(location_index)
 			table.insert(prefab_data.fires, fire)
 		end
 
+
+		--
+		--
+		-- <<<<<<<<<< get vehicles, and put them into a table, sorted by their directive/role and their type, as well as additional info >>>>>>>>>
+		--
+		--
+
+
 		if hasTag(vehicle.tags, "type=wep_turret") then
 			table.insert(g_savedata.constructable_turrets, prefab_data)
 			if render_debug then s.announce("dlcw", "prefab turret") end
 		elseif #prefab_data.survivors > 0 then
-			table.insert(g_savedata.constructable_vehicles, prefab_data)
-			if render_debug then s.announce("dlcw", "prefab vehicle") end
+			local varient = getTagValue(vehicle.tags, "varient")
+			if not varient then
+				local role = getTagValue(vehicle.tags, "role", true) or "general"
+				local vehicle_type = string.gsub(getTagValue(vehicle.tags, "type", true), "wep_", "") or "unknown"
+				local strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
+				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
+				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
+				wpDLCDebug(" ! role: "..role, false, false)
+			else
+				tabulate(g_savedata.constructable_vehicles, varient)
+				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
+			end
 		end
 	end
 end
@@ -561,7 +607,7 @@ function spawnTurret(island)
 					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
 				}
 			},
-			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy") or "general",
+			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			transform = spawn_transform,
 			target_player_id = -1,
 			target_vehicle_id = -1,
@@ -602,8 +648,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	local can_spawn = true
 	local spawn_attempts = 0
 	local selected_prefab = nil
+
 	repeat
-		selected_prefab = g_savedata.constructable_vehicles[requested_prefab] or g_savedata.constructable_vehicles[math.random(1, #g_savedata.constructable_vehicles)]
+		selected_prefab = g_savedata.constructable_vehicles[requested_prefab] or spawnModifiers("spawn")
 		spawn_attempts = spawn_attempts + 1
 
 		if hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab then can_spawn = false end
@@ -640,12 +687,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		local land_spawn_locations = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
-				wpDLCDebug("is owned by AI", true, false)
 				if g_savedata.land_spawn_zones then
 					for land_spawn_index, land_spawn in pairs(g_savedata.land_spawn_zones) do
-						wpDLCDebug("Looping spawn", true, false)
 						if m.distance(land_spawn, island.transform) <= 1000 or m.distance(land_spawn, g_savedata.ai_base_island.transform) <= 1000 then
-							wpDLCDebug("is on island", true, false)
 							table.insert(land_spawn_locations, land_spawn)
 						end
 					end
@@ -659,7 +703,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		if #land_spawn_locations > 0 then
 			spawn_transform = land_spawn_locations[math.random(1, #land_spawn_locations)]
 		else
-			wpDLCDebug("No suitible spawn location found for land vehicle", true, false)
+			wpDLCDebug("No suitible spawn location found for land vehicle, attempting to spawn a different vehicle", true, false)
+			spawnAIVehicle()
 			return false
 		end
 	else
@@ -744,6 +789,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
 				}
 			},
+			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			is_resupply_on_load = false,
 			transform = spawn_transform,
 			target_vehicle_id = -1,
@@ -914,6 +960,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				else
 					wpDLCDebug("the vehicle id needs to be specified!", false, true, user_peer_id)
 				end
+			elseif command == "?WDLCDE" then
+				spawnModifiers("create")
 			end
 		else
 			wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
@@ -2659,7 +2707,7 @@ function tickTerrainScanners()
 		local vehicle_data = s.getVehicleData(vehicle_id)
 		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
 		
-		if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
+		if hasTag(terrain_scanner_data.tags, "from=dlc_weapons_terrain_scanner") then
 			wpDLCDebug("terrain scanner loading!", true, false)
 			wpDLCDebug("ter id: "..terrain_scanner, true, false)
 			wpDLCDebug("veh id: "..vehicle_id, true, false)
@@ -2746,15 +2794,15 @@ function build_locations(playlist_index, location_index)
 
         for tag_index, tag_object in pairs(object_data.tags) do
 
-            if tag_object == "type=dlc_weapons" then
+            if tag_object == "from=dlc_weapons" then
                 is_valid_location = true
             end
-			if tag_object == "type=dlc_weapons_terrain_scanner" then
+			if tag_object == "from=dlc_weapons_terrain_scanner" then
 				if object_data.type == "vehicle" then
 					g_savedata.terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
 				end
 			end
-			if tag_object == "type=dlc_weapons_flag" then
+			if tag_object == "from=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
 					flag_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
 				end
@@ -2822,10 +2870,10 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 		if hasTag(object.tags, "type=wep_turret") then
 			l_ai_type = AI_TYPE_TURRET
 		end
-		if hasTag(object.tags, "type=dlc_weapons_flag") then
+		if hasTag(object.tags, "from=dlc_weapons_flag") then
 			l_ai_type = "flag"
 		end
-		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
+		if hasTag(object.tags, "from=dlc_weapons_terrain_scanner") then
 			wpDLCDebug("terrain scanner!", true, false)
 			l_ai_type = "terrain_scanner"
 		end
@@ -3156,11 +3204,15 @@ function hasTag(tags, tag)
 end
 
 -- gets the value of the specifed tag, returns nil if tag not found
-function getTagValue(tags, tag)
+function getTagValue(tags, tag, as_string)
 	if type(tags) == "table" then
 		for k, v in pairs(tags) do
 			if string.match(v, tag.."=") then
-				return tonumber(tostring(string.gsub(v, tag.."=", "")))
+				if not as_string then
+					return tonumber(tostring(string.gsub(v, tag.."=", "")))
+				else
+					return tostring(string.gsub(v, tag.."=", ""))
+				end
 			end
 		end
 	else
@@ -3173,10 +3225,115 @@ end
 function printTable(T, requiresDebugging, isError, toPlayer)
 	for k, v in pairs(T) do
 		if type(v) == "table" then
-			wpDLCDebug("Table: "..k, requiresDebugging, isError, toPlayer)
+			wpDLCDebug("Table: "..tostring(k), requiresDebugging, isError, toPlayer)
 			printTable(v, requiresDebugging, isError, toPlayer)
 		else
-			wpDLCDebug("k: "..k.." v: "..v, requiresDebugging, isError, toPlayer)
+			wpDLCDebug("k: "..tostring(k).." v: "..tostring(v), requiresDebugging, isError, toPlayer)
+		end
+	end
+end
+
+function tabulate(t,...) -- credit: woe | for this function
+	local _ = table.pack(...)
+	t[_[1]] = t[_[1]] or {}
+	if _.n>1 then
+		tabulate(t[_[1]], table.unpack(_, 2))
+	end
+end
+
+function rand(x, y)
+	return math.random()*(y-x)+x
+end
+
+function randChance(t)
+	local total_mod = 0
+	for k, v in pairs(t) do
+		total_mod = total_mod + v
+	end
+	local win_name = ""
+	local win_val = 0
+	for k, v in pairs(t) do
+		local chance = rand(0, v / total_mod)
+		wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
+		if chance > win_val then
+			win_val = chance
+			win_name = k
+		end
+	end
+	return win_name
+end
+
+function spawnModifiers(action,...)
+	local g_v_data = g_savedata.constructable_vehicles
+	local _ = table.pack(...)
+	if action == "create" then
+		for role, role_data in pairs(g_savedata.constructable_vehicles) do
+			if type(role_data) == "table" then
+				if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" then
+					for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
+						if veh_type ~= "mod" then
+							if type(veh_data) == "table" then
+								for strat, strat_data in pairs(veh_data) do
+									if type(strat_data) == "table" and strat ~= "mod" then
+										g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
+										for vehicle_id, v in pairs(strat_data) do
+											if type(v) == "table" and vehicle_id ~= "mod" then
+												g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
+											end
+										end
+									end
+								end
+							end
+							g_savedata.constructable_vehicles[role][veh_type].mod = 1
+						end
+					end
+					g_savedata.constructable_vehicles[role].mod = default_mods[role]
+				end
+			end
+		end
+	elseif action == "spawn" then
+		local role_chances = {}
+		local veh_type_chances = {}
+		local strat_chances = {}
+		local vehicle_chances = {}
+		for role, v in pairs(g_savedata.constructable_vehicles) do
+			if type(v) == "table" then
+				if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
+					role_chances[role] = g_savedata.constructable_vehicles[role].mod
+				end
+			end
+		end
+		local role = randChance(role_chances)
+		for veh_type, v in pairs(g_savedata.constructable_vehicles[role]) do
+			if type(v) == "table" then
+				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[role][veh_type].mod
+			end
+		end
+		local veh_type = randChance(veh_type_chances)
+		for strat, v in pairs(g_savedata.constructable_vehicles[role][veh_type]) do
+			if type(v) == "table" then
+				strat_chances[strat] = g_savedata.constructable_vehicles[role][veh_type][strat].mod
+			end
+		end
+		local strat = randChance(strat_chances)
+		for vehicle, v in pairs(g_savedata.constructable_vehicles[role][veh_type][strat]) do
+			if type(v) == "table" then
+				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[role][veh_type][strat][vehicle].mod
+			end
+		end
+		local vehicle = randChance(vehicle_chances)
+		return g_savedata.constructable_vehicles[role][veh_type][strat][vehicle]
+	elseif action == "train" then
+		if _[1] == "punish" then
+			g_savedata.constructable_vehicles[_[2]].mod = math.max(g_savedata.constructable_vehicles[_[2]].mod - ai_training.punishments[_[6]], 0)
+			g_savedata.constructable_vehicles[_[2]][_[3]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]].mod - ai_training.punishments[_[7]], 0.05)
+			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod - ai_training.punishments[_[8]], 0.05)
+			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod - ai_training.punishments[_[9]], 0.05)
+		elseif _[1] == "reward" then
+			g_savedata.constructable_vehicles[_[2]].mod = math.min(g_savedata.constructable_vehicles[_[2]].mod - ai_training.punishments[_[6]], 1.5)
+			g_savedata.constructable_vehicles[_[2]][_[3]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]].mod - ai_training.punishments[_[7]], 1.5)
+			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod - ai_training.punishments[_[8]], 1.5)
+			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod - ai_training.punishments[_[9]], 1.5)
 		end
 	end
 end
