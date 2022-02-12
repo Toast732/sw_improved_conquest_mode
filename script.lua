@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.14)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.15)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1248,7 +1248,11 @@ end
 
 function onVehicleLoad(incoming_vehicle_id)
 	if is_dlc_weapons then
-		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id.." | Name: "..s.getVehicleName(incoming_vehicle_id), true, false)
+		local vehicle_data, is_success = s.getVehicleData(incoming_vehicle_id)
+		if not is_success then
+			vehicle_data.filename = "Unable to get vehicle data!"
+		end
+		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id.." | Name: "vehicle_data.filename.., true, false)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
