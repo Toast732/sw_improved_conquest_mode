@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.13)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.14)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -129,6 +129,10 @@ local VEHICLE_STATE_HOLDING = "holding"
 
 local TARGET_VISIBILITY_VISIBLE = "visible"
 local TARGET_VISIBILITY_INVESTIGATE = "investigate"
+
+local TRAIN = "train"
+local REWARD = "reward"
+local PUNISH = "punish"
 
 local AI_SPEED_PSEUDO_PLANE = 60
 local AI_SPEED_PSEUDO_HELI = 40
@@ -239,7 +243,6 @@ g_savedata = {
 	player_vehicles = {},
 	debug_data = {},
 	constructable_vehicles = {},
-	spawn_modifiers = {},
 	constructable_turrets = {},
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
@@ -960,8 +963,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				else
 					wpDLCDebug("the vehicle id needs to be specified!", false, true, user_peer_id)
 				end
-			elseif command == "?WDLCDE" then
-				spawnModifiers("create")
+			elseif command == "?WDLCAM" or command == "?WeaponsDLCAIModifier" then
+				if arg1 then
+					spawnModifiers("debug", arg1, user_peer_id)
+				else
+					wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
+				end
 			end
 		else
 			wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
@@ -997,6 +1004,9 @@ function captureIsland(island, override, peer_id)
 			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
 		end
 
+		spawnModifiers(TRAIN, REWARD, "defend", 4)
+		spawnModifiers(TRAIN, PUNISH, "attack", 5)
+
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
 				setSquadCommand(squad, COMMAND_NONE) -- free squads from objective
@@ -1014,6 +1024,9 @@ function captureIsland(island, override, peer_id)
 		else
 			s.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 4)
 		end
+
+		spawnModifiers(TRAIN, REWARD, "defend", 4)
+		spawnModifiers(TRAIN, PUNISH, "attack", 2)
 
 		-- update vehicles looking to resupply
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1235,7 +1248,7 @@ end
 
 function onVehicleLoad(incoming_vehicle_id)
 	if is_dlc_weapons then
-		if render_debug then s.announce("dlcw", "onVehicleLoad: " .. incoming_vehicle_id) end
+		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id.." | Name: "..s.getVehicleName(incoming_vehicle_id), true, false)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
@@ -3325,16 +3338,18 @@ function spawnModifiers(action,...)
 		return g_savedata.constructable_vehicles[role][veh_type][strat][vehicle]
 	elseif action == "train" then
 		if _[1] == "punish" then
-			g_savedata.constructable_vehicles[_[2]].mod = math.max(g_savedata.constructable_vehicles[_[2]].mod - ai_training.punishments[_[6]], 0)
-			g_savedata.constructable_vehicles[_[2]][_[3]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]].mod - ai_training.punishments[_[7]], 0.05)
-			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod - ai_training.punishments[_[8]], 0.05)
-			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod - ai_training.punishments[_[9]], 0.05)
+			if _[2] then g_savedata.constructable_vehicles[_[2]].mod = math.max(g_savedata.constructable_vehicles[_[2]].mod + ai_training.punishments[_[3]], 0) end
+			if _[4] then g_savedata.constructable_vehicles[_[2]][_[4]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]].mod + ai_training.punishments[_[5]], 0.05) end
+			if _[6] then g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod + ai_training.punishments[_[7]], 0.05) end
+			if _[8] then g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod + ai_training.punishments[_[9]], 0.05) end
 		elseif _[1] == "reward" then
-			g_savedata.constructable_vehicles[_[2]].mod = math.min(g_savedata.constructable_vehicles[_[2]].mod - ai_training.punishments[_[6]], 1.5)
-			g_savedata.constructable_vehicles[_[2]][_[3]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]].mod - ai_training.punishments[_[7]], 1.5)
-			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]].mod - ai_training.punishments[_[8]], 1.5)
-			g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[3]][_[4]][_[5]].mod - ai_training.punishments[_[9]], 1.5)
+			if _[2] then g_savedata.constructable_vehicles[_[2]].mod = math.min(g_savedata.constructable_vehicles[_[2]].mod + ai_training.rewards[_[3]], 1.5) end
+			if _[4] then g_savedata.constructable_vehicles[_[2]][_[4]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]].mod + ai_training.rewards[_[5]], 1.5) end
+			if _[6] then g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod + ai_training.rewards[_[7]], 1.5) end
+			if _[8] then g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod + ai_training.rewards[_[9]], 1.5) end
 		end
+	elseif action == "debug" then
+		wpDLCDebug(_[1].."'s modifier: "..g_savedata.constructable_vehicles[_[1]].mod, false, false, _[2])
 	end
 end
 
