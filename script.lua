@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.15)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.16)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -572,6 +572,7 @@ function spawnTurret(island)
 		local home_x, home_y, home_z = m.position(spawn_transform)
 		local vehicle_data = {
 			id = spawned_objects.spawned_vehicle.id,
+			name = selected_prefab.location.data.name,
 			survivors = vehicle_survivors,
 			path = {
 				[1] = {
@@ -753,7 +754,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
 		local vehicle_data = { 
-			id = spawned_objects.spawned_vehicle.id, 
+			id = spawned_objects.spawned_vehicle.id,
+			name = selected_prefab.location.data.name,
 			survivors = vehicle_survivors, 
 			path = { 
 				[1] = {
@@ -1217,6 +1219,8 @@ function onVehicleUnload(incoming_vehicle_id)
 						cleanVehicle(squad_index, vehicle_id)
 					else
 						if render_debug then s.announce("dlcw", "onVehicleUnload: set vehicle pseudo: " .. vehicle_id) end
+						if not vehicle_object.name then vehicle_object.name = "nil" end
+						wpDLCDebug("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, false)
 						vehicle_object.state.is_simulating = false
 					end
 				end
@@ -1248,11 +1252,7 @@ end
 
 function onVehicleLoad(incoming_vehicle_id)
 	if is_dlc_weapons then
-		local vehicle_data, is_success = s.getVehicleData(incoming_vehicle_id)
-		if not is_success then
-			vehicle_data.filename = "Unable to get vehicle data!"
-		end
-		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id.." | Name: "vehicle_data.filename.., true, false)
+		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id, true, false)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
@@ -1263,7 +1263,9 @@ function onVehicleLoad(incoming_vehicle_id)
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 				if incoming_vehicle_id == vehicle_id then
-					if render_debug then s.announce("dlcw", "onVehicleLoad: set vehicle simulating: " .. vehicle_id) end
+					wpDLCDebug("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, false)
+					if not vehicle_object.name then vehicle_object.name = "nil" end
+					wpDLCDebug("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, false)
 					vehicle_object.state.is_simulating = true
 					vehicle_object.transform = s.getVehiclePos(vehicle_id)
 
