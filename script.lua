@@ -102,7 +102,7 @@ Characters should be placed as needed
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.16)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.17)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1230,24 +1230,28 @@ function onVehicleUnload(incoming_vehicle_id)
 end
 
 function setLandTarget(vehicle_id, vehicle_object)
-	s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
-	s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
-	s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_X", vehicle_object.path[#vehicle_object.path].x)
-	s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_Z", vehicle_object.path[#vehicle_object.path].z)
-	local terrain_type = 2
-	if vehicle_object.terrain_type == "road" then
-		terrain_type = 1
-	elseif vehicle_object.terrain_type == "bridge" then
-		terrain_type = 3
-	end
+	if vehicle_object.state.is_simulating then
+		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
+		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
+		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_X", vehicle_object.path[#vehicle_object.path].x)
+		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_Z", vehicle_object.path[#vehicle_object.path].z)
+		local terrain_type = 2
+		if vehicle_object.terrain_type == "road" then
+			terrain_type = 1
+		elseif vehicle_object.terrain_type == "bridge" then
+			terrain_type = 3
+		end
 
-	local is_aggressive = 0
-	if vehicle_object.is_aggressive == "aggressive" then
-		is_aggressive = 1
+		local is_aggressive = 0
+		if vehicle_object.is_aggressive == "aggressive" then
+			is_aggressive = 1
+		end
+		s.setVehicleKeypad(vehicle_id, "AI_ROAD_TYPE", terrain_type)
+		s.setVehicleKeypad(vehicle_id, "AI_AGR_STATUS", is_aggressive)
+		--wpDLCDebug("x: "..vehicle_object.path[1].x.." z: "..vehicle_object.path[1].z, true, false)
+	else
+		wpDLCDebug("Warning: Tried to set "..vehicle_id.."'s keypads, but it is in pseudo! (vehicle name: "..vehicle_object.name..")", true, true)
 	end
-	s.setVehicleKeypad(vehicle_id, "AI_ROAD_TYPE", terrain_type)
-	s.setVehicleKeypad(vehicle_id, "AI_AGR_STATUS", is_aggressive)
-	--wpDLCDebug("x: "..vehicle_object.path[1].x.." z: "..vehicle_object.path[1].z, true, false)
 end
 
 function onVehicleLoad(incoming_vehicle_id)
