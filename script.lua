@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.18)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.19)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -16,6 +16,7 @@ local COMMAND_PATROL = "patrol"
 local COMMAND_STAGE = "stage"
 local COMMAND_RESUPPLY = "resupply"
 local COMMAND_TURRET = "turret"
+local COMMAND_RETREAT = "retreat"
 
 local AI_TYPE_BOAT = "boat"
 local AI_TYPE_LAND = "land"
@@ -522,6 +523,9 @@ function spawnTurret(island)
 					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
 				}
 			},
+			capabilities = {
+				gps_missiles = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE")
+			},
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			transform = spawn_transform,
 			target_player_id = -1,
@@ -700,6 +704,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
 					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
 				}
+			},
+			capabilities = {
+				gps_missiles = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE")
 			},
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			is_resupply_on_load = false,
@@ -990,7 +997,7 @@ end
 
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
-	vehicleData = s.getVehicleData(incoming_vehicle_id)
+		vehicleData = s.getVehicleData(incoming_vehicle_id)
 		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
 		if player_vehicle ~= nil then
@@ -1010,12 +1017,17 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 					vehicle_object.current_damage = vehicle_object.current_damage + amount
 
 					local enemy_hp = g_savedata.settings.ENEMY_HP
-					if g_savedata.settings.SINKING_MODE == false or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
-						if vehicle_object.size == "large" then
-							enemy_hp = enemy_hp * 4
-						elseif vehicle_object.size == "medium" then
-							enemy_hp = enemy_hp * 2
-						end
+					if vehicle_object.size == "large" then
+						enemy_hp = enemy_hp * 4
+					elseif vehicle_object.size == "medium" then
+						enemy_hp = enemy_hp * 2
+					end
+
+					if g_savedata.settings.SINKING_MODE or vehicle_object.capabilities.gps_missiles then
+						enemy_hp = enemy_hp * 8
+					end
+
+					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
 
 						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
 							killVehicle(squad_index, vehicle_id, true)
@@ -1134,8 +1146,25 @@ function onVehicleUnload(incoming_vehicle_id)
 	end
 end
 
+function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
+	local squad_vision = squadGetVisionData(squad)
+	local target = nil
+	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+	end
+	if target then
+		tx, ty, tz = matrix.position(target.last_known_pos)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_X", tx)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_Y", ty)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_Z", tz)
+		s.pressVehicleButton(vehicle_id, "AI_GPS_MISSILE_FIRE")
+	end
+end
+
 function setLandTarget(vehicle_id, vehicle_object)
-	if vehicle_object.state.is_simulating and vehicle_id and vehicle_object and vehicle_object.path[1].x and vehicle_object.path[1].z then
+	if vehicle_object.state.is_simulating and vehicle_id and vehicle_object.path[1].x then
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_X", vehicle_object.path[#vehicle_object.path].x)
@@ -2119,6 +2148,7 @@ function tickSquadrons()
 						local target_player = target_player_data.obj
 						local target_x, target_y, target_z = m.position(target_player.last_known_pos)
 						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+						
 
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
@@ -2155,7 +2185,6 @@ function tickSquadrons()
 						
 						if #vehicle_object.path <= 1 then
 							resetPath(vehicle_object)
-							wpDLCDebugVehicle(vehicle_id, "(Tick Squadrons #2) Vehicle: "..vehicle_id.." path is getting reset!", true, false)
 							if vehicle_object.type == AI_TYPE_PLANE then
 								if m.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
 									addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
@@ -2184,6 +2213,15 @@ function tickSquadrons()
 
 				if squad_vision:is_engage() == false then
 					setSquadCommand(squad, COMMAND_NONE)
+				end
+			end
+		end
+		if isTickID(squad_index, 10) then
+			if squad.command ~= COMMAND_RETREAT then
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
+						if vehicle_object.capabilities.gps_missiles then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
+					end
 				end
 			end
 		end
@@ -2548,6 +2586,9 @@ function tickVehicles()
 						hp = hp * 4
 					elseif vehicle_object.size == "medium" then
 						hp = hp * 2
+					end
+					if g_savedata.settings.SINKING_MODE or vehicle_object.capabilities.gps_missiles then
+						hp = hp * 8
 					end
 					debug_data = debug_data .. "hp: " .. vehicle_object.current_damage .. " / " .. hp .. "\n"
 
@@ -3231,7 +3272,6 @@ function spawnModifiers(action,...)
 				end
 			end
 			if not sel_vehicle then
-				wpDLCDebug(g_savedata.vehicle_list[_[2]].location.data.name.." was attempted to be spawned, but was not found!", true, true)
 				return false
 			end
 		elseif _[1] == RANDOM and not _[2] then
@@ -3266,8 +3306,6 @@ function spawnModifiers(action,...)
 			end
 			sel_vehicle = randChance(vehicle_chances)
 		else
-			wpDLCDebug("I was asked to spawn a vehicle, but there was improper arguments!", true, true)
-			wpDLCDebug("action: "..tostring(action).." _[1]: "..tostring(_[1]).." _[2]: "..tostring(_[2]))
 			return false
 		end
 		return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
