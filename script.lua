@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.19)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.20)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -727,165 +727,190 @@ end
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command, arg1, arg2, arg3, arg4)
 	if is_dlc_weapons then
+		if string.sub(command, 1, 5) == "?WDLC" or string.sub(command, 1, 5) == "?wep_" or command == "?target" or string.sub(command, 1, 11) == "?WeaponsDLC" then
+			-- non admin commands
 
-		-- non admin commands
-
-		-- admin commands
-		if is_admin then
-			if command == "?wep_reset" then
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					if squad_index ~= RESUPPLY_SQUAD_INDEX then
-						setSquadCommand(squad, COMMAND_NONE)
-					end
-				end
-				g_is_air_ready = true
-				g_is_boats_ready = false
-				g_savedata.is_attack = false
-
-			elseif command == "?wep_debug_vehicle" then
-				g_debug_vehicle_id = arg1
-
-			elseif command == "?wep_debug_speed" then
-					g_debug_speed_multiplier = arg1
-
-			elseif command == "?wep_vreset" then
-					s.resetVehicleState(arg1)
-
-			elseif command == "?target" then
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						for i, char in  pairs(vehicle_object.survivors) do
-							s.setAITargetVehicle(char.id, arg1)
+			-- admin commands
+			if is_admin then
+				if command == "?wep_reset" then
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						if squad_index ~= RESUPPLY_SQUAD_INDEX then
+							setSquadCommand(squad, COMMAND_NONE)
 						end
 					end
-				end
+					g_is_air_ready = true
+					g_is_boats_ready = false
+					g_savedata.is_attack = false
 
-			elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
-				if arg1 then
-					local valid_vehicle = false
-					for vehicle_index, veh_obj in pairs(g_savedata.vehicle_list) do
-						if veh_obj.location.data.name == string.gsub(arg1, "_", " ") then
-							valid_vehicle = true
-							wpDLCDebug("Spawning \""..veh_obj.location.data.name.."\"", false, false, user_peer_id)
-							wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
-							spawnAIVehicle(true, user_peer_id, vehicle_index)
-						end
-					end
-					if not valid_vehicle then
-						wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores")
-					end
-				else -- if vehicle not specified, spawn random vehicle
-					wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
-					spawnAIVehicle(true, user_peer_id)
-				end
+				elseif command == "?wep_debug_vehicle" then
+					g_debug_vehicle_id = arg1
 
-			elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
-				wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
-				for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
-					wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
-					wpDLCDebug("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, false, user_peer_id)
-				end
+				elseif command == "?wep_debug_speed" then
+						g_debug_speed_multiplier = arg1
 
-			elseif command == "?WeaponsDLCDebug" or command == "?WDLCD" then
-				render_debug = not render_debug
-				playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+				elseif command == "?wep_vreset" then
+						s.resetVehicleState(arg1)
 
-				if playerData.isDebugging.user_peer_id ~= true then
-					wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
-				else
-					wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
-				end
-
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						s.removeMapObject(0,vehicle_object.map_id)
-						s.removeMapLine(0,vehicle_object.map_id)
-						for i = 1, #vehicle_object.path - 1 do
-							local waypoint = vehicle_object.path[i]
-							s.removeMapLine(0, waypoint.ui_id)
-						end
-					end
-				end
-			
-			elseif command == "?WDLCST" or command == "?WeaponsDLCSpawnTurret" then
-				local turrets_spawned = 1
-				spawnTurret(g_savedata.ai_base_island)
-				for island_index, island in pairs(g_savedata.controllable_islands) do
-					if island.faction == FACTION_AI then
-						spawnTurret(island)
-						turrets_spawned = turrets_spawned + 1
-					end
-				end
-				wpDLCDebug("attempted to spawn "..turrets_spawned.." turrets", false, false, user_peer_id)
-
-			elseif command == "?WDLCCP" or command == "?WeaponsDLCCapturePoint" then
-				if arg1 and arg2 then
-					local is_island = false
-					for island_index, island in pairs(g_savedata.controllable_islands) do
-						if island.name == string.gsub(arg1, "_", " ") then
-							is_island = true
-							if island.faction ~= arg2 then
-								if arg2 == FACTION_AI or arg2 == FACTION_NEUTRAL or arg2 == FACTION_PLAYER then
-									captureIsland(island, arg2, user_peer_id)
-								else
-									wpDLCDebug(arg2.." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
-								end
-							else
-								wpDLCDebug(island.name.." is already set to "..island.faction..".", false, true, user_peer_id)
+				elseif command == "?target" then
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							for i, char in  pairs(vehicle_object.survivors) do
+								s.setAITargetVehicle(char.id, arg1)
 							end
 						end
 					end
-					if not is_island then
-						wpDLCDebug(arg1.." is not a valid island! note: required to use \"_\" instead of \" \" in its name", false, true, user_peer_id)
+
+				elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
+					if arg1 then
+						local valid_vehicle = false
+						for vehicle_index, veh_obj in pairs(g_savedata.vehicle_list) do
+							if veh_obj.location.data.name == string.gsub(arg1, "_", " ") then
+								valid_vehicle = true
+								wpDLCDebug("Spawning \""..veh_obj.location.data.name.."\"", false, false, user_peer_id)
+								wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
+								spawnAIVehicle(true, user_peer_id, vehicle_index)
+							end
+						end
+						if not valid_vehicle then
+							wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores")
+						end
+					else -- if vehicle not specified, spawn random vehicle
+						wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
+						spawnAIVehicle(true, user_peer_id)
+					end
+
+				elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
+					wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
+					for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
+						wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
+						wpDLCDebug("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, false, user_peer_id)
+					end
+
+				elseif command == "?WeaponsDLCDebug" or command == "?WDLCD" then
+					if arg1 then
+						vehicles_debugging[tonumber(arg1)] = not vehicles_debugging[tonumber(arg1)]
+						local enDis = "dis"
+						if vehicles_debugging[tonumber(arg1)] then
+							enDis = "en"
+						end
+						wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg1, false, false, user_peer_id)
+					else
+						render_debug = not render_debug
+						playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+
+						if playerData.isDebugging.user_peer_id ~= true then
+							wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
+						else
+							wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
+						end
+
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+								s.removeMapObject(0,vehicle_object.map_id)
+								s.removeMapLine(0,vehicle_object.map_id)
+								for i = 1, #vehicle_object.path - 1 do
+									local waypoint = vehicle_object.path[i]
+									s.removeMapLine(0, waypoint.ui_id)
+								end
+							end
+						end
+					end
+				elseif command == "?WDLCST" or command == "?WeaponsDLCSpawnTurret" then
+					local turrets_spawned = 1
+					spawnTurret(g_savedata.ai_base_island)
+					for island_index, island in pairs(g_savedata.controllable_islands) do
+						if island.faction == FACTION_AI then
+							spawnTurret(island)
+							turrets_spawned = turrets_spawned + 1
+						end
+					end
+					wpDLCDebug("attempted to spawn "..turrets_spawned.." turrets", false, false, user_peer_id)
+				elseif command == "?WDLCCP" or command == "?WeaponsDLCCapturePoint" then
+					if arg1 and arg2 then
+						local is_island = false
+						for island_index, island in pairs(g_savedata.controllable_islands) do
+							if island.name == string.gsub(arg1, "_", " ") then
+								is_island = true
+								if island.faction ~= arg2 then
+									if arg2 == FACTION_AI or arg2 == FACTION_NEUTRAL or arg2 == FACTION_PLAYER then
+										captureIsland(island, arg2, user_peer_id)
+									else
+										wpDLCDebug(arg2.." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
+									end
+								else
+									wpDLCDebug(island.name.." is already set to "..island.faction..".", false, true, user_peer_id)
+								end
+							end
+						end
+						if not is_island then
+							wpDLCDebug(arg1.." is not a valid island! note: required to use \"_\" instead of \" \" in its name", false, true, user_peer_id)
+						end
+					else
+						wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
+					end
+
+				elseif command == "?WDLC_RELOAD_ADDON" or command == "?WeaponsDLC_RELOAD_ADDON" then
+					if playerData.isDoAsISay.user_peer_id == true and arg1 == "do_as_i_say" then
+						wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
+						onCreate(true, true, user_peer_id)
+					elseif playerData.isDoAsISay.user_peer_id == true and not arg1 then
+						wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
+						playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+					elseif not arg1 then
+						wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
+						playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+					end
+
+				elseif command == "?WDLCI" or command == "?WeaponsDLCInfo" then
+					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
+					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
+					wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
+					wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
+					if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
+						wpDLCDebug("Fully Reloaded Versions: ", false, false, user_peer_id)
+						for i = 1, #g_savedata.info.full_reload_versions do
+							wpDLCDebug(g_savedata.info.full_reload_versions[i], false, false, user_peer_id)
+						end
+					end
+				elseif command == "?WDLCAM" or command == "?WeaponsDLCAIModifier" then
+					if arg1 then
+						spawnModifiers("debug", arg1, user_peer_id)
+					else
+						wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
+					end
+				elseif command == "?WDLCDV" or command == "?WeaponsDLCDeleteVehicle" then
+					if arg1 then
+						if arg1 == "all" then
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+									killVehicle(squad_index, vehicle_id, true, true)
+									wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id, false, false, user_peer_id)
+								end
+							end
+						else
+							local found_vehicle = false
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+									if vehicle_id == tonumber(arg1) then
+										found_vehicle = true
+										killVehicle(squad_index, vehicle_id, true, true)
+										wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, false, user_peer_id)
+									end
+								end
+							end
+							if not found_vehicle then
+								wpDLCDebug("I was unable to find the vehicle with the id of "..arg1, false, true, user_peer_id)
+							end
+						end
+					else
+						wpDLCDebug("invalid syntax! you must either choose a vehicle id, or \"all\" to remove all enemy ai vehicles", false, true, user_peer_id) 
 					end
 				else
-					wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
+					wpDLCDebug("unknown command "..command, false, true, user_peer_id)
 				end
-
-			elseif command == "?WDLC_RELOAD_ADDON" or command == "?WeaponsDLC_RELOAD_ADDON" then
-				if playerData.isDoAsISay.user_peer_id == true and arg1 == "do_as_i_say" then
-					wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
-					onCreate(true, true, user_peer_id)
-				elseif playerData.isDoAsISay.user_peer_id == true and not arg1 then
-					wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
-					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-				elseif not arg1 then
-					wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
-					playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-				end
-
-			elseif command == "?WDLCI" or command == "?WeaponsDLCInfo" then
-				wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
-				wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
-				wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
-				wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
-				if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
-					wpDLCDebug("Fully Reloaded Versions: ", false, false, user_peer_id)
-					for i = 1, #g_savedata.info.full_reload_versions do
-						wpDLCDebug(g_savedata.info.full_reload_versions[i], false, false, user_peer_id)
-					end
-				end
-
-			elseif command == "?WDLCDV" or command == "?WeaponsDLCDebugVehicle" then
-				if arg1 then
-					vehicles_debugging[tonumber(arg1)] = not vehicles_debugging[tonumber(arg1)]
-					local enDis = "dis"
-					if vehicles_debugging[tonumber(arg1)] then
-						enDis = "en"
-					end
-					wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg1, false, false, user_peer_id)
-				else
-					wpDLCDebug("the vehicle id needs to be specified!", false, true, user_peer_id)
-				end
-			elseif command == "?WDLCAM" or command == "?WeaponsDLCAIModifier" then
-				if arg1 then
-					spawnModifiers("debug", arg1, user_peer_id)
-				else
-					wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
-				end
+			else
+				wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
 			end
-		else
-			wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
 		end
 	end
 end
