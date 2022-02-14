@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.20)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.21)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
