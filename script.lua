@@ -1,108 +1,7 @@
---[[
-
-The following comment contains information from the Devs for setting up a vehicle to be used in the DLC Weapons script.
-These guidelies only outline the technical changes needed for a vehicle to interface with the script and is not a guide on making a stable/optimized vehicle.
-
-General AI Requirements (Documented in-game):
-====================================
-
-AI Seats require the correct AI type to be set on their properties.
-All pilot hotkeys should use Push mode.
-
-SEAT TYPE = Ship Pilot
-	Hotkey 1 = Engine On
-	Hotkey 2 = Engine Off
-	Axis W = Throttle
-	Axis D = Steering
-
-SEAT TYPE = Helicopter Pilot
-	Hotkey 1 = Engine On 
-	Hotkey 2 = Engine Off
-	Axis W = Pitch
-	Axis D = Roll
-	Axis Up = Collective
-	Axis Right = Yaw
-	Trigger = Shoot
-
-SEAT TYPE = Plane Pilot
-	Hotkey 1 = Engine On 
-	Hotkey 2 = Engine Off
-	Axis W = Pitch
-	Axis D = Roll
-	Axis Up = Throttle
-	Axis Right = Yaw
-	Trigger = Shoot
-
-SEAT TYPE = Gunner
-	Axis W = Pitch
-	Axis D = Yaw
-	Trigger = Shoot
-
-SEAT TYPE = Designator
-	Axis W = Pitch
-	Axis D = Yaw
-	Trigger = Designate
-
-Script Specific Requirements:
-====================================
-
-Required 1x Push Button named "Resupply"
-This should turn on when the vehicle should be regarded as out of ammo, it will go and resupply at the nearest ally island
-
-Required Seat Name (1 per vehicle):
-Pilot
-Captain
-
-Forward firing guns should be attached to the pilot's trigger hotkey.
-Pilots in Gun-Run state with pull their trigger when locked onto their target.
-
-Optional Seat Names (x per vehicle or turret):
-Gunner 1
-Gunner 2
-..
-
-Guns controlled by gunners should be named the same as their controlling seat, e.g. Gunner 1
-
-Ammo / Belts / Guns that need direct reloading should be named:
-Ammo 1
-Ammo 2
-..
-
-Batteries should be named:
-Battery 1
-Battery 2
-
-Fuel Tanks should be named:
-Jet 1
-Jet 2
-Diesel 1
-Diesel 2
-
-Antennas and ropes should be removed where possible and physics should be simplified as much as possible to preserve performance with many vehicles.
-
-Playlist Specific Tags/Requirements:
-====================================
-
-Required type tag:
-from=dlc_weapons,type=wep_boat
-from=dlc_weapons,type=wep_plane
-from=dlc_weapons,type=wep_heli
-from=dlc_weapons,type=wep_land
-from=dlc_weapons,type=wep_turret
-
-Optional tags:
-radar
-(Increases the vision range for the vehicle in harsh weather)
-sonar
-(Adds medium underwater vision range to the vehicle)
-
-Characters should be placed as needed
-]]
-
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.17)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.18)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -133,6 +32,8 @@ local TARGET_VISIBILITY_INVESTIGATE = "investigate"
 local TRAIN = "train"
 local REWARD = "reward"
 local PUNISH = "punish"
+local SELECTED = "selected"
+local RANDOM = "random"
 
 local AI_SPEED_PSEUDO_PLANE = 60
 local AI_SPEED_PSEUDO_HELI = 40
@@ -146,6 +47,7 @@ local FACTION_AI = "ai"
 local FACTION_PLAYER = "player"
 
 local CAPTURE_RADIUS = 1500
+local RESUPPLY_RADIUS = 200
 local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 
 local VISIBLE_DISTANCE = 1500
@@ -244,6 +146,7 @@ g_savedata = {
 	debug_data = {},
 	constructable_vehicles = {},
 	constructable_turrets = {},
+	vehicle_list = {},
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
 	is_attack = false,
@@ -287,7 +190,7 @@ function wpDLCDebugVehicle(id, message, requiresDebugging, isError, toPlayer)
 end
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
-	if g_savedata.settings == nil then
+	if not g_savedata.settings then
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
 			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
@@ -352,7 +255,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				if not peer_id then
 					-- things that should never be changed even after this command
 					-- such as changing what version the world was created in, as this could lead to issues when trying to debug
-					if g_savedata.info.creation_version == nil then
+					if not g_savedata.info.creation_version then
 						g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
 					end
 				end
@@ -499,6 +402,7 @@ function buildPrefabs(location_index)
     local location = built_locations[location_index]
 
 	-- construct vehicle-character prefab list
+	local vehicle_index = #g_savedata.vehicle_list + 1 or 1
 	for key, vehicle in pairs(location.objects.vehicles) do
 
 		local prefab_data = {location = location, vehicle = vehicle, survivors = {}, fires = {}}
@@ -511,13 +415,19 @@ function buildPrefabs(location_index)
 			table.insert(prefab_data.fires, fire)
 		end
 
+		
+		if hasTag(vehicle.tags, "type=wep_turret") or #prefab_data.survivors > 0 then
+			table.insert(g_savedata.vehicle_list, vehicle_index, prefab_data)
+			g_savedata.vehicle_list[vehicle_index].role = getTagValue(vehicle.tags, "role", true) or "general"
+			g_savedata.vehicle_list[vehicle_index].vehicle_type = string.gsub(getTagValue(vehicle.tags, "type", true), "wep_", "") or "unknown"
+			g_savedata.vehicle_list[vehicle_index].strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
+		end
 
 		--
 		--
 		-- <<<<<<<<<< get vehicles, and put them into a table, sorted by their directive/role and their type, as well as additional info >>>>>>>>>
 		--
 		--
-
 
 		if hasTag(vehicle.tags, "type=wep_turret") then
 			table.insert(g_savedata.constructable_turrets, prefab_data)
@@ -530,7 +440,8 @@ function buildPrefabs(location_index)
 				local strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
 				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
-				wpDLCDebug(" ! role: "..role, false, false)
+				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
+				wpDLCDebug("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy], false, false)
 			else
 				tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
@@ -649,19 +560,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
 
-	local can_spawn = true
-	local spawn_attempts = 0
-	local selected_prefab = nil
+	wpDLCDebug("requested prefab: "..tostring(requested_prefab), true, false)
 
-	repeat
-		selected_prefab = g_savedata.constructable_vehicles[requested_prefab] or spawnModifiers("spawn")
-		spawn_attempts = spawn_attempts + 1
-
-		if hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab then can_spawn = false end
-		if hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab then can_spawn = false end
-
-		if (spawn_attempts > 10) then return end -- Failed to spawn
-	until (can_spawn)
+	selected_prefab = spawnModifiers("spawn", SELECTED, requested_prefab) or spawnModifiers("spawn", RANDOM)
 	
 	local spawn_transform = m.translation(0, 0, 0)
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
@@ -712,7 +613,13 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			return false
 		end
 	else
-		local spawn_transform = m.multiply(g_savedata.ai_base_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
+		if hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and selected_prefab or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and selected_prefab then 
+			spawn_transform = m.multiply(g_savedata.ai_base_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
+		else
+			wpDLCDebug("unable to spawn vehicle, attempting to spawn another vehicle...", true, false)
+			spawnAIVehicle()
+			return false
+		end
 	end
 
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -849,12 +756,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 			elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
 				if arg1 then
 					local valid_vehicle = false
-					for vehicle_index, vehicle_object in pairs(g_savedata.constructable_vehicles) do
-						if vehicle_object.location.data.name == string.gsub(arg1, "_", " ") then
+					for vehicle_index, veh_obj in pairs(g_savedata.vehicle_list) do
+						if veh_obj.location.data.name == string.gsub(arg1, "_", " ") then
 							valid_vehicle = true
-							wpDLCDebug("Spawning \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
+							wpDLCDebug("Spawning \""..veh_obj.location.data.name.."\"", false, false, user_peer_id)
 							wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
-							wpDLCDebug("name from index: \""..g_savedata.constructable_vehicles[vehicle_index].location.data.name.."\"", false, false, user_peer_id)
 							spawnAIVehicle(true, user_peer_id, vehicle_index)
 						end
 					end
@@ -868,8 +774,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 			elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
 				wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
-				for vehicle_index, vehicle_object in pairs(g_savedata.constructable_vehicles) do
-					wpDLCDebug(" ", false, false, user_peer_id)
+				for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
 					wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
 					wpDLCDebug("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, false, user_peer_id)
 				end
@@ -1230,7 +1135,7 @@ function onVehicleUnload(incoming_vehicle_id)
 end
 
 function setLandTarget(vehicle_id, vehicle_object)
-	if vehicle_object.state.is_simulating then
+	if vehicle_object.state.is_simulating and vehicle_id and vehicle_object and vehicle_object.path[1].x and vehicle_object.path[1].z then
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_X", vehicle_object.path[1].x)
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_LAND_Z", vehicle_object.path[1].z)
 		s.setVehicleKeypad(vehicle_id, "AI_WAYPOINT_FINAL_LAND_X", vehicle_object.path[#vehicle_object.path].x)
@@ -1248,9 +1153,6 @@ function setLandTarget(vehicle_id, vehicle_object)
 		end
 		s.setVehicleKeypad(vehicle_id, "AI_ROAD_TYPE", terrain_type)
 		s.setVehicleKeypad(vehicle_id, "AI_AGR_STATUS", is_aggressive)
-		--wpDLCDebug("x: "..vehicle_object.path[1].x.." z: "..vehicle_object.path[1].z, true, false)
-	else
-		wpDLCDebug("Warning: Tried to set "..vehicle_id.."'s keypads, but it is in pseudo! (vehicle name: "..vehicle_object.name..")", true, true)
 	end
 end
 
@@ -2078,7 +1980,7 @@ function tickSquadrons()
 						addPath(vehicle_object, m.multiply(ally_island.transform, m.translation(math.random(-250, 250), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-250, 250))))
 					end
 					
-					if m.distance(g_savedata.ai_base_island.transform, vehicle_object.transform) < CAPTURE_RADIUS then
+					if m.distance(g_savedata.ai_base_island.transform, vehicle_object.transform) < RESUPPLY_RADIUS then
 
 						if vehicle_object.state.is_simulating then
 							-- resupply ammo
@@ -3173,7 +3075,7 @@ function iterLocations(playlist_index)
 		local location_data = nil
 		local index = location_count
 
-		while location_data == nil and location_index < location_count do
+		while not location_data and location_index < location_count do
 			location_data = s.getLocationData(playlist_index, location_index)
 			index = location_index
 			location_index = location_index + 1
@@ -3198,7 +3100,7 @@ function iterObjects(playlist_index, location_index)
 		local object_data = nil
 		local index = object_count
 
-		while object_data == nil and object_index < object_count do
+		while not object_data and object_index < object_count do
 			object_data = s.getLocationComponentData(playlist_index, location_index, object_index)
 			object_data.index = object_index
 			index = object_index
@@ -3315,37 +3217,60 @@ function spawnModifiers(action,...)
 			end
 		end
 	elseif action == "spawn" then
-		local role_chances = {}
-		local veh_type_chances = {}
-		local strat_chances = {}
-		local vehicle_chances = {}
-		for role, v in pairs(g_savedata.constructable_vehicles) do
-			if type(v) == "table" then
-				if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
-					role_chances[role] = g_savedata.constructable_vehicles[role].mod
+		local sel_role = nil
+		local sel_veh_type = nil
+		local sel_strat = nil
+		local sel_vehicle = nil
+		if _[1] == SELECTED and _[2] then
+			sel_role = g_savedata.vehicle_list[_[2]].role
+			sel_veh_type = g_savedata.vehicle_list[_[2]].vehicle_type
+			sel_strat = g_savedata.vehicle_list[_[2]].strategy
+			for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+				if not sel_vehicle and _[2] == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
+					sel_vehicle = vehicle_id
 				end
 			end
-		end
-		local role = randChance(role_chances)
-		for veh_type, v in pairs(g_savedata.constructable_vehicles[role]) do
-			if type(v) == "table" then
-				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[role][veh_type].mod
+			if not sel_vehicle then
+				wpDLCDebug(g_savedata.vehicle_list[_[2]].location.data.name.." was attempted to be spawned, but was not found!", true, true)
+				return false
 			end
-		end
-		local veh_type = randChance(veh_type_chances)
-		for strat, v in pairs(g_savedata.constructable_vehicles[role][veh_type]) do
-			if type(v) == "table" then
-				strat_chances[strat] = g_savedata.constructable_vehicles[role][veh_type][strat].mod
+		elseif _[1] == RANDOM and not _[2] then
+			local role_chances = {}
+			local veh_type_chances = {}
+			local strat_chances = {}
+			local vehicle_chances = {}
+			for role, v in pairs(g_savedata.constructable_vehicles) do
+				if type(v) == "table" then
+					if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
+						role_chances[role] = g_savedata.constructable_vehicles[role].mod
+					end
+				end
 			end
-		end
-		local strat = randChance(strat_chances)
-		for vehicle, v in pairs(g_savedata.constructable_vehicles[role][veh_type][strat]) do
-			if type(v) == "table" then
-				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[role][veh_type][strat][vehicle].mod
+			sel_role = randChance(role_chances)
+			for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
+				if type(v) == "table" then
+					veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+				end
 			end
+			sel_veh_type = randChance(veh_type_chances)
+			for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
+				if type(v) == "table" then
+					strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
+				end
+			end
+			sel_strat = randChance(strat_chances)
+			for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+				if type(v) == "table" then
+					vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
+				end
+			end
+			sel_vehicle = randChance(vehicle_chances)
+		else
+			wpDLCDebug("I was asked to spawn a vehicle, but there was improper arguments!", true, true)
+			wpDLCDebug("action: "..tostring(action).." _[1]: "..tostring(_[1]).." _[2]: "..tostring(_[2]))
+			return false
 		end
-		local vehicle = randChance(vehicle_chances)
-		return g_savedata.constructable_vehicles[role][veh_type][strat][vehicle]
+		return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
 	elseif action == "train" then
 		if _[1] == "punish" then
 			if _[2] then g_savedata.constructable_vehicles[_[2]].mod = math.max(g_savedata.constructable_vehicles[_[2]].mod + ai_training.punishments[_[3]], 0) end
