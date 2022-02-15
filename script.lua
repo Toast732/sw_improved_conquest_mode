@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.23)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.24)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -300,7 +300,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						map_id = s.getMapID(),
 						assigned_squad_index = -1,
 						ai_capturing = 0,
-						players_capturing = 0
+						players_capturing = 0,
+						spawning_capabilities = {
+							heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
+							plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
+							land = hasTag(flagZone.tags, "can_spawn=land") or false,
+							sea = hasTag(flagZone.tags, "can_spawn=sea") or false
+						}
 					}
 					flag_zones[flagZone_index] = nil
 				end
@@ -332,7 +338,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				production_timer = 0,
 				zones = {},
 				ai_capturing = 0,
-				players_capturing = 0
+				players_capturing = 0,
+				spawning_capabilities = {
+					heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
+					plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
+					land = hasTag(flagZone.tags, "can_spawn=land") or false,
+					sea = hasTag(flagZone.tags, "can_spawn=sea") or false
+				}
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
@@ -357,7 +369,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					assigned_squad_index = -1, 
 					zones = {},
 					ai_capturing = 0,
-					players_capturing = 0
+					players_capturing = 0,
+					spawning_capabilities = {
+						heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
+						plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
+						land = hasTag(flagZone.tags, "can_spawn=land") or false,
+						sea = hasTag(flagZone.tags, "can_spawn=sea") or false
+					}
 				}
 
 				for _, turretZone in pairs(turret_zones) do
