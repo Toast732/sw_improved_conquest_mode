@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.25)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.26)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -72,6 +72,13 @@ local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local vehicles_debugging = {}
+
+local time = { -- the time unit in ticks, irl time, not in game
+	second = 60,
+	minute = 3600,
+	hour = 216000,
+	day = 5184000
+}
 
 local default_mods = {
 	attack = 0,
@@ -157,6 +164,11 @@ g_savedata = {
 		has_default_addon = false,
 	},
 	land_spawn_zones = {},
+	tick_counter = 0,
+	ai_history = {
+		has_defended = 0, -- logs the time in ticks the player attacked at
+		defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
+	},
 }
 
 --[[
@@ -254,6 +266,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.constructable_turrets = {}
 					g_savedata.is_attack = {}
 					g_savedata.vehicle_list = {}
+					g_savedata.ai_history = {}
+					g_savedata.tick_counter = 0
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
@@ -2758,8 +2772,58 @@ function tickTerrainScanners()
 	end
 end
 
+function tickModifiers()
+	if isTickID(g_savedata.tick_counter, time.hour / 2) then -- defence, if the player has attacked within the last 30 minutes, increase defence
+		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 then -- if the last time the player attacked was equal or less than 30 minutes ago
+			spawnModifiers(TRAIN, REWARD, "defend", 4)
+			spawnModifiers(TRAIN, PUNISH, "attack", 3)
+			wpDLCDebug("players have attacked within the last 30 minutes! increasing defence, decreasing attack!", true, false)
+		end
+	end
+	if isTickID(g_savedata.tick_counter, time.hour) then -- attack, if the player has not attacked in the last one hour, raise attack
+		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour then -- if the last time the player attacked was more than an hour ago
+			spawnModifiers(TRAIN, REWARD, "attack", 3)
+			wpDLCDebug("players have not attacked in the past hour! increasing attack!", true, false)
+		end
+	end
+	if isTickID(g_savedata.tick_counter, time.hour * 2) then -- defence, if the player has not attacked in the last two hours, then lower defence
+		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour * 2 then -- if the last time the player attacked was more than two hours ago
+			spawnModifiers(TRAIN, PUNISH, "defend", 3)
+			wpDLCDebug("players have not attacked in the last two hours! lowering defence!", true, false)
+		end
+	end
+
+	-- checks if the player is nearby the ai's controlled islands, works like a capacitor, however the
+	-- closer the player is, the faster it will charge up, once it hits its limit, it will then detect that the
+	-- player is attacking, and will then use that to tell the ai to increase on defence
+	for island_index, island in pairs(g_savedata.controllable_islands) do
+		if isTickID(island_index * 30, time.minute / 2) then
+			if island.faction == FACTION_AI then
+				local player_list = s.getPlayers()
+				for player_index, player in pairs(player_list) do
+					player_pos = s.getPlayerPos(player)
+					player_island_dist = xzDistance(player_pos, island.transform)
+					if player_island_dist < 1000 then
+						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
+					elseif player_island_dist < 2000 then
+						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 2
+					elseif player_island_dist < 3000 then
+						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 1
+					end
+					if g_savedata.ai_history.defended_charge >= 6 then
+						g_savedata.ai_history.defended_charge = 0
+						g_savedata.ai_history.has_defended = g_savedata.tick_counter
+						wpDLCDebug(player.name.." has been detected to be attacking "..island.name..", the ai will be raising their defences!", true, false)
+					end
+				end
+			end
+		end
+	end
+end
+
 function onTick(tick_time)
 	g_tick_counter = g_tick_counter + 1
+	g_savedata.tick_counter = g_savedata.tick_counter + 1
 
 	if is_dlc_weapons then
 		tickUpdateVehicleData()
@@ -2769,6 +2833,7 @@ function onTick(tick_time)
 		tickAI()
 		tickSquadrons()
 		tickVehicles()
+		tickModifiers()
 		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
 		end
@@ -3378,6 +3443,12 @@ function spawnModifiers(action,...)
 	elseif action == "debug" then
 		wpDLCDebug(_[1].."'s modifier: "..g_savedata.constructable_vehicles[_[1]].mod, false, false, _[2])
 	end
+end
+
+function xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
+	ox, oy, oz = m.position(matrix1)
+	tx, ty, tz = m.position(matrix2)
+	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
 end
 
 -- calculates the size of non-contiguous tables and tables that use non-integer keys
