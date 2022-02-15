@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.22)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.23)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -247,6 +247,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.constructable_vehicles = {}
 					g_savedata.constructable_turrets = {}
 					g_savedata.is_attack = {}
+					g_savedata.vehicle_list = {}
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
