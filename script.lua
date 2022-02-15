@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.24)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.25)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -154,6 +154,7 @@ g_savedata = {
 	info = {
 		creation_version = nil,
 		full_reload_versions = {},
+		has_default_addon = false,
 	},
 	land_spawn_zones = {},
 }
@@ -207,6 +208,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 	end
 
     is_dlc_weapons = s.dlcWeapons()
+
+	local addon_index, is_success = server.getAddonIndex("DLC Weapons AI")
+	if is_success then
+		g_savedata.info.has_default_addon = true
+	end
 
     if is_dlc_weapons then
 
@@ -883,6 +889,9 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 				elseif command == "?WDLCI" or command == "?WeaponsDLCInfo" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
 					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
+					if g_savedata.info.has_default_addon then
+						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
+					end
 					wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
 					wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
 					if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
@@ -1024,6 +1033,9 @@ end
 
 
 function onPlayerJoin(steam_id, name, peer_id)
+	if g_savedata.info.has_default_addon then
+		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+	end
 	if is_dlc_weapons then
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			updatePeerIslandMapData(peer_id, island)
