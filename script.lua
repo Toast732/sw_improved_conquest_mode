@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.21)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.22)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1907,7 +1907,7 @@ end
 
 function tickSquadrons()
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		if isTickID(squad_index, 60) then
+		if isTickID(squad_index, 30) then
 			-- clean out-of-action vehicles
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 
@@ -2240,8 +2240,6 @@ function tickSquadrons()
 					setSquadCommand(squad, COMMAND_NONE)
 				end
 			end
-		end
-		if isTickID(squad_index, 10) then
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
@@ -2275,7 +2273,7 @@ function tickVision()
 
 	-- analyse player vehicles
 	for player_vehicle_id, player_vehicle in pairs(g_savedata.player_vehicles) do
-		if isTickID(player_vehicle_id * 4, 240) then
+		if isTickID(player_vehicle_id, 30) then
 			local player_vehicle_transform = player_vehicle.transform
 
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2354,7 +2352,7 @@ function tickVision()
 	-- analyse players
 	local playerList = s.getPlayers()
 	for player_id, player in pairs(playerList) do
-		if isTickID(player_id * 4, 240) then
+		if isTickID(player_id, 30) then
 			if player.object_id then
 				local player_transform = s.getPlayerPos(player.id)
 				
