@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.28)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.29)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -233,7 +233,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
     if is_dlc_weapons then
 
-		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete", 0)
+		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
 
         if is_world_create then
 
@@ -2547,7 +2547,7 @@ function tickVision()
 							local vehicle_transform = vehicle_object.transform
 							local distance = m.distance(player_transform, vehicle_transform)
 
-							if distance < VISIBLE_DISTANCE then
+							if distance < vehicle_object.vision.radius then
 								g_savedata.ai_knowledge.last_seen_positions[player.steam_id] = player_transform
 								if squad.target_players[player.object_id] == nil then
 									squad.target_players[player.object_id] = {
