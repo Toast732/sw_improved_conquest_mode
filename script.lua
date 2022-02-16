@@ -1,7 +1,7 @@
 local s = server
 local m = matrix
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.27)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.28)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -171,6 +171,9 @@ g_savedata = {
 		has_defended = 0, -- logs the time in ticks the player attacked at
 		defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
 	},
+	ai_knowledge = {
+		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
+	},
 }
 
 --[[
@@ -328,7 +331,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
 							land = hasTag(flagZone.tags, "can_spawn=land") or false,
 							sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-						}
+						},
+						defenders = 0
 					}
 					flag_zones[flagZone_index] = nil
 				end
@@ -366,7 +370,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
 					land = hasTag(flagZone.tags, "can_spawn=land") or false,
 					sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-				}
+				},
+				defenders = 0
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
@@ -397,7 +402,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
 						land = hasTag(flagZone.tags, "can_spawn=land") or false,
 						sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-					}
+					},
+					defenders = 0
 				}
 
 				for _, turretZone in pairs(turret_zones) do
@@ -605,35 +611,108 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	end
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
-
-	wpDLCDebug("requested prefab: "..tostring(requested_prefab), true, false)
-
+		
 	selected_prefab = spawnModifiers("spawn", SELECTED, requested_prefab) or spawnModifiers("spawn", RANDOM)
-	
-	local spawn_transform = m.translation(0, 0, 0)
-	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
-		if nearPlayer ~= true then
-			local boat_spawn_transform, found_ocean = s.getOceanTransform(g_savedata.ai_base_island.transform, 500, 1500)
-			if found_ocean == false then return end
-			spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
-		else
-			local pMatrix, is_success = s.getPlayerPos(user_peer_id)
-			if is_success ~= true then
-				local name, is_success = s.getPlayerName(user_peer_id)
-				if is_success ~= true then
-					wpDLCDebug("failed to get the specified player's name, peer id: "..user_peer_id, true, true)
-					wpDLCDebug("failed to get the specified player's matrix, peer id: "..user_peer_id.." returned matrix: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, true)
-				else
-					wpDLCDebug("failed to get the specified player's matrix, peer name: "..name.." returned x: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, true)
+
+	local player_list = s.getPlayers()
+
+	local selected_spawn = 0
+	local selected_spawn_transform = g_savedata.ai_base_island.transform
+
+	-------
+	-- get spawn location
+	-------
+
+	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
+	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" then
+		target, ally = getObjectiveIsland()
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.faction == FACTION_AI then
+				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
+					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
+						selected_spawn_transform = island.transform
+						selected_spawn = island_index
+					end
 				end
-				return false
-			else
-				wpDLCDebug("player's matrix, peer id: "..user_peer_id.." returned x: "..pMatrix[13].. " y: "..pMatrix[14].." z: "..pMatrix[15], true, false)
 			end
-			local boat_spawn_transform, found_ocean = s.getOceanTransform(pMatrix, 500, 6000)
-			if found_ocean == false then return end
-			spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 		end
+	-- (A) if the vehicle we want to spawn is a defensive vehicle, we want to spawn it on the island that has the least amount of defence
+	-- (B) if theres multiple, pick the island we saw the player closest to
+	-- (C) if none, then spawn it at the island which is closest to the player's island
+	elseif getTagValue(selected_prefab.vehicle.tags, "role") == "defend" then
+		local lowest_defenders = nil
+		local check_last_seen = false
+		local islands_needing_checked = {}
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.faction == FACTION_AI then
+				if playersNotNearby(player_list, island.transform, 3000, true) then -- make sure no players are within 3km of the island
+					if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
+						lowest_defenders = island.defenders -- set the new lowest defender amount on an island
+						selected_spawn_transform = island.transform
+						selected_spawn = island_index
+						check_last_seen = false -- say that we dont need to do a tie breaker
+						islands_needing_checked = {}
+					elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
+						islands_needing_checked[selected_spawn] = selected_spawn_transform
+						islands_needing_checked[island_index] = island.transform
+						check_last_seen = true -- we need a tie breaker
+					end
+				end
+			end
+		end
+		if check_last_seen then -- do a tie breaker (B)
+			local closest_player_pos = nil
+			for player_steam_id, player_transform in pairs(g_savedata.ai_knowledge.last_seen_positions) do
+				for island_index, island_transform in pairs(islands_needing_checked) do
+					local player_to_island_dist = xzDistance(player_transform, island_transform)
+					if player_to_island_dist < 6000 then
+						if not closest_player_pos or player_to_island_dist < closest_player_pos then
+							if playersNotNearby(player_list, island_transform, 3000, true) then
+								closest_player_pos = player_transform
+								selected_spawn_transform = island_transform
+								selected_spawn = island_index
+							end
+						end
+					end
+				end
+			end
+			if not closest_player_pos then -- if no players were seen this game, spawn closest to the closest player island (C)
+				for island_index, island_transform in pairs(islands_needing_checked) do
+					for player_island_index, player_island in pairs(g_savedata.controllable_islands) do
+						if player_island.faction == FACTION_PLAYER then
+							if xzDistance(selected_spawn_transform, island_transform) > xzDistance(player_island.transform, island_transform) then
+								if playersNotNearby(player_list, island_transform, 3000, true) then
+									selected_spawn_transform = island_transform
+									selected_spawn = island_index
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	-- spawn it at a random ai island
+	else
+		local valid_islands = {}
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.faction == FACTION_AI then
+				if playersNotNearby(player_list, island.transform, 3000, true) then
+					table.insert(valid_islands, island)
+				end
+			end
+		end
+		if #valid_islands > 0 then
+			random_island = math.random(1, #valid_islands)
+			selected_spawn_transform = valid_islands[random_island].transform
+			selected_spawn = random_island
+		end
+	end
+
+	local spawn_transform = selected_spawn_transform
+	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
+		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 1500)
+		if found_ocean == false then return end
+		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
 		local land_spawn_locations = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
@@ -660,7 +739,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		end
 	else
 		if hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and selected_prefab or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and selected_prefab then 
-			spawn_transform = m.multiply(g_savedata.ai_base_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
+			spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 		else
 			wpDLCDebug("unable to spawn vehicle, attempting to spawn another vehicle...", true, false)
 			spawnAIVehicle()
@@ -1519,7 +1598,6 @@ function tickGamemode()
 	
 						elseif island.ai_capturing == 0 then -- if players are capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
-	
 						else -- if ai is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
 	
@@ -1944,14 +2022,30 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 			-- get the command it has
 			local vehicle_command = getTagValue(vehicle_object.tags, "role", true) or "general"
 
-			local vehicle_list_id = spawnModifiers(getVehicleListID, vehicle_object.name)
+			local constructable_vehicle_id = spawnModifiers(getConstructableVehicleID, vehicle_command, vehicle_object.ai_type, vehicle_object.strategy, spawnModifiers(getVehicleListID, vehicle_object.name))
 
 			wpDLCDebug("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, false)
 
 			if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
-				spawnModifiers(TRAIN, REWARD, vehicle_command, math.min(math.max(math.floor(ai_damage_dealt/(ai_damaged * 0.3333)), 1), 2), vehicle_object.ai_type, math.min(math.max(math.floor(ai_damage_dealt/(ai_damaged * 0.3333)), 1), 3), vehicle_object.strategy, math.min(math.max(math.floor(ai_damage_dealt/(ai_damaged * 0.3333)), 1), 2), spawnModifiers(getConstructableVehicleID, vehicle_command, vehicle_object.ai_type, vehicle_object.strategy, vehicle_list_id), math.min(math.max(math.floor(ai_damage_dealt/(ai_damaged * 0.3333)), 1), 3))
+				local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
+				spawnModifiers(
+					TRAIN, 
+					REWARD, 
+					vehicle_command, math.clamp(ai_reward_ratio, 1, 2),
+					vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
+					vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
+					constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
+				)
 			else -- if the ai did less damage than the damage it took / 3
-				spawnModifiers(TRAIN, PUNISH, vehicle_command, math.min(math.max(math.floor((ai_damaged * 0.3333)/ai_damage_dealt), 1), 2), vehicle_object.ai_type, math.min(math.max(math.floor((ai_damaged * 0.3333)/ai_damage_dealt), 1), 3), vehicle_object.strategy, math.min(math.max(math.floor((ai_damaged * 0.3333)/ai_damage_dealt), 1), 2), spawnModifiers(getConstructableVehicleID, vehicle_command, vehicle_object.ai_type, vehicle_object.strategy, vehicle_list_id), math.min(math.max(math.floor((ai_damaged * 0.3333)/ai_damage_dealt), 1), 3))
+				local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
+				spawnModifiers(
+					TRAIN,
+					PUNISH, 
+					vehicle_command, math.clamp(ai_punish_ratio, 1, 2),
+					vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
+					vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
+					constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
+				)
 			end
 		end
 
@@ -2454,6 +2548,7 @@ function tickVision()
 							local distance = m.distance(player_transform, vehicle_transform)
 
 							if distance < VISIBLE_DISTANCE then
+								g_savedata.ai_knowledge.last_seen_positions[player.steam_id] = player_transform
 								if squad.target_players[player.object_id] == nil then
 									squad.target_players[player.object_id] = {
 										state = TARGET_VISIBILITY_VISIBLE,
@@ -3509,6 +3604,18 @@ function xzDistance(matrix1, matrix2) -- returns the distance between two matrix
 	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
 end
 
+function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
+	local players_clear = true
+	for player_index, player in pairs(player_list) do
+		if ignore_y and xzDistance(s.getPlayerPos(player_index), target_pos) < min_dist then
+			players_clear = false
+		elseif not ignore_y and m.distance(s.getPlayerPos(player_index), target_pos) < min_dist then
+			players_clear = false
+		end
+	end
+	return players_clear
+end
+
 -- calculates the size of non-contiguous tables and tables that use non-integer keys
 function tableLength(T)
 	if T ~= nil then
@@ -3516,4 +3623,8 @@ function tableLength(T)
 		for _ in pairs(T) do count = count + 1 end
 		return count
 	else return 0 end
+end
+
+function math.clamp(x, min, max)
+    return max<x and max or min>x and min or x
 end
