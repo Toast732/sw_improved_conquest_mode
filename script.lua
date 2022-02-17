@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.33)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.34)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -315,7 +315,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				if flag_tile.name == start_island.name or (flag_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					g_savedata.player_base_island = {
 						name = flagZone.name,
-						transform = flagZone.transform, 
+						transform = flagZone.transform,
+						tags = flagZone.tags,
 						faction = FACTION_PLAYER, 
 						faction_prev = FACTION_PLAYER,
 						is_contested = false,
@@ -352,7 +353,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			local flagZone = flag_zones[furthest_flagZone_index]
 			g_savedata.ai_base_island = {
 				name = flagZone.name, 
-				transform = flagZone.transform, 
+				transform = flagZone.transform,
+				tags = flagZone.tags,
 				faction = FACTION_AI, 
 				faction_prev = FACTION_AI,
 				is_contested = false,
@@ -385,7 +387,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				local new_island = {
 					name = flagZone.name, 
 					flag_vehicle = flag, 
-					transform = flagZone.transform, 
+					transform = flagZone.transform,
+					tags = flagZone.tags,
 					faction = FACTION_NEUTRAL, 
 					faction_prev = FACTION_NEUTRAL,
 					is_contested = false,
@@ -628,8 +631,10 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
 					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
-						selected_spawn_transform = island.transform
-						selected_spawn = island_index
+						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+							selected_spawn_transform = island.transform
+							selected_spawn = island_index
+						end
 					end
 				end
 			end
@@ -644,16 +649,18 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then -- make sure no players are within 3km of the island
-					if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
-						lowest_defenders = island.defenders -- set the new lowest defender amount on an island
-						selected_spawn_transform = island.transform
-						selected_spawn = island_index
-						check_last_seen = false -- say that we dont need to do a tie breaker
-						islands_needing_checked = {}
-					elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
-						islands_needing_checked[selected_spawn] = selected_spawn_transform
-						islands_needing_checked[island_index] = island.transform
-						check_last_seen = true -- we need a tie breaker
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+						if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
+							lowest_defenders = island.defenders -- set the new lowest defender amount on an island
+							selected_spawn_transform = island.transform
+							selected_spawn = island_index
+							check_last_seen = false -- say that we dont need to do a tie breaker
+							islands_needing_checked = {}
+						elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
+							islands_needing_checked[selected_spawn] = selected_spawn_transform
+							islands_needing_checked[island_index] = island.transform
+							check_last_seen = true -- we need a tie breaker
+						end
 					end
 				end
 			end
@@ -666,9 +673,11 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 					if player_to_island_dist < 6000 then
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
 							if playersNotNearby(player_list, island_transform, 3000, true) then
-								closest_player_pos = player_transform
-								selected_spawn_transform = island_transform
-								selected_spawn = island_index
+								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+									closest_player_pos = player_transform
+									selected_spawn_transform = island_transform
+									selected_spawn = island_index
+								end
 							end
 						end
 					end
@@ -680,8 +689,10 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 						if player_island.faction == FACTION_PLAYER then
 							if xzDistance(selected_spawn_transform, island_transform) > xzDistance(player_island.transform, island_transform) then
 								if playersNotNearby(player_list, island_transform, 3000, true) then
-									selected_spawn_transform = island_transform
-									selected_spawn = island_index
+									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+										selected_spawn_transform = island_transform
+										selected_spawn = island_index
+									end
 								end
 							end
 						end
@@ -695,7 +706,9 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then
-					table.insert(valid_islands, island)
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then
+						table.insert(valid_islands, island)
+					end
 				end
 			end
 		end
@@ -1633,6 +1646,8 @@ function tickGamemode()
 						end
 					end
 
+					if render_debug then updatePeerIslandMapData(-1, island) end
+
 					-- resets amount capping
 					island.ai_capturing = 0
 					island.players_capturing = 0
@@ -1709,15 +1724,36 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 		s.removeMapObject(peer_id, island.map_id)
 		if not is_reset then
 			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-
+			local extra_title = ""
+			local r = 75
+			local g = 75
+			local b = 75
 			if island.is_contested then
-				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")".." CONTESTED", 1, cap_percent.."%", 255, 255, 0, 255)
+				r = 255
+				g = 255
+				b = 0
+				extra_title = " CONTESTED"
 			elseif island.faction == FACTION_AI then
-				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 225, 0, 0, 255)
+				r = 255
+				g = 0
+				b = 0
 			elseif island.faction == FACTION_PLAYER then
-				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 0, 225, 0, 255)
+				r = 0
+				g = 255
+				b = 0
+			end
+
+			if not render_debug then
+				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
-				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")", 1, cap_percent.."%", 75, 75, 75, 255)
+				for player_debugging_id, v in pairs(playerData.isDebugging) do
+					if playerData.isDebugging[player_debugging_id] then
+						local debug_data = "\n\nNumber of AI Capturing: "..island.ai_capturing
+						local debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
+						local debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders
+						s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					end
+				end
 			end
 		end
 	end
@@ -1774,6 +1810,18 @@ function tickAI()
 					end
 				end
 			end
+			if isTickID(island_index*15, time.minute/4) then -- every 15 seconds, update the amount of vehicles that are defending the base
+				island.defenders = 0
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					if squad.command == COMMAND_DEFEND or squad.command == COMMAND_TURRET then
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							if xzDistance(island.transform, vehicle_object.transform) < 1500 then
+								island.defenders = island.defenders + 1
+							end
+						end
+					end
+				end
+			end 
 		end
 
 		-- allocate squads to engage or investigate based on vision
