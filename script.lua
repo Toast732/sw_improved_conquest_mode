@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.32)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.33)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -736,7 +736,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			return false
 		end
 	else
-		if 
+		if
 			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE 
 			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE 
 			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and selected_prefab 
