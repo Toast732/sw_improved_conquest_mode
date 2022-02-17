@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.31)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.32)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -69,6 +69,8 @@ local flag_prefab = nil
 local is_dlc_weapons = false
 local render_debug = false
 local g_debug_speed_multiplier = 1
+
+local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
 
 local vehicles_debugging = {}
 
@@ -706,8 +708,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
-		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 1500)
-		if found_ocean == false then return end
+		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 2000)
+		if found_ocean == false then wpDLCDebug("unable to find ocean to spawn boat!", true, false); return end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
 		local land_spawn_locations = {}
@@ -1648,10 +1650,12 @@ function tickGamemode()
 			local heli_count = 0
 			local army_count = 0
 			local land_count = 0
+			local turret_count = 0
 		
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
 					if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 					if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 					if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
@@ -2593,6 +2597,9 @@ end
 
 function tickVehicles()
 	local vehicle_update_tickrate = 30
+	if isTickID(0, 60) then
+		debug_mode_blinker = not debug_mode_blinker
+	end
 
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -2755,14 +2762,14 @@ function tickVehicles()
 							local new_pos = m.multiply(m.translation(vehicle_x + movement_x, vehicle_y + movement_y, vehicle_z + movement_z), rotation_matrix)
 
 							if s.getVehicleLocal(vehicle_id) == false then
-								local _, new_transform = s.setVehiclePosSafe(vehicle_id, new_pos)
+								s.setVehiclePos(vehicle_id, new_pos)
 
 								for npc_index, npc_object in pairs(vehicle_object.survivors) do
-									s.setObjectPos(npc_object.id, new_transform)
+									s.setObjectPos(npc_object.id, new_pos)
 								end
 
 								if vehicle_object.fire_id ~= nil then
-									s.setObjectPos(vehicle_object.fire_id, new_transform)
+									s.setObjectPos(vehicle_object.fire_id, new_pos)
 								end
 							end
 						end
@@ -2828,26 +2835,31 @@ function tickVehicles()
 						[COMMAND_TURRET] = 14,
 						[COMMAND_RESUPPLY] = 11,
 					}
-					local r = 0
+					local r = 55
 					local g = 0
-					local b = 255
+					local b = 200
+					local vehicle_icon = debug_mode_blinker and 16 or state_icons[squad.command]
 					if vehicle_object.ai_type == AI_TYPE_LAND then
 						g = 255
 						b = 125
+						vehicle_icon = debug_mode_blinker and 12 or state_icons[squad.command]
 					elseif vehicle_object.ai_type == AI_TYPE_HELI then
 						r = 255
 						b = 200
+						vehicle_icon = debug_mode_blinker and 15 or state_icons[squad.command]
 					elseif vehicle_object.ai_type == AI_TYPE_PLANE then
 						g = 200
+						vehicle_icon = debug_mode_blinker and 13 or state_icons[squad.command]
 					elseif vehicle_object.ai_type == AI_TYPE_TURRET then
 						r = 131
 						g = 101
 						b = 57
+						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
 					for player_debugging_id, v in pairs(playerData.isDebugging) do
 						if playerData.isDebugging[player_debugging_id] then
 							s.removeMapObject(player_debugging_id ,vehicle_object.map_id)
-							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, state_icons[squad.command] or 4, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 4, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							local is_render = tostring(vehicle_id) == g_debug_vehicle_id or g_debug_vehicle_id == tostring(0)
 
@@ -2864,8 +2876,6 @@ function tickVehicles()
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
 									s.removeMapLine(player_debugging_id, waypoint.ui_id)
-
-									
 
 									if is_render then
 										s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
