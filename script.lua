@@ -1,7 +1,10 @@
+local spawnModifiers = {}
+
 local s = server
 local m = matrix
+local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.30)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.31)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -30,13 +33,8 @@ local VEHICLE_STATE_HOLDING = "holding"
 local TARGET_VISIBILITY_VISIBLE = "visible"
 local TARGET_VISIBILITY_INVESTIGATE = "investigate"
 
-local getConstructableVehicleID = "getCVID"
-local getVehicleListID = "getVLID"
-local TRAIN = "train"
 local REWARD = "reward"
 local PUNISH = "punish"
-local SELECTED = "selected"
-local RANDOM = "random"
 
 local AI_SPEED_PSEUDO_PLANE = 60
 local AI_SPEED_PSEUDO_HELI = 40
@@ -303,7 +301,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				buildPrefabs(i)
             end
 
-			spawnModifiers("create")
+			sm.create()
 
 			local start_island = s.getStartIsland()
 
@@ -610,7 +608,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
 		
-	selected_prefab = spawnModifiers("spawn", SELECTED, requested_prefab) or spawnModifiers("spawn", RANDOM)
+	selected_prefab = sm.spawn(true, requested_prefab) or sm.spawn(false)
 
 	local player_list = s.getPlayers()
 
@@ -1014,7 +1012,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 				elseif command == "?WDLCAM" or command == "?WeaponsDLCAIModifier" then
 					if arg1 then
-						spawnModifiers("debug", arg1, user_peer_id)
+						sm.debug(user_peer_id, arg1, arg2, arg3, arg4)
 					else
 						wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
 					end
@@ -1083,8 +1081,8 @@ function captureIsland(island, override, peer_id)
 			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
 		end
 
-		spawnModifiers(TRAIN, REWARD, "defend", 4)
-		spawnModifiers(TRAIN, PUNISH, "attack", 5)
+		sm.train(REWARD, "defend", 4)
+		sm.train(PUNISH, "attack", 5)
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			if (squad.command == COMMAND_ATTACK or squad.command == COMMAND_STAGE) and island.transform == squad.target_island.transform then
@@ -1104,8 +1102,8 @@ function captureIsland(island, override, peer_id)
 			s.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 4)
 		end
 
-		spawnModifiers(TRAIN, REWARD, "defend", 4)
-		spawnModifiers(TRAIN, PUNISH, "attack", 2)
+		sm.train(REWARD, "defend", 4)
+		sm.train(PUNISH, "attack", 2)
 
 		-- update vehicles looking to resupply
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2041,28 +2039,26 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 			end
 			
 			-- get the command it has
-			local vehicle_command = getTagValue(vehicle_object.tags, "role", true) or "general"
+			local vehicle_role = getTagValue(vehicle_object.tags, "role", true) or "general"
 
-			local constructable_vehicle_id = spawnModifiers(getConstructableVehicleID, vehicle_command, vehicle_object.ai_type, vehicle_object.strategy, spawnModifiers(getVehicleListID, vehicle_object.name))
+			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
 
 			wpDLCDebug("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, false, false)
 
 			if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
 				local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
-				spawnModifiers(
-					TRAIN, 
+				sm.train(
 					REWARD, 
-					vehicle_command, math.clamp(ai_reward_ratio, 1, 2),
+					vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
 					vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
 					vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
 					constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
 				)
 			else -- if the ai did less damage than the damage it took / 3
 				local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
-				spawnModifiers(
-					TRAIN,
+				sm.train(
 					PUNISH, 
-					vehicle_command, math.clamp(ai_punish_ratio, 1, 2),
+					vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
 					vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
 					vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
 					constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
@@ -2940,20 +2936,20 @@ end
 function tickModifiers()
 	if isTickID(g_savedata.tick_counter, time.hour / 2) then -- defence, if the player has attacked within the last 30 minutes, increase defence
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 then -- if the last time the player attacked was equal or less than 30 minutes ago
-			spawnModifiers(TRAIN, REWARD, "defend", 4)
-			spawnModifiers(TRAIN, PUNISH, "attack", 3)
+			sm.train(REWARD, "defend", 4)
+			sm.train(PUNISH, "attack", 3)
 			wpDLCDebug("players have attacked within the last 30 minutes! increasing defence, decreasing attack!", true, false)
 		end
 	end
 	if isTickID(g_savedata.tick_counter, time.hour) then -- attack, if the player has not attacked in the last one hour, raise attack
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour then -- if the last time the player attacked was more than an hour ago
-			spawnModifiers(TRAIN, REWARD, "attack", 3)
+			sm.train(REWARD, "attack", 3)
 			wpDLCDebug("players have not attacked in the past hour! increasing attack!", true, false)
 		end
 	end
 	if isTickID(g_savedata.tick_counter, time.hour * 2) then -- defence, if the player has not attacked in the last two hours, then lower defence
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour * 2 then -- if the last time the player attacked was more than two hours ago
-			spawnModifiers(TRAIN, PUNISH, "defend", 3)
+			sm.train(PUNISH, "defend", 3)
 			wpDLCDebug("players have not attacked in the last two hours! lowering defence!", true, false)
 		end
 	end
@@ -3513,156 +3509,196 @@ function randChance(t)
 	return win_name
 end
 
-function spawnModifiers(action,...)
-	local g_v_data = g_savedata.constructable_vehicles
-	local _ = table.pack(...)
-	---@param
-	if action == "create" then
-		for role, role_data in pairs(g_savedata.constructable_vehicles) do
-			if type(role_data) == "table" then
-				if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" then
-					for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
-						if veh_type ~= "mod" and type(veh_data) == "table"then
-							for strat, strat_data in pairs(veh_data) do
-								if type(strat_data) == "table" and strat ~= "mod" then
-									g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
-									for vehicle_id, v in pairs(strat_data) do
-										if type(v) == "table" and vehicle_id ~= "mod" then
-											g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-										end
+function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
+	for role, role_data in pairs(g_savedata.constructable_vehicles) do
+		if type(role_data) == "table" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" then
+				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
+					if veh_type ~= "mod" and type(veh_data) == "table"then
+						for strat, strat_data in pairs(veh_data) do
+							if type(strat_data) == "table" and strat ~= "mod" then
+								g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
+								for vehicle_id, v in pairs(strat_data) do
+									if type(v) == "table" and vehicle_id ~= "mod" then
+										g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
 									end
 								end
 							end
-							g_savedata.constructable_vehicles[role][veh_type].mod = 1
 						end
-					end
-					g_savedata.constructable_vehicles[role].mod = default_mods[role]
-				end
-			end
-		end
-	elseif action == "spawn" then
-		local sel_role = nil
-		local sel_veh_type = nil
-		local sel_strat = nil
-		local sel_vehicle = nil
-		if _[1] == SELECTED and _[2] then
-			sel_role = g_savedata.vehicle_list[_[2]].role
-			sel_veh_type = g_savedata.vehicle_list[_[2]].vehicle_type
-			sel_strat = g_savedata.vehicle_list[_[2]].strategy
-			for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
-				if not sel_vehicle and _[2] == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
-					sel_vehicle = vehicle_id
-				end
-			end
-			if not sel_vehicle then
-				return false
-			end
-		elseif _[1] == RANDOM and not _[2] then
-			local role_chances = {}
-			local veh_type_chances = {}
-			local strat_chances = {}
-			local vehicle_chances = {}
-			for role, v in pairs(g_savedata.constructable_vehicles) do
-				if type(v) == "table" then
-					if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
-						role_chances[role] = g_savedata.constructable_vehicles[role].mod
+						g_savedata.constructable_vehicles[role][veh_type].mod = 1
 					end
 				end
-			end
-			sel_role = randChance(role_chances)
-			for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
-				if type(v) == "table" then
-					veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
-				end
-			end
-			sel_veh_type = randChance(veh_type_chances)
-			for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
-				if type(v) == "table" then
-					strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
-				end
-			end
-			sel_strat = randChance(strat_chances)
-			for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
-				if type(v) == "table" then
-					vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
-				end
-			end
-			sel_vehicle = randChance(vehicle_chances)
-		else
-			return false
-		end
-		return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
-
-	
-	elseif action == "getCVID" then -- converts a vehicle list id to constructable vehicles id
-		-- example: spawnModifier("getCVID", "stealth", "plane", "bomber", 5 (from vehicle_list))
-		local found_vehicle = nil
-		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[_[1]][_[2]][_[3]]) do
-			if not found_vehicle and _[4] == g_savedata.constructable_vehicles[_[1]][_[2]][_[3]][vehicle_id].id then
-				found_vehicle = vehicle_id
+				g_savedata.constructable_vehicles[role].mod = default_mods[role]
 			end
 		end
-		return found_vehicle -- returns the vehicle id, if not found then it returns nil
-
-	
-	elseif action == "getVLID" then -- converts a vehicle name to a vehicle list id
-		local found_vehicle = ""
-		for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
-			if vehicle_object.location.data.name == _[1] and found_vehicle == "" then
-				found_vehicle = vehicle_id
-			end
-		end
-		return found_vehicle
-
-	elseif action == "train" then -- example: spawnModifier(TRAIN, REWARD, "stealth", 1, "plane", 2, "bomber", 3, "1", 4)
-		if _[1] == "punish" then
-			if _[2] and _[3] then
-				wpDLCDebug("Types: _[2]: "..type(_[2]).." | _[3]: "..type(_[3]), false, false)
-				wpDLCDebug("Values: _[2]".._[2].." | _[3]".._[3], false, false)
-				wpDLCDebug("punished role:".._[2].." | amount punished: "..ai_training.punishments[_[3]], true, false)
-				g_savedata.constructable_vehicles[_[2]].mod = math.max(g_savedata.constructable_vehicles[_[2]].mod + ai_training.punishments[_[3]], 0)
-				if _[4] and _[5] then 
-					wpDLCDebug("punished type:".._[4].." | amount punished: "..ai_training.punishments[_[5]], true, false)
-					g_savedata.constructable_vehicles[_[2]][_[4]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]].mod + ai_training.punishments[_[5]], 0.05)
-					if _[6] and _[7] then 
-						wpDLCDebug("punished strategy:".._[6].." | amount punished: "..ai_training.punishments[_[7]], true, false)
-						g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod + ai_training.punishments[_[7]], 0.05)
-						if _[8] and _[9] then 
-							wpDLCDebug("punished vehicle:".._[8].." | amount punished: "..ai_training.punishments[_[9]], true, false)
-							g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod = math.max(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod + ai_training.punishments[_[9]], 0.05)
-						end
-					end
-				end
-			end
-		elseif _[1] == "reward" then
-			if _[2] and _[3] then
-				wpDLCDebug("rewarded role:".._[2].." | amount rewarded: "..ai_training.rewards[_[3]], true, false)
-				g_savedata.constructable_vehicles[_[2]].mod = math.min(g_savedata.constructable_vehicles[_[2]].mod + ai_training.rewards[_[3]], 1.5)
-				if _[4] and _[5] then 
-					wpDLCDebug("rewarded type:".._[4].." | amount rewarded: "..ai_training.rewards[_[5]], true, false)
-					g_savedata.constructable_vehicles[_[2]][_[4]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]].mod + ai_training.rewards[_[5]], 1.5)
-					if _[6] and _[7] then 
-						wpDLCDebug("rewarded strategy:".._[6].." | amount rewarded: "..ai_training.rewards[_[7]], true, false)
-						g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]].mod + ai_training.rewards[_[7]], 1.5)
-						if _[8] and _[9] then 
-							wpDLCDebug("rewarded vehicle:".._[8].." | amount rewarded: "..ai_training.rewards[_[9]], true, false)
-							g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod = math.min(g_savedata.constructable_vehicles[_[2]][_[4]][_[6]][_[8]].mod + ai_training.rewards[_[9]], 1.5)
-						end
-					end
-				end
-			end
-		end
-	elseif action == "debug" then
-		wpDLCDebug(_[1].."'s modifier: "..g_savedata.constructable_vehicles[_[1]].mod, false, false, _[2])
 	end
 end
 
+---@param is_specified boolean true to specify what vehicle to spawn, false for random
+---@param vehicle_list_id integer vehicle to spawn if is_specified is true
+---@return prefab_data[] prefab_data the vehicle's prefab data
+function spawnModifiers.spawn(is_specified, vehicle_list_id)
+	local sel_role = nil
+	local sel_veh_type = nil
+	local sel_strat = nil
+	local sel_vehicle = nil
+	if is_specified == true and vehicle_list_id then
+		sel_role = g_savedata.vehicle_list[vehicle_list_id].role
+		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
+		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
+		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+			if not sel_vehicle and vehicle_list_id == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
+				sel_vehicle = vehicle_id
+			end
+		end
+		if not sel_vehicle then
+			return false
+		end
+	elseif is_specified == false and not vehicle_list_id then
+		local role_chances = {}
+		local veh_type_chances = {}
+		local strat_chances = {}
+		local vehicle_chances = {}
+		for role, v in pairs(g_savedata.constructable_vehicles) do
+			if type(v) == "table" then
+				if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
+					role_chances[role] = g_savedata.constructable_vehicles[role].mod
+				end
+			end
+		end
+		sel_role = randChance(role_chances)
+		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
+			if type(v) == "table" then
+				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+			end
+		end
+		sel_veh_type = randChance(veh_type_chances)
+		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
+			if type(v) == "table" then
+				strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
+			end
+		end
+		sel_strat = randChance(strat_chances)
+		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+			if type(v) == "table" then
+				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
+			end
+		end
+		sel_vehicle = randChance(vehicle_chances)
+	else
+		return false
+	end
+	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
+end
+
+---@param role string the role of the vehicle, such as attack, general or defend
+---@param type string the vehicle type, such as boat, plane, heli, land or turret
+---@param strategy string the strategy of the vehicle, such as strafe, bombing or general
+---@param vehicle_list_id integer the index of the vehicle in the vehicle list
+---@return integer constructable_vehicle_id the index of the vehicle in the constructable vehicle list, returns nil if not found
+function spawnModifiers.getConstructableVehicleID(role, type, strategy, vehicle_list_id)
+	local constructable_vehicle_id = nil
+	for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][type][strategy]) do
+		if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][type][strategy][vehicle_id].id then
+			constructable_vehicle_id = vehicle_id
+		end
+	end
+	return constructable_vehicle_id -- returns the constructable_vehicle_id, if not found then it returns nil
+end
+
+---@param vehicle_name string the name of the vehicle
+---@return integer vehicle_list_id the vehicle list id from the vehicle's name, returns nil if not found
+function spawnModifiers.getVehicleListID(vehicle_name)
+	local found_vehicle = nil
+	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
+		if vehicle_object.location.data.name == vehicle_name and not found_vehicle then
+			found_vehicle = vehicle_id
+		end
+	end
+	return found_vehicle
+end
+
+---@param reinforcement_type string \"punish\" to make it less likely to spawn, \"reward\" to make it more likely to spawn
+---@param role string the role of the vehicle, such as attack, general or defend
+---@param role_reinforcement integer how much to reinforce the role of the vehicle, 1-5
+---@param type string the vehicle type, such as boat, plane, heli, land or turret
+---@param type_reinforcement integer how much to reinforce the type of the vehicle, 1-5
+---@param strategy string strategy of the vehicle, such as strafe, bombing or general
+---@param strategy_reinforcement integer how much to reinforce the strategy of the vehicle, 1-5
+---@param constructable_vehicle_id integer the index of the vehicle in the constructable vehicle list
+---@param vehicle_reinforcement integer how much to reinforce the vehicle, 1-5
+function spawnModifiers.train(reinforcement_type, role, role_reinforcement, type, type_reinforcement, strategy, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
+	if reinforcement_type == PUNISH then
+		if role and role_reinforcement then
+			wpDLCDebug("punished role:"..role.." | amount punished: "..ai_training.punishments[role_reinforcement], true, false)
+			g_savedata.constructable_vehicles[role].mod = math.max(g_savedata.constructable_vehicles[role].mod + ai_training.punishments[role_reinforcement], 0)
+			if type and type_reinforcement then 
+				wpDLCDebug("punished type:"..type.." | amount punished: "..ai_training.punishments[type_reinforcement], true, false)
+				g_savedata.constructable_vehicles[role][type].mod = math.max(g_savedata.constructable_vehicles[role][type].mod + ai_training.punishments[type_reinforcement], 0.05)
+				if strategy and strategy_reinforcement then 
+					wpDLCDebug("punished strategy:"..strategy.." | amount punished: "..ai_training.punishments[strategy_reinforcement], true, false)
+					g_savedata.constructable_vehicles[role][type][strategy].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.punishments[strategy_reinforcement], 0.05)
+					if constructable_vehicle_id and vehicle_reinforcement then 
+						wpDLCDebug("punished vehicle:"..constructable_vehicle_id.." | amount punished: "..ai_training.punishments[vehicle_reinforcement], true, false)
+						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.punishments[vehicle_reinforcement], 0.05)
+					end
+				end
+			end
+		end
+	elseif reinforcement_type == REWARD then
+		if role and role_reinforcement then
+			wpDLCDebug("rewarded role:"..role.." | amount rewarded: "..ai_training.rewards[role_reinforcement], true, false)
+			g_savedata.constructable_vehicles[role].mod = math.min(g_savedata.constructable_vehicles[role].mod + ai_training.rewards[role_reinforcement], 1.5)
+			if type and type_reinforcement then 
+				wpDLCDebug("rewarded type:"..type.." | amount rewarded: "..ai_training.rewards[type_reinforcement], true, false)
+				g_savedata.constructable_vehicles[role][type].mod = math.min(g_savedata.constructable_vehicles[role][type].mod + ai_training.rewards[type_reinforcement], 1.5)
+				if strategy and strategy_reinforcement then 
+					wpDLCDebug("rewarded strategy:"..strategy.." | amount rewarded: "..ai_training.rewards[strategy_reinforcement], true, false)
+					g_savedata.constructable_vehicles[role][type][strategy].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.rewards[strategy_reinforcement], 1.5)
+					if constructable_vehicle_id and vehicle_reinforcement then 
+						wpDLCDebug("rewarded vehicle:"..constructable_vehicle_id.." | amount rewarded: "..ai_training.rewards[vehicle_reinforcement], true, false)
+						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.rewards[vehicle_reinforcement], 1.5)
+					end
+				end
+			end
+		end
+	end
+end
+
+---@param user_peer_id integer the peer_id of the player who executed the command
+---@param role string the role of the vehicle, such as attack, general or defend
+---@param type string the vehicle type, such as boat, plane, heli, land or turret
+---@param strategy string strategy of the vehicle, such as strafe, bombing or general
+---@param constructable_vehicle_id integer the index of the vehicle in the constructable vehicle list
+function spawnModifiers.debug(user_peer_id, role, type, strategy, constructable_vehicle_id)
+	if not constructable_vehicle_id then
+		if not strategy then
+			if not type then
+				wpDLCDebug("modifier of vehicles with role "..role..": "..g_savedata.constructable_vehicles[role].mod, false, false, user_peer_id)
+			else
+				wpDLCDebug("modifier of vehicles with role "..role..", with type "..type..": "..g_savedata.constructable_vehicles[role][type].mod, false, false, user_peer_id)
+			end
+		else
+			wpDLCDebug("modifier of vehicles with role "..role..", with type "..type..", with strategy "..strategy..": "..g_savedata.constructable_vehicles[role][type][strategy].mod, false, false, user_peer_id)
+		end
+	else
+		wpDLCDebug("modifier of role "..role..", type "..type..", strategy "..strategy..", with the id of "..constructable_vehicle_id..": "..g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod, false, false, user_peer_id)
+	end
+end
+
+---@param matrix1 Matrix the first matrix
+---@param matrix2 Matrix the second matrix
 function xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
 	ox, oy, oz = m.position(matrix1)
 	tx, ty, tz = m.position(matrix2)
 	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
 end
 
+---@param player_list Players[] the list of players to check
+---@param target_pos Matrix the position that you want to check
+---@param min_dist number the minimum distance between the player and the target position
+---@param ignore_y boolean if you want to ignore the y level between the two or not
+---@return boolean no_players_nearby returns true if theres no players which distance from the target_pos was less than the min_dist
 function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
 	local players_clear = true
 	for player_index, player in pairs(player_list) do
@@ -3675,7 +3711,8 @@ function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
 	return players_clear
 end
 
--- calculates the size of non-contiguous tables and tables that use non-integer keys
+---@param T table table to get the size of
+---@return number count the size of the table
 function tableLength(T)
 	if T ~= nil then
 		local count = 0
@@ -3684,6 +3721,10 @@ function tableLength(T)
 	else return 0 end
 end
 
+---@param x number the number to clamp
+---@param min number the minimum value
+---@param max number the maximum value
+---@return number clamped_x the number clamped between the min and max
 function math.clamp(x, min, max)
     return max<x and max or min>x and min or x
 end
