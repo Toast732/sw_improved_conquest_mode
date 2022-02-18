@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.34)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.35)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -20,6 +20,7 @@ local COMMAND_STAGE = "stage"
 local COMMAND_RESUPPLY = "resupply"
 local COMMAND_TURRET = "turret"
 local COMMAND_RETREAT = "retreat"
+local COMMAND_SCOUT = "scout"
 
 local AI_TYPE_BOAT = "boat"
 local AI_TYPE_LAND = "land"
@@ -67,7 +68,7 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = false
+local render_debug = true
 local g_debug_speed_multiplier = 1
 
 local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
@@ -105,6 +106,8 @@ local ai_training = {
 		1
 	}
 }
+
+local scout_requirement = time.hour
 
 local playerData = {
 	isDebugging = {},
@@ -150,7 +153,7 @@ g_savedata = {
 	ai_base_island = nil,
 	player_base_island = nil,
 	controllable_islands = {},
-    ai_army = { squadrons = { [RESUPPLY_SQUAD_INDEX] = { command = COMMAND_RESUPPLY, ai_type = "", vehicles = {}, target_island = nil }} },
+    ai_army = { squadrons = { [RESUPPLY_SQUAD_INDEX] = { command = COMMAND_RESUPPLY, ai_type = "", role = "", vehicles = {}, target_island = nil }} },
 	player_vehicles = {},
 	debug_data = {},
 	constructable_vehicles = {},
@@ -172,6 +175,7 @@ g_savedata = {
 	},
 	ai_knowledge = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
+		scout = 0, -- the scout progress of each island
 	},
 }
 
@@ -212,9 +216,9 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
 			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
-			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main base)", 0, 15, 1, 1),
+			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
-			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 17, 1, 17),
+			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 19, 1, 19),
 			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
 			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
@@ -326,13 +330,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						assigned_squad_index = -1,
 						ai_capturing = 0,
 						players_capturing = 0,
-						spawning_capabilities = {
-							heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
-							plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
-							land = hasTag(flagZone.tags, "can_spawn=land") or false,
-							sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-						},
-						defenders = 0
+						defenders = 0,
+						is_scouting = false
 					}
 					flag_zones[flagZone_index] = nil
 				end
@@ -366,13 +365,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				zones = {},
 				ai_capturing = 0,
 				players_capturing = 0,
-				spawning_capabilities = {
-					heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
-					plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
-					land = hasTag(flagZone.tags, "can_spawn=land") or false,
-					sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-				},
-				defenders = 0
+				defenders = 0,
+				is_scouting = false
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
@@ -399,13 +393,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					zones = {},
 					ai_capturing = 0,
 					players_capturing = 0,
-					spawning_capabilities = {
-						heli = hasTag(flagZone.tags, "can_spawn=heli") or false,
-						plane = hasTag(flagZone.tags, "can_spawn=plane") or false,
-						land = hasTag(flagZone.tags, "can_spawn=land") or false,
-						sea = hasTag(flagZone.tags, "can_spawn=sea") or false
-					},
-					defenders = 0
+					defenders = 0,
+					is_scouting = false
 				}
 
 				for _, turretZone in pairs(turret_zones) do
@@ -548,6 +537,7 @@ function spawnTurret(island)
 			},
 			map_id = s.getMapID(),
 			ai_type = spawned_objects.spawned_vehicle.ai_type,
+			role = getTagValue(selected_prefab.vehicle.tags, "role") or "general",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			vision = {
@@ -596,7 +586,7 @@ function spawnTurret(island)
 	end
 end
 
-function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
+function spawnAIVehicle(requested_prefab)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
@@ -612,7 +602,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	end
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
-		
+	
 	selected_prefab = sm.spawn(true, requested_prefab) or sm.spawn(false)
 
 	local player_list = s.getPlayers()
@@ -625,13 +615,13 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 	-------
 
 	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
-	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" then
+	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" or getTagValue(selected_prefab.vehicle.tags, "role") == "scout" then
 		target, ally = getObjectiveIsland()
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
 					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
-						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 							selected_spawn_transform = island.transform
 							selected_spawn = island_index
 						end
@@ -649,7 +639,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then -- make sure no players are within 3km of the island
-					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 						if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
 							lowest_defenders = island.defenders -- set the new lowest defender amount on an island
 							selected_spawn_transform = island.transform
@@ -673,7 +663,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 					if player_to_island_dist < 6000 then
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
 							if playersNotNearby(player_list, island_transform, 3000, true) then
-								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 									closest_player_pos = player_transform
 									selected_spawn_transform = island_transform
 									selected_spawn = island_index
@@ -689,7 +679,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 						if player_island.faction == FACTION_PLAYER then
 							if xzDistance(selected_spawn_transform, island_transform) > xzDistance(player_island.transform, island_transform) then
 								if playersNotNearby(player_list, island_transform, 3000, true) then
-									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then -- if it can spawn at the island
+									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 										selected_spawn_transform = island_transform
 										selected_spawn = island_index
 									end
@@ -706,7 +696,7 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then
-					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) then
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
 						table.insert(valid_islands, island)
 					end
 				end
@@ -718,6 +708,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			selected_spawn = random_island
 		end
 	end
+
+	wpDLCDebug("testing!")
 
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
@@ -752,8 +744,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 		if
 			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE 
 			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and selected_prefab 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and selected_prefab 
+			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab 
+			or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab 
 			then
 
 			spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
@@ -819,7 +811,8 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 				is_simulating = false
 			}, 
 			map_id = s.getMapID(), 
-			ai_type = spawned_objects.spawned_vehicle.ai_type, 
+			ai_type = spawned_objects.spawned_vehicle.ai_type,
+			role = getTagValue(selected_prefab.vehicle.tags, "role", true) or "general",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1, 
 			vision = { 
@@ -860,8 +853,15 @@ function spawnAIVehicle(nearPlayer, user_peer_id, requested_prefab)
 			vehicle_data.fire_id = spawned_objects.fires[1].id
 		end
 
-		addToSquadron(vehicle_data)
+		local squad = addToSquadron(vehicle_data)
+		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
+			setSquadCommand(squad, COMMAND_SCOUT)
+		elseif getTagValue(selected_prefab.vehicle.tags, "role", true) == "turret" then
+			setSquadCommand(squad, COMMAND_TURRET)
+		end
+		return true
 	end
+	return false
 end
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command, arg1, arg2, arg3, arg4)
@@ -901,21 +901,21 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 				elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
 					if arg1 then
-						local valid_vehicle = false
-						for vehicle_index, veh_obj in pairs(g_savedata.vehicle_list) do
-							if veh_obj.location.data.name == string.gsub(arg1, "_", " ") then
-								valid_vehicle = true
-								wpDLCDebug("Spawning \""..veh_obj.location.data.name.."\"", false, false, user_peer_id)
-								wpDLCDebug("index: "..vehicle_index, false, false, user_peer_id)
-								spawnAIVehicle(true, user_peer_id, vehicle_index)
+						vehicle_id = sm.getVehicleListID(arg1)
+						if vehicle_id or arg1 == "scout" then
+							valid_vehicle = true
+							wpDLCDebug("Spawning \""..arg1.."\"", false, false, user_peer_id)
+							if not arg1 == "scout" then
+								spawnAIVehicle(vehicle_id)
+							else
+								spawnAIVehicle(arg1)
 							end
-						end
-						if not valid_vehicle then
+						else
 							wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores")
 						end
 					else -- if vehicle not specified, spawn random vehicle
 						wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
-						spawnAIVehicle(true, user_peer_id)
+						spawnAIVehicle()
 					end
 
 				elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
@@ -1749,8 +1749,8 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				for player_debugging_id, v in pairs(playerData.isDebugging) do
 					if playerData.isDebugging[player_debugging_id] then
 						local debug_data = "\n\nNumber of AI Capturing: "..island.ai_capturing
-						local debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
-						local debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders
+						debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
+						if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
 						s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 					end
 				end
@@ -1815,8 +1815,10 @@ function tickAI()
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					if squad.command == COMMAND_DEFEND or squad.command == COMMAND_TURRET then
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if xzDistance(island.transform, vehicle_object.transform) < 1500 then
-								island.defenders = island.defenders + 1
+							if island.faction == FACTION_AI then
+								if xzDistance(island.transform, vehicle_object.transform) < 1500 then
+									island.defenders = island.defenders + 1
+								end
 							end
 						end
 					end
@@ -1870,69 +1872,99 @@ function tickAI()
 				g_savedata.is_attack = false
 			else
 				if g_savedata.is_attack == false then
-					local boats_ready = 0
-					local boats_total = 0
-					local air_ready = 0
-					local air_total = 0
-					local land_ready = 0
-					local land_total = 0
+					if g_savedata.constructable_vehicles.attack.mod > -1 then -- if its above the threshold in order to attack
+						if g_savedata.ai_knowledge.scout >= scout_requirement then
+							local boats_ready = 0
+							local boats_total = 0
+							local air_ready = 0
+							local air_total = 0
+							local land_ready = 0
+							local land_total = 0
 
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_STAGE then
-							local _, squad_leader = getSquadLeader(squad)
-							local squad_leader_transform = squad_leader.transform
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								if squad.command == COMMAND_STAGE then
+									local _, squad_leader = getSquadLeader(squad)
+									local squad_leader_transform = squad_leader.transform
 
-							if squad.ai_type == AI_TYPE_BOAT then
-								boats_total = boats_total + 1
+									if squad.ai_type == AI_TYPE_BOAT then
+										boats_total = boats_total + 1
 
-								local air_dist = m.distance(objective_island.transform, ally_island.transform)
-								local dist = m.distance(squad_leader_transform, objective_island.transform)
-								local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
+										local air_dist = m.distance(objective_island.transform, ally_island.transform)
+										local dist = m.distance(squad_leader_transform, objective_island.transform)
+										local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
 
-								if dist < air_dist * air_sea_speed_factor then
-									boats_ready = boats_ready + 1
+										if dist < air_dist * air_sea_speed_factor then
+											boats_ready = boats_ready + 1
+										end
+									elseif squad.ai_type == AI_TYPE_LAND then
+										land_total = land_total + 1
+
+										local air_dist = m.distance(objective_island.transform, ally_island.transform)
+										local dist = m.distance(squad_leader_transform, objective_island.transform)
+										local air_sea_speed_factor = AI_SPEED_PSEUDO_LAND/AI_SPEED_PSEUDO_PLANE
+
+										if dist < air_dist * air_sea_speed_factor then
+											land_ready = land_ready + 1
+										end
+									else
+										air_total = air_total + 1
+
+										local dist = m.distance(squad_leader_transform, ally_island.transform)
+										if dist < 2000 then
+											air_ready = air_ready + 1
+										end
+									end
 								end
-							elseif squad.ai_type == AI_TYPE_LAND then
-								land_total = land_total + 1
-
-								local air_dist = m.distance(objective_island.transform, ally_island.transform)
-								local dist = m.distance(squad_leader_transform, objective_island.transform)
-								local air_sea_speed_factor = AI_SPEED_PSEUDO_LAND/AI_SPEED_PSEUDO_PLANE
-
-								if dist < air_dist * air_sea_speed_factor then
-									land_ready = land_ready + 1
+							end
+				
+							g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
+							g_is_boats_ready = boats_total == 0 or boats_ready / boats_total >= 0.25
+				
+							local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
+				
+							if is_attack then
+								g_savedata.is_attack = is_attack
+				
+								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+									if squad.command == COMMAND_STAGE then
+										setSquadCommandAttack(squad, objective_island)
+									end
 								end
 							else
-								air_total = air_total + 1
-
-								local dist = m.distance(squad_leader_transform, ally_island.transform)
-								if dist < 2000 then
-									air_ready = air_ready + 1
+								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+									if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+										if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
+											setSquadCommandStage(squad, objective_island)
+										else
+											setSquadCommandStage(squad, ally_island)
+										end
+									end
 								end
 							end
-						end
-					end
-		
-					g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
-					g_is_boats_ready = boats_total == 0 or boats_ready / boats_total >= 0.25
-		
-					local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
-		
-					if is_attack then
-						g_savedata.is_attack = is_attack
-		
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							if squad.command == COMMAND_STAGE then
-								setSquadCommandAttack(squad, objective_island)
+						else -- if they've yet to fully scout the base
+							if not objective_island.is_scouting then
+								wpDLCDebug("attempting to spawn scout vehicle...", false, false)
+								local spawned = spawnAIVehicle("scout")
+								if spawned then
+									wpDLCDebug("scout vehicle spawned!")
+									objective_island.is_scouting = true
+									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+										if squad.command == COMMAND_SCOUT then
+											setSquadCommandScout(squad)
+										end
+									end
+								else
+									wpDLCDebug("Failed to spawn scout vehicle!", false, false)
+								end
+							else
+
 							end
 						end
-					else
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-								if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
-									setSquadCommandStage(squad, objective_island)
-								else
-									setSquadCommandStage(squad, ally_island)
+					else -- if they've not hit the threshold to attack
+						if objective_island.is_scouting then -- if theres still a scout plane scouting the island
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								if squad.command == COMMAND_SCOUT then
+									setSquadCommand(squad, COMMAND_DEFEND)
 								end
 							end
 						end
@@ -2043,7 +2075,7 @@ function addToSquadron(vehicle_object)
 		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
 			if squad.ai_type == vehicle_object.ai_type then
 				local _, squad_leader = getSquadLeader(squad)
-				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
+				if squad.role ~= "scout" and squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
 					if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 						squad.vehicles[vehicle_object.id] = vehicle_object
 						new_squad = squad
@@ -2058,6 +2090,7 @@ function addToSquadron(vehicle_object)
 		new_squad = { 
 			command = COMMAND_NONE, 
 			ai_type = vehicle_object.ai_type, 
+			role = vehicle_object.role,
 			vehicles = {}, 
 			target_island = nil,
 			target_players = {},
@@ -2153,7 +2186,7 @@ end
 
 function tickSquadrons()
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		if isTickID(squad_index, 30) then
+		if isTickID(squad_index, 60) then
 			-- clean out-of-action vehicles
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 
@@ -2882,6 +2915,7 @@ function tickVehicles()
 						[COMMAND_PATROL] = 15,
 						[COMMAND_TURRET] = 14,
 						[COMMAND_RESUPPLY] = 11,
+						[COMMAND_SCOUT] = 4,
 					}
 					local r = 55
 					local g = 0
@@ -2907,7 +2941,7 @@ function tickVehicles()
 					for player_debugging_id, v in pairs(playerData.isDebugging) do
 						if playerData.isDebugging[player_debugging_id] then
 							s.removeMapObject(player_debugging_id ,vehicle_object.map_id)
-							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 4, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							local is_render = tostring(vehicle_id) == g_debug_vehicle_id or g_debug_vehicle_id == tostring(0)
 
@@ -2993,7 +3027,7 @@ end
 
 function tickModifiers()
 	if isTickID(g_savedata.tick_counter, time.hour / 2) then -- defence, if the player has attacked within the last 30 minutes, increase defence
-		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 then -- if the last time the player attacked was equal or less than 30 minutes ago
+		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 and g_savedata.ai_history.has_defended ~= 0 then -- if the last time the player attacked was equal or less than 30 minutes ago
 			sm.train(REWARD, "defend", 4)
 			sm.train(PUNISH, "attack", 3)
 			wpDLCDebug("players have attacked within the last 30 minutes! increasing defence, decreasing attack!", true, false)
@@ -3281,6 +3315,10 @@ function setSquadCommandInvestigate(squad, investigate_transform)
 	setSquadCommand(squad, COMMAND_INVESTIGATE)
 end
 
+function setSquadCommandScout(squad)
+	setSquadCommand(squad, COMMAND_SCOUT)
+end
+
 function setSquadCommand(squad, command)
 	if squad.command ~= command then
 		squad.command = command
@@ -3334,6 +3372,44 @@ function squadInitVehicleCommand(squad, vehicle_object)
 		addPath(vehicle_object, m.multiply(squad.investigate_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-500, 500))))
 	elseif squad.command == COMMAND_ENGAGE then
 		resetPath(vehicle_object)
+	elseif squad.command == COMMAND_SCOUT then
+		resetPath(vehicle_object)
+		local target_island = nil
+		local target_best_distance = nil
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.faction ~= FACTION_AI then
+				for ai_island_index, ai_island in pairs(g_savedata.controllable_islands) do
+					if ai_island.faction == FACTION_AI then
+						if not target then
+							target_island = island
+							target_best_distance = xzDistance(ai_island.transform, island.transform)
+						elseif island.faction == FACTION_PLAYER then -- if the player owns the island we are checking
+							if target_island.faction == FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+								target_island = island
+								target_best_distance = xzDistance(ai_island.transform, island.transform)
+							elseif target_island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
+								target_island = island
+								target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
+							end
+						elseif island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
+							target_island = island
+							target_best_distance = xzDistance(ai_island.transform, island.transform)
+						end
+					end
+				end
+			end
+		end
+		if target_island then
+			wpDLCDebug("Scout found a target island!", true, false)
+			local holding_route = g_holding_pattern
+			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[1].x, CRUISE_HEIGHT * 2, holding_route[1].z)))
+			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[2].x, CRUISE_HEIGHT * 2, holding_route[2].z)))
+			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[3].x, CRUISE_HEIGHT * 2, holding_route[3].z)))
+			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[4].x, CRUISE_HEIGHT * 2, holding_route[4].z)))
+		else
+			wpDLCDebug("Scout was unable to find a island to target!", true, true)
+		end
+	elseif squad.command == COMMAND_RETREAT then
 	elseif squad.command == COMMAND_NONE then
 	elseif squad.command == COMMAND_TURRET then
 		resetPath(vehicle_object)
@@ -3570,7 +3646,7 @@ end
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
 					if veh_type ~= "mod" and type(veh_data) == "table"then
 						for strat, strat_data in pairs(veh_data) do
@@ -3593,14 +3669,14 @@ function spawnModifiers.create() -- populates the constructable vehicles with th
 end
 
 ---@param is_specified boolean true to specify what vehicle to spawn, false for random
----@param vehicle_list_id integer vehicle to spawn if is_specified is true
+---@param vehicle_list_id any vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
 ---@return prefab_data[] prefab_data the vehicle's prefab data
 function spawnModifiers.spawn(is_specified, vehicle_list_id)
 	local sel_role = nil
 	local sel_veh_type = nil
 	local sel_strat = nil
 	local sel_vehicle = nil
-	if is_specified == true and vehicle_list_id then
+	if is_specified == true and type(vehicle_list_id) == "number" then
 		sel_role = g_savedata.vehicle_list[vehicle_list_id].role
 		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
 		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
@@ -3612,19 +3688,23 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		if not sel_vehicle then
 			return false
 		end
-	elseif is_specified == false and not vehicle_list_id then
+	elseif is_specified == false or type(vehicle_list_id) == "string" then
 		local role_chances = {}
 		local veh_type_chances = {}
 		local strat_chances = {}
 		local vehicle_chances = {}
-		for role, v in pairs(g_savedata.constructable_vehicles) do
-			if type(v) == "table" then
-				if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
-					role_chances[role] = g_savedata.constructable_vehicles[role].mod
+		if not vehicle_list_id then
+			for role, v in pairs(g_savedata.constructable_vehicles) do
+				if type(v) == "table" then
+					if role == "attack" or role == "general" or role == "defend" or role == "roaming" then
+						role_chances[role] = g_savedata.constructable_vehicles[role].mod
+					end
 				end
 			end
+			sel_role = randChance(role_chances)
+		else
+			sel_role = vehicle_list_id
 		end
-		sel_role = randChance(role_chances)
 		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
 			if type(v) == "table" then
 				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
@@ -3644,6 +3724,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		end
 		sel_vehicle = randChance(vehicle_chances)
 	else
+		wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
 		return false
 	end
 	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]

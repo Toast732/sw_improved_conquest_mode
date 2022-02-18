@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/Improved_Conquest_Mode" folder_path="data/missions/Improved_Conquest_Mode" file_store="4" name="Improved Conquest Mode (Closed Alpha Testing)">
+<playlist path_id="app_data/data/missions/Improved_Conquest_Mode" folder_path="data/missions/Improved_Conquest_Mode" file_store="4" name="Improved Conquest Mode">
 	<locations location_id_counter="149" component_id_counter="2753">
 		<locations>
 			<l id="75" tile="" name="Flag" is_env_mod="false" env_mod_spawn_num="1">
@@ -3117,7 +3117,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="20" tile="" name="AIR - EUROFIGHTER" is_env_mod="false" env_mod_spawn_num="1">
+			<l id="20" tile="" name="PLANE - EUROFIGHTER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="81" vehicle_parent_id="0" name="from=dlc_weapons,type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-1.599282" 31="8.210866" 32="-0.878728" 33="1"/>
@@ -3783,9 +3783,9 @@
 					</c>
 				</components>
 			</l>
-			<l id="28" tile="" name="AIR - O-2 SKYMASTER" is_env_mod="false" env_mod_spawn_num="1">
+			<l id="28" tile="" name="PLANE - O-2 SKYMASTER" is_env_mod="false" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="597" vehicle_parent_id="0" name="from=disabled,type=disabled,size=small,role=special,special=scout,visibility_range=2500,spawning_radius=8" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
+					<c component_type="3" id="597" vehicle_parent_id="0" name="from=dlc_weapons,type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8" display_name="" is_sea_floor_object="false" show_zone_on_map="false" zone_type="0" zone_radius="2.5" dynamic_object_type="2" loot_type="0" character_outfit_category="11" character_type="1" character_special_outfit="0" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4" vehicle_is_static="false" vehicle_is_no_sleep="false" vehicle_is_editable="false" vehicle_is_invulnerable="false" vehicle_is_show_on_map="false" vehicle_is_transponder_active="false" is_fire_lit="true" is_explosion="false" explosion_magnitude="1" flare_hue="0" is_flare_lit="true" vehicle_button_name="" ice_type="0" ice_scale="1" animal_type="0">
 						<spawn_transform 00="1" 01="0" 02="0" 03="0" 10="0" 11="1" 12="0" 13="0" 20="0" 21="0" 22="1" 23="0" 30="-0.039262" 31="1.954949" 32="-0.050625" 33="1"/>
 						<spawn_bounds>
 							<min x="-5.625" y="-0.375" z="-5.125"/>
