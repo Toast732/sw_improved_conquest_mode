@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.35)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.36)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1646,8 +1646,6 @@ function tickGamemode()
 						end
 					end
 
-					if render_debug then updatePeerIslandMapData(-1, island) end
-
 					-- resets amount capping
 					island.ai_capturing = 0
 					island.players_capturing = 0
@@ -1656,63 +1654,62 @@ function tickGamemode()
 			end
 		end
 
-		
 		if render_debug then
-			local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
-			s.removeMapObject(player_debugging_id, g_savedata.ai_base_island.map_id)
+			if isTickID(60, 60) then
+			
+				local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
+				s.removeMapObject(player_debugging_id, g_savedata.ai_base_island.map_id)
 
-			local plane_count = 0
-			local heli_count = 0
-			local army_count = 0
-			local land_count = 0
-			local turret_count = 0
-		
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
-					if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
-					if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
-					if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
-					if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
+				local plane_count = 0
+				local heli_count = 0
+				local army_count = 0
+				local land_count = 0
+				local turret_count = 0
+			
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
+					end
+				end
+
+				local t, a = getObjectiveIsland()
+				local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
+				debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
+				debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
+				debug_data = debug_data .. "Land_Count: " .. tostring(land_count) .. "\n"
+				debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
+				debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
+				debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
+				debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
+
+				if t then
+					debug_data = debug_data .. "Target: " .. t.name .. "\n"
+				end
+				if a then
+					debug_data = debug_data .. " Ally: " .. a.name
+				end
+				for player_debugging_id, v in pairs(playerData.isDebugging) do
+					if playerData.isDebugging[player_debugging_id] then
+						s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
+
+						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
+						s.removeMapObject(player_debugging_id, g_savedata.player_base_island.map_id)
+						s.addMapObject(player_debugging_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
+					end
 				end
 			end
 
-			local t, a = getObjectiveIsland()
-			local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
-			debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
-			debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
-			debug_data = debug_data .. "Land_Count: " .. tostring(land_count) .. "\n"
-			debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
-			debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
-			debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
-			debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
-
-			if t then
-				debug_data = debug_data .. "Target: " .. t.name .. "\n"
-			end
-			if a then
-				debug_data = debug_data .. " Ally: " .. a.name
-			end
-			for player_debugging_id, v in pairs(playerData.isDebugging) do
-				if playerData.isDebugging[player_debugging_id] then
-					s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
-
-					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
-					s.removeMapObject(player_debugging_id, g_savedata.player_base_island.map_id)
-					s.addMapObject(player_debugging_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
-				end
-			end
-		end
-
-		-- Render Island Info
-		for island_index, island in pairs(g_savedata.controllable_islands) do
-			if isTickID(island_index, 60) then
-				if island.capture_timer ~= island.capture_timer_prev or island.faction ~= island.faction_prev then
+			-- Render Island Info
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				if isTickID(island_index, 60) then
 					updatePeerIslandMapData(-1, island)
+					island.capture_timer_prev = island.capture_timer
+					island.faction_prev = island.faction
 				end
-
-				island.capture_timer_prev = island.capture_timer
-				island.faction_prev = island.faction
 			end
 		end
 	end
