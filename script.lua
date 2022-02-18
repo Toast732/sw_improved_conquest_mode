@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.37)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.38)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -107,7 +107,7 @@ local ai_training = {
 	}
 }
 
-local scout_requirement = time.hour
+local scout_requirement = time.minute*40
 
 local playerData = {
 	isDebugging = {},
@@ -175,7 +175,7 @@ g_savedata = {
 	},
 	ai_knowledge = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
-		scout = 0, -- the scout progress of each island
+		scout = {}, -- the scout progress of each island
 	},
 }
 
@@ -408,6 +408,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				if(#g_savedata.controllable_islands >= g_savedata.settings.ISLAND_COUNT) then
 					break
 				end
+			end
+
+			-- sets up scouting data
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				tabulate(g_savedata.ai_knowledge.scout, island.name)
+				g_savedata.ai_knowledge.scout[island.name].scouted = 0
 			end
 
 			-- game setup
@@ -1467,6 +1473,7 @@ function onVehicleLoad(incoming_vehicle_id)
 								end
 							end
 							if not is_player_close then
+								wpDLCDebug("a vehicle was removed as it tried to spawn in the air!", true, false)
 								killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
 							end
 						end
@@ -1571,13 +1578,18 @@ function tickGamemode()
 				-- does a check for how many enemy ai are capturing the island
 				if island.capture_timer > 0 then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if isTickID(vehicle_id, tick_rate) then
-								if vehicle_object.role ~= "scout" then
-									if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
-										island.ai_capturing = island.ai_capturing + 1
-									elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
-										island.ai_capturing = island.ai_capturing + 1
+						if squad.command == COMMAND_ATTACK then
+							local target_island, origin_island = getObjectiveIsland()
+							if target_island.name == island.name then
+								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+									if isTickID(vehicle_id, tick_rate) then
+										if vehicle_object.role ~= "scout" then
+											if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
+												island.ai_capturing = island.ai_capturing + 1
+											elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
+												island.ai_capturing = island.ai_capturing + 1
+											end
+										end
 									end
 								end
 							end
@@ -1748,8 +1760,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				for player_debugging_id, v in pairs(playerData.isDebugging) do
 					if playerData.isDebugging[player_debugging_id] then
 						local debug_data = ""
-						local target_island, origin_island = getObjectiveIsland()
-						if target_island.name == island.name then debug_data = debug_data.."\nScout Progress: "..(g_savedata.ai_knowledge.scout/scout_requirement*100).."%" end
+						debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
 						debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
 						debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
 						if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
@@ -1835,16 +1846,17 @@ function tickAI()
 			if isTickID(squad_index, 60) then			
 				if squad_index ~= RESUPPLY_SQUAD_INDEX then
 					local squad_vision = squadGetVisionData(squad)
-
-					if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
-						setSquadCommandEngage(squad)
-					elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
-						if #squad_vision.investigate_players > 0 then
-							local investigate_player = squad_vision:getBestInvestigatePlayer()
-							setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
-						elseif #squad_vision.investigate_vehicles > 0 then
-							local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
-							setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
+					if squad.command ~= COMMAND_SCOUT then
+						if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
+							setSquadCommandEngage(squad)
+						elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
+							if #squad_vision.investigate_players > 0 then
+								local investigate_player = squad_vision:getBestInvestigatePlayer()
+								setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
+							elseif #squad_vision.investigate_vehicles > 0 then
+								local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
+								setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
+							end
 						end
 					end
 				end
@@ -1877,7 +1889,7 @@ function tickAI()
 			else
 				if g_savedata.is_attack == false then
 					if g_savedata.constructable_vehicles.attack.mod > -1 then -- if its above the threshold in order to attack
-						if g_savedata.ai_knowledge.scout >= scout_requirement then
+						if g_savedata.ai_knowledge.scout[objective_island.name].scouted >= scout_requirement then
 							local boats_ready = 0
 							local boats_total = 0
 							local air_ready = 0
@@ -1886,7 +1898,15 @@ function tickAI()
 							local land_total = 0
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == COMMAND_STAGE then
+								if squad.command == COMMAND_PATROL then
+									if squad.role ~= "defend" and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+										if squad.ai_type == AI_TYPE_BOAT or squad.ai_type == AI_TYPE_LAND then
+											setSquadCommandStage(squad, ally_island)
+										else
+											setSquadCommandStage(squad, ally_island)
+										end
+									end
+								elseif squad.command == COMMAND_STAGE then
 									local _, squad_leader = getSquadLeader(squad)
 									local squad_leader_transform = squad_leader.transform
 
@@ -1960,8 +1980,6 @@ function tickAI()
 								else
 									wpDLCDebug("Failed to spawn scout vehicle!", false, false)
 								end
-							else
-
 							end
 						end
 					else -- if they've not hit the threshold to attack
@@ -2017,36 +2035,41 @@ function getAlliedIslands()
 	return alliedIslandIndexes
 end
 
-function getObjectiveIsland()
+---@param ignore_scouted boolean true if you want to ignore islands that are already fully scouted
+---@return table target_island returns the island which the ai should target
+---@return table origin_island returns the island which the ai should attack from
+function getObjectiveIsland(ignore_scouted)
 	local origin_island = nil
 	local target_island = nil
 	local target_best_distance = nil
 	for island_index, island in pairs(g_savedata.controllable_islands) do
 		if island.faction ~= FACTION_AI then
 			for ai_island_index, ai_island in pairs(g_savedata.controllable_islands) do
-				if ai_island.faction == FACTION_AI then
-					if not target_island then
-						origin_island = ai_island
-						target_island = island
-						if island.faction == FACTION_PLAYER then
-							target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
-						else
-							target_best_distance = xzDistance(ai_island.transform, island.transform)
-						end
-					elseif island.faction == FACTION_PLAYER then -- if the player owns the island we are checking
-						if target_island.faction == FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+				if ai_island.faction == FACTION_AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
+					if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
+						if not target_island then
+							origin_island = ai_island
+							target_island = island
+							if island.faction == FACTION_PLAYER then
+								target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
+							else
+								target_best_distance = xzDistance(ai_island.transform, island.transform)
+							end
+						elseif island.faction == FACTION_PLAYER then -- if the player owns the island we are checking
+							if target_island.faction == FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+								origin_island = ai_island
+								target_island = island
+								target_best_distance = xzDistance(ai_island.transform, island.transform)
+							elseif target_island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
+								origin_island = ai_island
+								target_island = island
+								target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
+							end
+						elseif island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
 							origin_island = ai_island
 							target_island = island
 							target_best_distance = xzDistance(ai_island.transform, island.transform)
-						elseif target_island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
-							origin_island = ai_island
-							target_island = island
-							target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
 						end
-					elseif island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
-						origin_island = ai_island
-						target_island = island
-						target_best_distance = xzDistance(ai_island.transform, island.transform)
 					end
 				end
 			end
@@ -2055,25 +2078,27 @@ function getObjectiveIsland()
 	if not target_island then
 		origin_island = g_savedata.ai_base_island
 		for island_index, island in pairs(g_savedata.controllable_islands) do
-			if island.faction ~= FACTION_AI then
-				if not target_island then
-					target_island = island
-					if island.faction == FACTION_PLAYER then
-						target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
-					else
-						target_best_distance = xzDistance(origin_island.transform, island.transform)
-					end
-				elseif island.faction == FACTION_PLAYER then
-					if target_island.faction == FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+			if island.faction ~= FACTION_AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
+				if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
+					if not target_island then
+						target_island = island
+						if island.faction == FACTION_PLAYER then
+							target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
+						else
+							target_best_distance = xzDistance(origin_island.transform, island.transform)
+						end
+					elseif island.faction == FACTION_PLAYER then
+						if target_island.faction == FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+							target_island = island
+							target_best_distance = xzDistance(origin_island.transform, island.transform)
+						elseif target_island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
+							target_island = island
+							target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
+						end
+					elseif island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
 						target_island = island
 						target_best_distance = xzDistance(origin_island.transform, island.transform)
-					elseif target_island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
-						target_island = island
-						target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
 					end
-				elseif island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
-					target_island = island
-					target_best_distance = xzDistance(origin_island.transform, island.transform)
 				end
 			end
 		end
@@ -2719,18 +2744,17 @@ function tickVehicles()
 
 				-- scout vehicles
 				if vehicle_object.role == "scout" then
-					if g_savedata.ai_knowledge.scout >= scout_requirement then -- if it finished its scouting
-						wpDLCDebug("scout finished scouting island!", true, false)
-					else
+					local target_island, origin_island = getObjectiveIsland(true)
+					if g_savedata.ai_knowledge.scout[target_island.name].scouted < scout_requirement then
 						if #vehicle_object.path == 0 then -- if its finishing circling the island
 							setSquadCommandScout(squad)
 						end
-						local target_island, origin_island = getObjectiveIsland()
+						local target_island, origin_island = getObjectiveIsland(true)
 						if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
 							if target_island.faction == FACTION_NEUTRAL then
-								g_savedata.ai_knowledge.scout = g_savedata.ai_knowledge.scout + vehicle_update_tickrate * 4
+								g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate * 4, 0, scout_requirement)
 							else
-								g_savedata.ai_knowledge.scout = g_savedata.ai_knowledge.scout + vehicle_update_tickrate
+								g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
 							end
 						end
 					end
@@ -2787,7 +2811,7 @@ function tickVehicles()
 							local vehicle_pos = vehicle_object.transform
 							local distance = m.distance(ai_target, vehicle_pos)
 	
-							if distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 7 then
+							if vehicle_object.ai_type == AI_TYPE_PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 7 then
 								if #vehicle_object.path > 1 then
 									s.removeMapID(0, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
@@ -2796,7 +2820,7 @@ function tickVehicles()
 									end
 								elseif vehicle_object.role == "scout" then
 									resetPath(vehicle_object)
-									target_island, origin_island = getObjectiveIsland()
+									target_island, origin_island = getObjectiveIsland(true)
 									if target_island then
 										local holding_route = g_holding_pattern
 										addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[1].x, CRUISE_HEIGHT * 2, holding_route[1].z)))
@@ -3528,6 +3552,9 @@ end
 --
 --------------------------------------------------------------------------------
 
+---@param id integer the tick you want to check that it is
+---@param rate integer the total amount of ticks, for example, a rate of 60 means it returns true once every second* (if the tps is not low)
+---@return boolean isTick if its the current tick that you requested
 function isTickID(id, rate)
 	return (g_tick_counter + id) % rate == 0
 end
