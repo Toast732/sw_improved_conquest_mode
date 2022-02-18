@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.38)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.39)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -907,11 +907,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 				elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
 					if arg1 then
-						vehicle_id = sm.getVehicleListID(arg1)
+						vehicle_id = sm.getVehicleListID(string.gsub(arg1, "_", " "))
 						if vehicle_id or arg1 == "scout" then
 							valid_vehicle = true
 							wpDLCDebug("Spawning \""..arg1.."\"", false, false, user_peer_id)
-							if not arg1 == "scout" then
+							if arg1 ~= "scout" then
 								spawnAIVehicle(vehicle_id)
 							else
 								spawnAIVehicle(arg1)
@@ -3813,6 +3813,7 @@ end
 function spawnModifiers.getVehicleListID(vehicle_name)
 	local found_vehicle = nil
 	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
+		wpDLCDebug(vehicle_object.location.data.name)
 		if vehicle_object.location.data.name == vehicle_name and not found_vehicle then
 			found_vehicle = vehicle_id
 		end
