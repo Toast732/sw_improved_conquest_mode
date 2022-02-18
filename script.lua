@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.40)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.41)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -68,7 +68,7 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = true
+local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
@@ -609,7 +609,13 @@ function spawnAIVehicle(requested_prefab)
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
 	
-	selected_prefab = sm.spawn(true, requested_prefab) or sm.spawn(false)
+	local selected_prefab = nil
+
+	if requested_prefab then
+		selected_prefab = sm.spawn(true, requested_prefab) 
+	else
+		selected_prefab = sm.spawn(false)
+	end
 
 	local player_list = s.getPlayers()
 
@@ -746,8 +752,8 @@ function spawnAIVehicle(requested_prefab)
 		end
 	else
 		if
-			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_SIZE 
+			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count <= g_savedata.settings.MAX_HELI_SIZE 
+			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count <= g_savedata.settings.MAX_PLANE_SIZE 
 			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab 
 			or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab 
 			then
