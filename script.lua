@@ -4,13 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.39)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.40)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
 local MAX_ATTACKING_SQUADS = 3
 
-local COMMAND_NONE = ""
+local COMMAND_NONE = "nocomm"
 local COMMAND_ATTACK = "attack"
 local COMMAND_DEFEND = "defend"
 local COMMAND_INVESTIGATE = "investigate"
@@ -714,8 +714,6 @@ function spawnAIVehicle(requested_prefab)
 			selected_spawn = random_island
 		end
 	end
-
-	wpDLCDebug("testing!")
 
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
@@ -1896,9 +1894,10 @@ function tickAI()
 							local air_total = 0
 							local land_ready = 0
 							local land_total = 0
+							objective_island.is_scouting = false
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == COMMAND_PATROL then
+								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND then
 									if squad.role ~= "defend" and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 										if squad.ai_type == AI_TYPE_BOAT or squad.ai_type == AI_TYPE_LAND then
 											setSquadCommandStage(squad, ally_island)
@@ -1966,19 +1965,29 @@ function tickAI()
 								end
 							end
 						else -- if they've yet to fully scout the base
+							local scout_exists = false
 							if not objective_island.is_scouting then
-								wpDLCDebug("attempting to spawn scout vehicle...", false, false)
-								local spawned = spawnAIVehicle("scout")
-								if spawned then
-									wpDLCDebug("scout vehicle spawned!")
-									objective_island.is_scouting = true
-									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-										if squad.command == COMMAND_SCOUT then
-											setSquadCommandScout(squad)
+								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+									for vehicle_index, vehicle in pairs(squad.vehicles) do
+										if vehicle.role == "scout" then
+											scout_exists = true
 										end
 									end
-								else
-									wpDLCDebug("Failed to spawn scout vehicle!", false, false)
+								end
+								if not scout_exists then -- if a scout vehicle does not exist
+									wpDLCDebug("attempting to spawn scout vehicle...", false, false)
+									local spawned = spawnAIVehicle("scout")
+									if spawned then
+										wpDLCDebug("scout vehicle spawned!")
+										objective_island.is_scouting = true
+										for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+											if squad.command == COMMAND_SCOUT then
+												setSquadCommandScout(squad)
+											end
+										end
+									else
+										wpDLCDebug("Failed to spawn scout vehicle!", false, false)
+									end
 								end
 							end
 						end
@@ -2015,6 +2024,8 @@ function tickAI()
 						if (g_count_patrol / g_count_squads) < 0.5 then
 							g_count_patrol = g_count_patrol + 1
 							setSquadCommandPatrol(squad, allied_islands[math.random(1, #allied_islands)])
+						else
+							setSquadCommandDefend(squad, allied_islands[math.random(1, #allied_islands)])
 						end
 					else
 						setSquadCommandPatrol(squad, g_savedata.ai_base_island)
@@ -2131,7 +2142,7 @@ function addToSquadron(vehicle_object)
 		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
 			if squad.ai_type == vehicle_object.ai_type then
 				local _, squad_leader = getSquadLeader(squad)
-				if squad.role ~= "scout" and squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
+				if squad.role ~= "scout" and squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island and squad.role ~= "scout" then
 					if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 						squad.vehicles[vehicle_object.id] = vehicle_object
 						new_squad = squad
@@ -3404,7 +3415,7 @@ function setSquadCommandScout(squad)
 end
 
 function setSquadCommand(squad, command)
-	if squad.command ~= command then
+	if squad.command ~= command and squad.command ~= COMMAND_SCOUT then
 		squad.command = command
 	
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
