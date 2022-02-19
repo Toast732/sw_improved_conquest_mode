@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.41)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.42)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1106,6 +1106,9 @@ function captureIsland(island, override, peer_id)
 			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
 		end
 
+		island.is_scouting = false
+		g_savedata.ai_knowledge.scout[island.name].scouted = scout_requirement
+
 		sm.train(REWARD, "defend", 4)
 		sm.train(PUNISH, "attack", 5)
 
@@ -1126,6 +1129,8 @@ function captureIsland(island, override, peer_id)
 		else
 			s.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 4)
 		end
+
+		g_savedata.ai_knowledge.scout[island.name].scouted = 0
 
 		sm.train(REWARD, "defend", 4)
 		sm.train(PUNISH, "attack", 2)
@@ -1150,6 +1155,9 @@ function captureIsland(island, override, peer_id)
 		else
 			s.notify(-1, "ISLAND SET NEUTRAL", "Successfully set an island to neutral.", 1)
 		end
+
+		island.is_scouting = false
+		g_savedata.ai_knowledge.scout[island.name].scouted = 0
 
 		-- update vehicles looking to resupply
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2148,11 +2156,13 @@ function addToSquadron(vehicle_object)
 		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
 			if squad.ai_type == vehicle_object.ai_type then
 				local _, squad_leader = getSquadLeader(squad)
-				if squad.role ~= "scout" and squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island and squad.role ~= "scout" then
-					if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
-						squad.vehicles[vehicle_object.id] = vehicle_object
-						new_squad = squad
-						break
+				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
+					if vehicle_object.role ~= "scout" and squad.ai_type ~= "scout" then
+						if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
+							squad.vehicles[vehicle_object.id] = vehicle_object
+							new_squad = squad
+							break
+						end
 					end
 				end
 			end
@@ -2195,32 +2205,34 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 			for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
 				ai_damage_dealt = ai_damage_dealt + damage
 			end
-			
-			-- get the command it has
-			local vehicle_role = getTagValue(vehicle_object.tags, "role", true) or "general"
 
-			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
 
 			wpDLCDebug("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, false, false)
-
-			if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
-				local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
-				sm.train(
-					REWARD, 
-					vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
-					vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
-					vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
-					constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
-				)
-			else -- if the ai did less damage than the damage it took / 3
-				local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
-				sm.train(
-					PUNISH, 
-					vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
-					vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
-					vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
-					constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
-				)
+			if vehicle_object.role ~= "scout" then -- makes sure the vehicle isnt a scout vehicle
+				if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
+					local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
+					sm.train(
+						REWARD, 
+						vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
+						vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
+						vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
+						constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
+					)
+				else -- if the ai did less damage than the damage it took / 3
+					local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
+					sm.train(
+						PUNISH, 
+						vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
+						vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
+						vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
+						constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
+					)
+				end
+			else -- if it is a scout vehicle, we instead want to reset its progress on whatever island it was on
+				target_island, origin_island = getObjectiveIsland(true)
+				g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
+				target_island.is_scouting = false
 			end
 		end
 
@@ -3817,9 +3829,11 @@ end
 ---@return integer constructable_vehicle_id the index of the vehicle in the constructable vehicle list, returns nil if not found
 function spawnModifiers.getConstructableVehicleID(role, type, strategy, vehicle_list_id)
 	local constructable_vehicle_id = nil
-	for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][type][strategy]) do
-		if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][type][strategy][vehicle_id].id then
-			constructable_vehicle_id = vehicle_id
+	if g_savedata.constructable_vehicles[role][type][strategy] then
+		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][type][strategy]) do
+			if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][type][strategy][vehicle_id].id then
+				constructable_vehicle_id = vehicle_id
+			end
 		end
 	end
 	return constructable_vehicle_id -- returns the constructable_vehicle_id, if not found then it returns nil
