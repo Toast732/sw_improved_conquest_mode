@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.42)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.43)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1964,14 +1964,18 @@ function tickAI()
 				
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									if squad.command == COMMAND_STAGE then
-										setSquadCommandAttack(squad, objective_island)
+										if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT then -- makes sure boats can attack that island
+											setSquadCommandAttack(squad, objective_island)
+										end
 									end
 								end
 							else
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 										if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
-											setSquadCommandStage(squad, objective_island)
+											if not hasTag(objective_island.tags, "no-access=boat") then -- if boats can attack that island
+												setSquadCommandStage(squad, objective_island)
+											end
 										else
 											setSquadCommandStage(squad, ally_island)
 										end
