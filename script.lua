@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.43)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.44)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1068,6 +1068,24 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					else
 						wpDLCDebug("invalid syntax! you must either choose a vehicle id, or \"all\" to remove all enemy ai vehicles", false, true, user_peer_id) 
 					end
+				elseif command == "?WDLCSI" or command == "?WeaponsDLCScoutIsland" then
+					if arg1 then
+						if arg2 then
+							if tonumber(arg2) then
+								if g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")] then
+									g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted = (math.clamp(tonumber(arg2), 0, 100)/100) * scout_requirement
+								else
+									wpDLCDebug("Unknown island: "..string.gsub(arg1, "_", " "), false, true, user_peer_id)
+								end
+							else
+								wpDLCDebug("arg 2 has to be a number! unknown value: "..arg2, false, true, user_peer_id)
+							end
+						else
+							wpDLCDebug("invalid syntax! you must specify the scout level to set it to (0-100)", false, true, user_peer_id)
+						end
+					else
+						wpDLCDebug("invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
+					end
 				else
 					wpDLCDebug("unknown command "..command, false, true, user_peer_id)
 				end
@@ -1914,7 +1932,9 @@ function tickAI()
 								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND then
 									if squad.role ~= "defend" and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 										if squad.ai_type == AI_TYPE_BOAT or squad.ai_type == AI_TYPE_LAND then
-											setSquadCommandStage(squad, ally_island)
+											if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") or squad.ai_type == AI_TYPE_LAND then
+												setSquadCommandStage(squad, ally_island)
+											end
 										else
 											setSquadCommandStage(squad, ally_island)
 										end
@@ -1954,9 +1974,10 @@ function tickAI()
 								end
 							end
 				
-							g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
-							g_is_boats_ready = boats_total == 0 or boats_ready / boats_total >= 0.25
-				
+							g_is_air_ready = hasTag(objective_island.tags, "no-access=boat") or air_total == 0 or air_ready / air_total >= 0.5
+							g_is_boats_ready = hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
+							wpDLCDebug("is air ready?"..tostring(g_is_air_ready))
+							wpDLCDebug("is boat ready?"..tostring(g_is_boats_ready))
 							local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
 				
 							if is_attack then
@@ -2026,7 +2047,9 @@ function tickAI()
 		
 						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 							if squad.command == COMMAND_ATTACK then
-								setSquadCommandStage(squad, ally_island)
+								if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") or squad.ai_type ~= AI_TYPE_BOAT then
+									setSquadCommandStage(squad, ally_island)
+								end
 							end
 						end
 					end
