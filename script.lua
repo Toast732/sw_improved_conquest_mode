@@ -9,6 +9,24 @@ local IMPROVED_CONQUEST_UPDATE_NAME = "Improved Commands"
 local COMMAND_LIST = {
 	""
 }
+local ADMIN_COMMAND_LIST = {
+	"reset",
+	"debug_vehicle (vehicle_id)",
+	"debug_speed (speed_multiplier)",
+	"vreset (vehicle_id)",
+	"target (target_vehicle_id)",
+	"sv (vehicle_name OR scout)",
+	"vl",
+	"debug [vehicle_id = all]",
+	"st",
+	"cp (island_name_underscore_separated) (faction)",
+	"full_reload",
+	"info",
+	"aimod (role) (type) (strategy) (constructable_vehicle_id)",
+	"setmod (type) (constructable_vehicle_id) (value 1-5)",
+	"dv (vehicle_id)",
+	"si (island_name_underscore_separated) (number 1-100)"
+}
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -895,20 +913,20 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 
 				elseif args[1] == "debug_vehicle" then
-					g_debug_vehicle_id = args[1]
+					g_debug_vehicle_id = args[2]
 
 
 				elseif args[1] == "debug_speed" then
-						g_debug_speed_multiplier = args[1]
+						g_debug_speed_multiplier = args[2]
 
 				elseif args[1] == "vreset" then
-						s.resetVehicleState(args[1])
+						s.resetVehicleState(args[2])
 
 				elseif args[1] == "target" then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							for i, char in  pairs(vehicle_object.survivors) do
-								s.setAITargetVehicle(char.id, args[1])
+								s.setAITargetVehicle(char.id, args[2])
 							end
 						end
 					end
@@ -1097,7 +1115,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 				elseif args[1] == "dv" then
 					if args[2] then
-						if args[3] == "all" then
+						if args[2] == "all" then
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 									killVehicle(squad_index, vehicle_id, true, true)
@@ -1124,7 +1142,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					end
 
 
-				elseif args[1] == "si" then
+				elseif args[1] == "si" then --scout island
 					if args[2] then
 						if args[3] then
 							if tonumber(args[3]) then
@@ -1133,7 +1151,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 									-- announce the change to the players
 									local name = s.getPlayerName(user_peer_id)
-									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..args[1].."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(args[2], "_", " ")].scouted/scout_requirement*100).."%", 1)
+									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..args[2].."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(args[2], "_", " ")].scouted/scout_requirement*100).."%", 1)
 								else
 									wpDLCDebug("Unknown island: "..string.gsub(args[1], "_", " "), false, true, user_peer_id)
 								end
@@ -1148,8 +1166,20 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					end
 
 
+				elseif args[1] == "help" then
+					if is_admin then
+						s.announce("Improved Conquest Mode", "All Admin Commands", user_peer_id)
+						for k,v in pairs(ADMIN_COMMAND_LIST) do
+							s.announce("Improved Conquest Mode", "?impwep "..v, user_peer_id)
+						end
+					else
+						s.announce("Improved Conquest Mode", "All Player Commands", user_peer_id)
+						for k,v in pairs(COMMAND_LIST) do
+							s.announce("Improved Conquest Mode", "?impwep "..v, user_peer_id)
+						end
+					end
 				else
-					wpDLCDebug("Unknown command '"..args[1].."', please refer to ?impwep help", false, true, user_peer_id)
+					wpDLCDebug("Unknown command or no command! Please refer to ?impwep help", false, true, user_peer_id)
 				end
 			else
 				wpDLCDebug("You do not have permission to use "..args[1]..", contact a server admin if you believe this is incorrect.", false, true, user_peer_id)
