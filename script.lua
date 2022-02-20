@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.44)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.45)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -172,6 +172,7 @@ g_savedata = {
 	ai_history = {
 		has_defended = 0, -- logs the time in ticks the player attacked at
 		defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
+		scout_death = -1, -- saves the time the scout plane was destroyed, allows the players some time between each time the scout comes
 	},
 	ai_knowledge = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
@@ -322,10 +323,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						transform = flagZone.transform,
 						tags = flagZone.tags,
 						faction = FACTION_PLAYER, 
-						faction_prev = FACTION_PLAYER,
 						is_contested = false,
 						capture_timer = g_savedata.settings.CAPTURE_TIME, 
-						capture_timer_prev = g_savedata.settings.CAPTURE_TIME,
 						map_id = s.getMapID(),
 						assigned_squad_index = -1,
 						ai_capturing = 0,
@@ -355,10 +354,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				transform = flagZone.transform,
 				tags = flagZone.tags,
 				faction = FACTION_AI, 
-				faction_prev = FACTION_AI,
 				is_contested = false,
 				capture_timer = 0,
-				capture_timer_prev = 0,
 				map_id = s.getMapID(), 
 				assigned_squad_index = -1, 
 				production_timer = 0,
@@ -384,10 +381,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					transform = flagZone.transform,
 					tags = flagZone.tags,
 					faction = FACTION_NEUTRAL, 
-					faction_prev = FACTION_NEUTRAL,
 					is_contested = false,
 					capture_timer = g_savedata.settings.CAPTURE_TIME / 2,
-					capture_timer_prev = g_savedata.settings.CAPTURE_TIME / 2,
 					map_id = s.getMapID(), 
 					assigned_squad_index = -1, 
 					zones = {},
@@ -1074,6 +1069,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 							if tonumber(arg2) then
 								if g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")] then
 									g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted = (math.clamp(tonumber(arg2), 0, 100)/100) * scout_requirement
+
+									-- announce the change to the players
+									local name = s.getPlayerName(user_peer_id)
+									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..arg1.."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted*scout_requirement), 1)
 								else
 									wpDLCDebug("Unknown island: "..string.gsub(arg1, "_", " "), false, true, user_peer_id)
 								end
@@ -1587,7 +1586,6 @@ function tickGamemode()
 			spawnTurret(g_savedata.ai_base_island)
 			spawnAIVehicle()
 		end
-
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 
 			if island.ai_capturing == nil then
@@ -1604,21 +1602,17 @@ function tickGamemode()
 			local tick_rate = 60
 			if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
 				local playerList = s.getPlayers()
-				
 				-- does a check for how many enemy ai are capturing the island
 				if island.capture_timer > 0 then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_ATTACK then
-							local target_island, origin_island = getObjectiveIsland()
-							if target_island.name == island.name then
-								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-									if isTickID(vehicle_id, tick_rate) then
-										if vehicle_object.role ~= "scout" then
-											if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
-												island.ai_capturing = island.ai_capturing + 1
-											elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
-												island.ai_capturing = island.ai_capturing + 1
-											end
+						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name then
+							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+								if isTickID(vehicle_id, tick_rate) then
+									if vehicle_object.role ~= "scout" then
+										if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
+											island.ai_capturing = island.ai_capturing + 1
+										elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
+											island.ai_capturing = island.ai_capturing + 1
 										end
 									end
 								end
@@ -1747,12 +1741,10 @@ function tickGamemode()
 				end
 			end
 
-			-- Render Island Info
+			-- Update Island Debug Info
 			for island_index, island in pairs(g_savedata.controllable_islands) do
 				if isTickID(island_index, 60) then
 					updatePeerIslandMapData(-1, island)
-					island.capture_timer_prev = island.capture_timer
-					island.faction_prev = island.faction
 				end
 			end
 		end
@@ -1929,7 +1921,7 @@ function tickAI()
 							objective_island.is_scouting = false
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND then
+								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET then
 									if squad.role ~= "defend" and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 										if squad.ai_type == AI_TYPE_BOAT or squad.ai_type == AI_TYPE_LAND then
 											if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") or squad.ai_type == AI_TYPE_LAND then
@@ -1976,23 +1968,21 @@ function tickAI()
 				
 							g_is_air_ready = hasTag(objective_island.tags, "no-access=boat") or air_total == 0 or air_ready / air_total >= 0.5
 							g_is_boats_ready = hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
-							wpDLCDebug("is air ready?"..tostring(g_is_air_ready))
-							wpDLCDebug("is boat ready?"..tostring(g_is_boats_ready))
 							local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
-				
+							
 							if is_attack then
 								g_savedata.is_attack = is_attack
 				
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									if squad.command == COMMAND_STAGE then
-										if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT then -- makes sure boats can attack that island
+										if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT or squad.ai_type ~= AI_TYPE_BOAT then -- makes sure boats can attack that island
 											setSquadCommandAttack(squad, objective_island)
 										end
 									end
 								end
 							else
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									if squad.command == COMMAND_NONE and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+									if squad.command == COMMAND_NONE and squad.ai_type ~= AI_TYPE_TURRET and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 										if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
 											if not hasTag(objective_island.tags, "no-access=boat") then -- if boats can attack that island
 												setSquadCommandStage(squad, objective_island)
@@ -2014,18 +2004,23 @@ function tickAI()
 									end
 								end
 								if not scout_exists then -- if a scout vehicle does not exist
-									wpDLCDebug("attempting to spawn scout vehicle...", false, false)
-									local spawned = spawnAIVehicle("scout")
-									if spawned then
-										wpDLCDebug("scout vehicle spawned!")
-										objective_island.is_scouting = true
-										for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-											if squad.command == COMMAND_SCOUT then
-												setSquadCommandScout(squad)
+									if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death <= time.hour / 2 then
+										wpDLCDebug("attempting to spawn scout vehicle...", true, false)
+										local spawned = spawnAIVehicle("scout")
+										if spawned then
+											if g_savedata.ai_history.scout_death == -1 then
+												g_savedata.ai_history.scout_death = 0
 											end
+											wpDLCDebug("scout vehicle spawned!", true, false)
+											objective_island.is_scouting = true
+											for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+												if squad.command == COMMAND_SCOUT then
+													setSquadCommandScout(squad)
+												end
+											end
+										else
+											wpDLCDebug("Failed to spawn scout vehicle!", true, true)
 										end
-									else
-										wpDLCDebug("Failed to spawn scout vehicle!", false, false)
 									end
 								end
 							end
@@ -2260,6 +2255,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 				target_island, origin_island = getObjectiveIsland(true)
 				g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
 				target_island.is_scouting = false
+				g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
 			end
 		end
 
