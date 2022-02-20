@@ -37,17 +37,21 @@
         ],
         "lua.debug.settings.cpath": [
             "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/dll/socket/core.dll",
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/dll/mime/core.dll"
+            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/dll/mime/core.dll",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/dll/socket/core.dll",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/dll/mime/core.dll"
         ],
         "lua.debug.settings.path": [
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/?.lua",
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Addons/?.lua",
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Tools/?.lua"
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/luasocket/?.lua",
+            "G:/Program Files (x86)/Lua Libs/STDebugger.lua/?.lua",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Addons/?.lua",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Tools/?.lua"
         ],
         "Lua.workspace.library": [
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Addons/",
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Tools/",
-            "c:/Users/liamm/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/nelodocs/docs_missions.lua"
+            "G:/Program Files (x86)/Lua Libs/STDebugger.lua/",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Addons/",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/LifeBoatAPI/Tools/",
+            "c:/Users/senty_dml71xc/.vscode/extensions/nameouschangey.lifeboatapi-0.0.12//assets/nelodocs/docs_missions.lua"
         ],
         "lua.debug.settings.luaVersion": "5.3",
         "lua.debug.settings.luaArch": "x86",

@@ -5,6 +5,10 @@ local m = matrix
 local sm = spawnModifiers
 
 local IMPROVED_CONQUEST_VERSION = "(0.2.0)"
+local IMPROVED_CONQUEST_UPDATE_NAME = "Improved Commands"
+local COMMAND_LIST = {
+	""
+}
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -871,14 +875,15 @@ function spawnAIVehicle(requested_prefab)
 	return false
 end
 
-function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command, arg1, arg2, arg3, arg4)
+function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, ...)
 	if is_dlc_weapons then
-		if string.sub(command, 1, 5) == "?WDLC" or string.sub(command, 1, 5) == "?wep_" or command == "?target" or string.sub(command, 1, 11) == "?WeaponsDLC" then
+		if prefix == "?impwep" then
+			local args = table.pack(...) --this will supply all the remaining arguments to the function
 			-- non admin commands
 
 			-- admin commands
 			if is_admin then
-				if command == "?wep_reset" then
+				if args[1] == "reset" then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						if squad_index ~= RESUPPLY_SQUAD_INDEX then
 							setSquadCommand(squad, COMMAND_NONE)
@@ -889,41 +894,38 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					g_savedata.is_attack = false
 
 
-				elseif command == "?wep_debug_vehicle" then
-					g_debug_vehicle_id = arg1
+				elseif args[1] == "debug_vehicle" then
+					g_debug_vehicle_id = args[1]
 
 
-				elseif command == "?wep_debug_speed" then
-						g_debug_speed_multiplier = arg1
+				elseif args[1] == "debug_speed" then
+						g_debug_speed_multiplier = args[1]
 
+				elseif args[1] == "vreset" then
+						s.resetVehicleState(args[1])
 
-				elseif command == "?wep_vreset" then
-						s.resetVehicleState(arg1)
-
-
-				elseif command == "?target" then
+				elseif args[1] == "target" then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							for i, char in  pairs(vehicle_object.survivors) do
-								s.setAITargetVehicle(char.id, arg1)
+								s.setAITargetVehicle(char.id, args[1])
 							end
 						end
 					end
 
-
-				elseif command == "?WeaponsDLCSpawnVehicle" or command == "?WDLCSV" then
-					if arg1 then
-						vehicle_id = sm.getVehicleListID(string.gsub(arg1, "_", " "))
-						if vehicle_id or arg1 == "scout" then
+				elseif args[1] == "sv" then --spawn vehicle
+					if args[2] then
+						vehicle_id = sm.getVehicleListID(string.gsub(args[2], "_", " "))
+						if vehicle_id or args[2] == "scout" then
 							valid_vehicle = true
-							wpDLCDebug("Spawning \""..arg1.."\"", false, false, user_peer_id)
-							if arg1 ~= "scout" then
+							wpDLCDebug("Spawning \""..args[2].."\"", false, false, user_peer_id)
+							if args[2] ~= "scout" then
 								spawnAIVehicle(vehicle_id)
 							else
-								spawnAIVehicle(arg1)
+								spawnAIVehicle(args[2])
 							end
 						else
-							wpDLCDebug("Was unable to find a vehicle with the name \""..arg1.."\", use ?WDLCVL to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, true, user_peer_id)
+							wpDLCDebug("Was unable to find a vehicle with the name \""..args[2].."\", use '?impwep vl' to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, true, user_peer_id)
 						end
 					else -- if vehicle not specified, spawn random vehicle
 						wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
@@ -931,7 +933,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 
 
-				elseif command == "?WeaponsDLCVehicleList" or command == "?WDLCVL" then
+				elseif args[1] == "vl" then --vehicle list
 					wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
 					for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
 						wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
@@ -939,14 +941,14 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 
 
-				elseif command == "?WeaponsDLCDebug" or command == "?WDLCD" then
-					if arg1 then
-						vehicles_debugging[tonumber(arg1)] = not vehicles_debugging[tonumber(arg1)]
+				elseif args[1] == "debug" then
+					if args[2] then
+						vehicles_debugging[tonumber(args[2])] = not vehicles_debugging[tonumber(args[2])]
 						local enDis = "dis"
-						if vehicles_debugging[tonumber(arg1)] then
+						if vehicles_debugging[tonumber(args[2])] then
 							enDis = "en"
 						end
-						wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg1, false, false, user_peer_id)
+						wpDLCDebug(enDis.."abled debugging for vehicle id: "..args[2], false, false, user_peer_id)
 					else
 						playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
 
@@ -981,7 +983,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 
 
-				elseif command == "?WDLCST" or command == "?WeaponsDLCSpawnTurret" then
+				elseif args[1] == "st" then --spawn turret
 					local turrets_spawned = 1
 					spawnTurret(g_savedata.ai_base_island)
 					for island_index, island in pairs(g_savedata.controllable_islands) do
@@ -993,17 +995,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					wpDLCDebug("attempted to spawn "..turrets_spawned.." turrets", false, false, user_peer_id)
 
 
-				elseif command == "?WDLCCP" or command == "?WeaponsDLCCapturePoint" then
-					if arg1 and arg2 then
+				elseif args[1] == "cp" then --capture point
+					if args[2] and args[3] then
 						local is_island = false
 						for island_index, island in pairs(g_savedata.controllable_islands) do
-							if island.name == string.gsub(arg1, "_", " ") then
+							if island.name == string.gsub(args[2], "_", " ") then
 								is_island = true
-								if island.faction ~= arg2 then
-									if arg2 == FACTION_AI or arg2 == FACTION_NEUTRAL or arg2 == FACTION_PLAYER then
-										captureIsland(island, arg2, user_peer_id)
+								if island.faction ~= args[3] then
+									if args[3] == FACTION_AI or args[3] == FACTION_NEUTRAL or args[3] == FACTION_PLAYER then
+										captureIsland(island, args[3], user_peer_id)
 									else
-										wpDLCDebug(arg2.." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
+										wpDLCDebug(args[3].." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
 									end
 								else
 									wpDLCDebug(island.name.." is already set to "..island.faction..".", false, true, user_peer_id)
@@ -1011,29 +1013,29 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 							end
 						end
 						if not is_island then
-							wpDLCDebug(arg1.." is not a valid island! note: required to use \"_\" instead of \" \" in its name", false, true, user_peer_id)
+							wpDLCDebug(args[1].." is not a valid island! Did you replace spaces with _?", false, true, user_peer_id)
 						end
 					else
-						wpDLCDebug("Invalid Syntax! command usage: ?WDLCCP (island_name) (faction)", false, true, user_peer_id)
+						wpDLCDebug("Invalid Syntax! command usage: ?impwep cp (island_name) (faction)", false, true, user_peer_id)
 					end
 
 
-				elseif command == "?WDLC_RELOAD_ADDON" or command == "?WeaponsDLC_RELOAD_ADDON" then
-					if playerData.isDoAsISay.user_peer_id == true and arg1 == "do_as_i_say" then
+				elseif args[1] == "full_reload" and user_peer_id == 0 then
+					if playerData.isDoAsISay.user_peer_id == true and args[1] == "do_as_i_say" then
 						wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 						onCreate(true, true, user_peer_id)
-					elseif playerData.isDoAsISay.user_peer_id == true and not arg1 then
+					elseif playerData.isDoAsISay.user_peer_id == true and not args[1] then
 						wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
 						playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-					elseif not arg1 then
+					elseif not args[1] then
 						wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
 						playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 					end
 
 
-				elseif command == "?WDLCI" or command == "?WeaponsDLCInfo" then
+				elseif args[1] == "info" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
-					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
+					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION..": The "..IMPROVED_CONQUEST_UPDATE_NAME.." Update", false, false, user_peer_id)
 					if g_savedata.info.has_default_addon then
 						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
 					end
@@ -1047,55 +1049,55 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 
 
-				elseif command == "?WDLCAM" or command == "?WeaponsDLCAIModifier" then
-					if arg1 then
-						sm.debug(user_peer_id, arg1, arg2, arg3, arg4)
+				elseif args[1] == "aimod" then
+					if args[2] then
+						sm.debug(user_peer_id, args[2], args[3], args[4], args[5])
 					else
 						wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
 					end
 
 
-				elseif command == "?WDLCSM" or command == "?WeaponsDLCSetModifier" then
-					if arg1 then
-						if arg1 == "punish" or arg1 == "reward" then
-							if arg2 then
-								if g_savedata.constructable_vehicles[arg2].mod then
-									if tonumber(arg3) then
-										if arg1 == "punish" then
-											if ai_training.punishments[tonumber(arg3)] then
-												g_savedata.constructable_vehicles[arg2].mod = g_savedata.constructable_vehicles[arg2].mod + ai_training.punishments[tonumber(arg3)]
-												wpDLCDebug("successfully set role "..arg2.." to modifier: "..g_savedata.constructable_vehicles[arg2].mod, false, false, user_peer_id)
+				elseif args[1] == "setmod" then
+					if args[2] then
+						if args[2] == "punish" or args[2] == "reward" then
+							if args[3] then
+								if g_savedata.constructable_vehicles[args[2]].mod then
+									if tonumber(args[4]) then
+										if args[2] == "punish" then
+											if ai_training.punishments[tonumber(args[3])] then
+												g_savedata.constructable_vehicles[args[3]].mod = g_savedata.constructable_vehicles[args[3]].mod + ai_training.punishments[tonumber(args[4])]
+												wpDLCDebug("successfully set role "..args[3].." to modifier: "..g_savedata.constructable_vehicles[args[3]].mod, false, false, user_peer_id)
 											else
-												wpDLCDebug("incorrect syntax! "..arg3.." has to be a number from 1-5!"..arg2, false, true, user_peer_id)
+												wpDLCDebug("incorrect syntax! "..args[4].." has to be a number from 1-5!"..args[4], false, true, user_peer_id)
 											end
-										elseif arg1 == "reward" then
-											if ai_training.rewards[tonumber(arg3)] then
-												g_savedata.constructable_vehicles[arg2].mod = g_savedata.constructable_vehicles[arg2].mod + ai_training.rewards[tonumber(arg3)]
-												wpDLCDebug("successfully set role "..arg2.." to modifier: "..g_savedata.constructable_vehicles[arg2].mod, false, false, user_peer_id)
+										elseif args[2] == "reward" then
+											if ai_training.rewards[tonumber(args[4])] then
+												g_savedata.constructable_vehicles[args[3]].mod = g_savedata.constructable_vehicles[args[3]].mod + ai_training.rewards[tonumber(args[4])]
+												wpDLCDebug("successfully set role "..args[3].." to modifier: "..g_savedata.constructable_vehicles[args[3]].mod, false, false, user_peer_id)
 											else
-												wpDLCDebug("incorrect syntax! "..arg3.." has to be a number from 1-5!"..arg2, false, true, user_peer_id)
+												wpDLCDebug("incorrect syntax! "..args[4].." has to be a number from 1-5!"..args[3], false, true, user_peer_id)
 											end
 										end
 									else
-										wpDLCDebug("incorrect syntax! "..arg3.." has to be a number from 1-5!"..arg2, false, true, user_peer_id)
+										wpDLCDebug("incorrect syntax! "..args[4].." has to be a number from 1-5!"..args[3], false, true, user_peer_id)
 									end
 								else
-									wpDLCDebug("unknown role: "..arg2, false, true, user_peer_id)
+									wpDLCDebug("unknown role: "..args[3], false, true, user_peer_id)
 								end
 							else
 								wpDLCDebug("you need to specify which role to set!", false, true, user_peer_id)
 							end
 						else
-							wpDLCDebug("unknown reinforcement type: "..arg1.." valid reinforcement types: \"punish\" and \"reward\"", false, true, user_peer_id)
+							wpDLCDebug("unknown reinforcement type: "..args[2].." valid reinforcement types: \"punish\" and \"reward\"", false, true, user_peer_id)
 						end
 					else
 						wpDLCDebug("You need to specify wether to punish or reward!", false, true, user_peer_id)
 					end
 
 
-				elseif command == "?WDLCDV" or command == "?WeaponsDLCDeleteVehicle" then
-					if arg1 then
-						if arg1 == "all" then
+				elseif args[1] == "dv" then
+					if args[2] then
+						if args[3] == "all" then
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 									killVehicle(squad_index, vehicle_id, true, true)
@@ -1106,7 +1108,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 							local found_vehicle = false
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-									if vehicle_id == tonumber(arg1) then
+									if vehicle_id == tonumber(args[2]) then
 										found_vehicle = true
 										killVehicle(squad_index, vehicle_id, true, true)
 										wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, false, user_peer_id)
@@ -1114,7 +1116,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 								end
 							end
 							if not found_vehicle then
-								wpDLCDebug("I was unable to find the vehicle with the id of "..arg1, false, true, user_peer_id)
+								wpDLCDebug("Unable to find vehicle with id "..args[2], false, true, user_peer_id)
 							end
 						end
 					else
@@ -1122,21 +1124,21 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 					end
 
 
-				elseif command == "?WDLCSI" or command == "?WeaponsDLCScoutIsland" then
-					if arg1 then
-						if arg2 then
-							if tonumber(arg2) then
-								if g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")] then
-									g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted = (math.clamp(tonumber(arg2), 0, 100)/100) * scout_requirement
+				elseif args[1] == "si" then
+					if args[2] then
+						if args[3] then
+							if tonumber(args[3]) then
+								if g_savedata.ai_knowledge.scout[string.gsub(args[2], "_", " ")] then
+									g_savedata.ai_knowledge.scout[string.gsub(args[2], "_", " ")].scouted = (math.clamp(tonumber(args[3]), 0, 100)/100) * scout_requirement
 
 									-- announce the change to the players
 									local name = s.getPlayerName(user_peer_id)
-									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..arg1.."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted/scout_requirement*100).."%", 1)
+									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..args[1].."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(args[2], "_", " ")].scouted/scout_requirement*100).."%", 1)
 								else
-									wpDLCDebug("Unknown island: "..string.gsub(arg1, "_", " "), false, true, user_peer_id)
+									wpDLCDebug("Unknown island: "..string.gsub(args[1], "_", " "), false, true, user_peer_id)
 								end
 							else
-								wpDLCDebug("arg 2 has to be a number! unknown value: "..arg2, false, true, user_peer_id)
+								wpDLCDebug("arg 2 has to be a number! unknown value: "..args[3], false, true, user_peer_id)
 							end
 						else
 							wpDLCDebug("invalid syntax! you must specify the scout level to set it to (0-100)", false, true, user_peer_id)
@@ -1147,10 +1149,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 
 				else
-					wpDLCDebug("unknown command "..command, false, true, user_peer_id)
+					wpDLCDebug("Unknown command '"..args[1].."', please refer to ?impwep help", false, true, user_peer_id)
 				end
 			else
-				wpDLCDebug("You do not have permission to execute "..command..".", false, true, user_peer_id)
+				wpDLCDebug("You do not have permission to use "..args[1]..", contact a server admin if you believe this is incorrect.", false, true, user_peer_id)
 			end
 		end
 	end
