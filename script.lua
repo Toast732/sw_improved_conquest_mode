@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.46)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0.47)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -83,9 +83,9 @@ local time = { -- the time unit in ticks, irl time, not in game
 }
 
 local default_mods = {
-	attack = 0,
+	attack = 0.55,
 	general = 1,
-	defend = 0,
+	defend = 0.2,
 	roaming = 0.1,
 	stealth = 0.05
 }
@@ -277,6 +277,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.vehicle_list = {}
 					g_savedata.ai_history = {}
 					g_savedata.tick_counter = 0
+					g_savedata.ai_history = {}
+					g_savedata.ai_knowledge = {}
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
@@ -1072,7 +1074,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, command,
 
 									-- announce the change to the players
 									local name = s.getPlayerName(user_peer_id)
-									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..arg1.."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted*scout_requirement), 1)
+									s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..arg1.."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(arg1, "_", " ")].scouted/scout_requirement*100).."%", 1)
 								else
 									wpDLCDebug("Unknown island: "..string.gsub(arg1, "_", " "), false, true, user_peer_id)
 								end
@@ -1149,8 +1151,8 @@ function captureIsland(island, override, peer_id)
 
 		g_savedata.ai_knowledge.scout[island.name].scouted = 0
 
-		sm.train(REWARD, "defend", 4)
-		sm.train(PUNISH, "attack", 2)
+		sm.train(REWARD, "defend", 1)
+		sm.train(REWARD, "attack", 2)
 
 		-- update vehicles looking to resupply
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1743,7 +1745,7 @@ function tickGamemode()
 
 			-- Update Island Debug Info
 			for island_index, island in pairs(g_savedata.controllable_islands) do
-				if isTickID(island_index, 60) then
+				if isTickID(60, 60) then
 					updatePeerIslandMapData(-1, island)
 				end
 			end
@@ -1910,7 +1912,7 @@ function tickAI()
 				g_savedata.is_attack = false
 			else
 				if g_savedata.is_attack == false then
-					if g_savedata.constructable_vehicles.attack.mod > -1 then -- if its above the threshold in order to attack
+					if g_savedata.constructable_vehicles.attack.mod >= 0.1 then -- if its above the threshold in order to attack
 						if g_savedata.ai_knowledge.scout[objective_island.name].scouted >= scout_requirement then
 							local boats_ready = 0
 							local boats_total = 0
@@ -1923,8 +1925,8 @@ function tickAI()
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET then
 									if squad.role ~= "defend" and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-										if squad.ai_type == AI_TYPE_BOAT or squad.ai_type == AI_TYPE_LAND then
-											if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") or squad.ai_type == AI_TYPE_LAND then
+										if squad.ai_type == AI_TYPE_BOAT then
+											if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
 												setSquadCommandStage(squad, ally_island)
 											end
 										else
@@ -1966,8 +1968,8 @@ function tickAI()
 								end
 							end
 				
-							g_is_air_ready = hasTag(objective_island.tags, "no-access=boat") or air_total == 0 or air_ready / air_total >= 0.5
-							g_is_boats_ready = hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
+							g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
+							g_is_boats_ready = hasTag(ally_island.tags, "no-access=boat") or hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
 							local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
 							
 							if is_attack then
@@ -1976,7 +1978,11 @@ function tickAI()
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									if squad.command == COMMAND_STAGE then
 										if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT or squad.ai_type ~= AI_TYPE_BOAT then -- makes sure boats can attack that island
-											setSquadCommandAttack(squad, objective_island)
+											if objective_island.faction ~= FACTION_AI then
+												setSquadCommandAttack(squad, objective_island)
+											else -- if they own the island they are trying to attack
+												setSquadCommand(squad, COMMAND_NONE)
+											end
 										end
 									end
 								end
@@ -1995,15 +2001,19 @@ function tickAI()
 							end
 						else -- if they've yet to fully scout the base
 							local scout_exists = false
+							local not_scouting = false
+							local squad_to_set = nil
 							if not objective_island.is_scouting then
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									for vehicle_index, vehicle in pairs(squad.vehicles) do
 										if vehicle.role == "scout" then
 											scout_exists = true
+											if squad.command ~= COMMAND_SCOUT then not_scouting = true; squad_to_set = squad_index end
 										end
 									end
 								end
 								if not scout_exists then -- if a scout vehicle does not exist
+									-- then we want to spawn one, unless its been less than 30 minutes since it was killed
 									if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death <= time.hour / 2 then
 										wpDLCDebug("attempting to spawn scout vehicle...", true, false)
 										local spawned = spawnAIVehicle("scout")
@@ -2022,6 +2032,9 @@ function tickAI()
 											wpDLCDebug("Failed to spawn scout vehicle!", true, true)
 										end
 									end
+								elseif not_scouting and squad_to_set then -- if the scout was just set to a different command
+									-- then we want to set it back to scouting
+									setSquadCommandScout(g_savedata.ai_army.squadrons[squad_to_set])
 								end
 							end
 						end
@@ -2030,6 +2043,7 @@ function tickAI()
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								if squad.command == COMMAND_SCOUT then
 									setSquadCommand(squad, COMMAND_DEFEND)
+									objective_island.is_scouting = false
 								end
 							end
 						end
@@ -2042,7 +2056,7 @@ function tickAI()
 		
 						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 							if squad.command == COMMAND_ATTACK then
-								if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") or squad.ai_type ~= AI_TYPE_BOAT then
+								if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") or squad.ai_type ~= AI_TYPE_BOAT then
 									setSquadCommandStage(squad, ally_island)
 								end
 							end
@@ -2995,17 +3009,19 @@ function tickVehicles()
 				if render_debug then
 					local vehicle_pos = vehicle_object.transform
 					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_pos)
-
-					local debug_data = vehicle_object.state.s .. "\n"
+					local debug_data = ""
+					debug_data = debug_data.."Role: "..vehicle_object.role.."\n"
+					debug_data = debug_data.."Strategy: "..vehicle_object.strategy.."\n\n"
+					debug_data = debug_data.."Movement State: "..vehicle_object.state.s .. "\n"
 					debug_data = debug_data .. "Waypoints: " .. #vehicle_object.path .."\n\n"
-
+					
 					debug_data = debug_data .. "Squad: " .. squad_index .."\n"
-					debug_data = debug_data .. "Comm: " .. squad.command .."\n"
+					debug_data = debug_data .. "Command: " .. squad.command .."\n"
 					debug_data = debug_data .. "AI State: ".. ai_state .. "\n"
 					if squad.target_island then debug_data = debug_data .. "\n" .. "ISLE: " .. squad.target_island.name .. "\n" end
 
-					debug_data = debug_data .. "TP: " .. vehicle_object.target_player_id .."\n"
-					debug_data = debug_data .. "TV: " .. vehicle_object.target_vehicle_id .."\n\n"
+					debug_data = debug_data .. "Target Player: " .. vehicle_object.target_player_id .."\n"
+					debug_data = debug_data .. "Target Vehicle: " .. vehicle_object.target_vehicle_id .."\n\n"
 
 					if squad_index ~= RESUPPLY_SQUAD_INDEX then
 						local squad_vision = squadGetVisionData(squad)
@@ -3026,7 +3042,30 @@ function tickVehicles()
 					end
 					debug_data = debug_data .. "hp: " .. vehicle_object.current_damage .. " / " .. hp .. "\n"
 
-					debug_data = debug_data .. "Pos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
+					local damage_dealt = 0
+					for victim_vehicle, damage in pairs(vehicle_object.damage_dealt) do
+						damage_dealt = damage_dealt + damage
+					end
+					debug_data = debug_data.."Damage Dealt: "..damage_dealt.."\n\n"
+					local ai_speed_pseudo = "nil"
+
+					if vehicle_object.ai_type == AI_TYPE_BOAT then
+						ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT
+					elseif vehicle_object.ai_type == AI_TYPE_PLANE then
+						ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE
+					elseif vehicle_object.ai_type == AI_TYPE_HELI then
+						ai_speed_pseudo = AI_SPEED_PSEUDO_HELI
+					elseif vehicle_object.ai_type == AI_TYPE_LAND then
+						ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND)
+					end
+					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
+					
+					if vehicle_object.ai_type == AI_TYPE_LAND then
+						debug_data = debug_data.."Is Agressive: "..vehicle_object.is_aggressive.."\n"
+						debug_data = debug_data.."Terrain Type: "..vehicle_object.terrain_type.."\n"
+					end
+
+					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
 					if ai_target then
 						local ts_x, ts_y, ts_z = m.position(ai_target)
 						debug_data = debug_data .. "Dest: [" .. math.floor(ts_x) .. " ".. math.floor(ts_y) .. " ".. math.floor(ts_z) .. "]\n"
@@ -3377,8 +3416,15 @@ end
 
 -- spawn an individual object descriptor from a playlist location
 function spawnObjectType(spawn_transform, playlist_index, location_index, object_descriptor, parent_vehicle_id)
-	local component = s.spawnAddonComponent(spawn_transform, playlist_index, location_index, object_descriptor.index, parent_vehicle_id)
-	return component.id
+	local component, is_success = s.spawnAddonComponent(spawn_transform, playlist_index, location_index, object_descriptor.index, parent_vehicle_id)
+	if is_success then
+		return component.id
+	else -- then it failed to spawn the addon component
+		-- print info for use in debugging
+		wpDLCDebug("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, true)
+		wpDLCDebug("component index: "..component, false, true)
+		return nil
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -3456,21 +3502,23 @@ function setSquadCommandScout(squad)
 end
 
 function setSquadCommand(squad, command)
-	if squad.command ~= command and squad.command ~= COMMAND_SCOUT then
-		squad.command = command
-	
-		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-			squadInitVehicleCommand(squad, vehicle_object)
-		end
+	if squad.command ~= command then
+		if squad.command ~= COMMAND_SCOUT or squad.command == COMMAND_SCOUT and command == COMMAND_DEFEND then
+			squad.command = command
+		
+			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+				squadInitVehicleCommand(squad, vehicle_object)
+			end
 
-		if squad.command == COMMAND_NONE then
-			resetSquadTarget(squad)
-		elseif squad.command == COMMAND_INVESTIGATE then
-			squad.target_players = {}
-			squad.target_vehicles = {}
-		end
+			if squad.command == COMMAND_NONE then
+				resetSquadTarget(squad)
+			elseif squad.command == COMMAND_INVESTIGATE then
+				squad.target_players = {}
+				squad.target_vehicles = {}
+			end
 
-		return true
+			return true
+		end
 	end
 
 	return false
@@ -3494,12 +3542,12 @@ function squadInitVehicleCommand(squad, vehicle_object)
 	elseif squad.command == COMMAND_ATTACK then
 		-- go to island, once island is captured the command will be cleared
 		resetPath(vehicle_object)
-		addPath(vehicle_object, m.multiply(squad.target_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-500, 500))))
+		addPath(vehicle_object, m.multiply(squad.target_island.transform, m.translation(math.random(-100, 100), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-100, 100))))
 	elseif squad.command == COMMAND_STAGE then
 		resetPath(vehicle_object)
 		addPath(vehicle_object, m.multiply(squad.target_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-500, 500))))
 	elseif squad.command == COMMAND_DEFEND then
-		-- go to island, remain there indefinitely
+		-- defend island
 		resetPath(vehicle_object)
 		addPath(vehicle_object, m.multiply(squad.target_island.transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-500, 500))))
 	elseif squad.command == COMMAND_INVESTIGATE then
