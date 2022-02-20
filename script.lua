@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.0.48)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.0)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
