@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.7)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.8)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -565,6 +565,8 @@ function spawnTurret(island)
 			capabilities = {
 				gps_missiles = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE")
 			},
+			is_aggressive = "normal",
+			terrain_type = "offroad",
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			transform = spawn_transform,
 			target_player_id = -1,
@@ -3464,36 +3466,49 @@ end
 function tickTerrainScanners()
 	printTable(g_savedata.terrain_scanner_links, true, false)
 	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
-		local vehicle_data = s.getVehicleData(vehicle_id)
+		local vehicle_object = nil
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for vehicle_index, vehicle_data in pairs(squad.vehicles) do
+				if vehicle_index == vehicle_id then
+					vehicle_object = vehicle_data
+				end
+			end
+		end
+
 		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
 		
-		if hasTag(terrain_scanner_data.tags, "from=dlc_weapons_terrain_scanner") then
-			wpDLCDebug("terrain scanner loading!", true, false)
-			wpDLCDebug("ter id: "..terrain_scanner, true, false)
-			wpDLCDebug("veh id: "..vehicle_id, true, false)
-			dial_read_attempts = 0
-			repeat
-				dial_read_attempts = dial_read_attempts + 1
-				terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
-				if success and terrain_height.value ~= 0 then
-					printTable(terrain_height, true, false)
-					local new_terrain_height = (1000 - terrain_height.value) + 5
-					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_data.transform)
-					local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
-					s.setVehiclePos(vehicle_id, new_vehicle_matrix)
-					wpDLCDebug("set land vehicle to new y level!", true, false)
-					g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
-					s.despawnVehicle(terrain_scanner, true)
-				else
-					if success then
-						wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+		if vehicle_object then
+			if hasTag(terrain_scanner_data.tags, "from=dlc_weapons_terrain_scanner") then
+				wpDLCDebug("terrain scanner loading!", true, false)
+				wpDLCDebug("ter id: "..terrain_scanner, true, false)
+				wpDLCDebug("veh id: "..vehicle_id, true, false)
+				dial_read_attempts = 0
+				repeat
+					dial_read_attempts = dial_read_attempts + 1
+					terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
+					if success and terrain_height.value ~= 0 then
+						printTable(terrain_height, true, false)
+						local new_terrain_height = (1000 - terrain_height.value) + 5
+						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+						local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
+						s.setVehiclePos(vehicle_id, new_vehicle_matrix)
+						wpDLCDebug("set land vehicle to new y level!", true, false)
+						g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
+						s.despawnVehicle(terrain_scanner, true)
 					else
-						wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+						if success then
+							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+						else
+							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+						end
+						
 					end
-					
-				end
-				if dial_read_attempts >= 2 then return end
-			until(success and terrain_height.value ~= 0)
+					if dial_read_attempts >= 2 then return end
+				until(success and terrain_height.value ~= 0)
+			end
+		else -- the vehicle seems to have been destroyed in some way
+			g_savedata.terrain_scanner_links[vehicle_id] = nil
 		end
 	end
 end
