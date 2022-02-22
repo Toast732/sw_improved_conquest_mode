@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.6)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.7)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1088,14 +1088,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-									s.removeMapObject(user_peer_id,vehicle_object.map_id)
-									s.removeMapLine(user_peer_id,vehicle_object.map_id)
+									s.removeMapObject(user_peer_id, vehicle_object.map_id)
+									s.removeMapLine(user_peer_id, vehicle_object.map_id)
 									for i = 1, #vehicle_object.path - 1 do
 										local waypoint = vehicle_object.path[i]
 										s.removeMapLine(user_peer_id, waypoint.ui_id)
 									end
 								end
 							end
+
+							s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
+							s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
 						end
 
 
