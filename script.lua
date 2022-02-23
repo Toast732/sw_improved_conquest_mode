@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.11)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.12)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -343,9 +343,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				if flag_tile.name == start_island.name or (flag_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					g_savedata.player_base_island = {
 						name = flagZone.name,
+						index = flagZone_index,
 						transform = flagZone.transform,
 						tags = flagZone.tags,
-						faction = FACTION_PLAYER, 
+						faction = FACTION_PLAYER,
 						is_contested = false,
 						capture_timer = g_savedata.settings.CAPTURE_TIME, 
 						map_id = s.getMapID(),
@@ -374,6 +375,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			local flagZone = flag_zones[furthest_flagZone_index]
 			g_savedata.ai_base_island = {
 				name = flagZone.name, 
+				index = furthest_flagZone_index,
 				transform = flagZone.transform,
 				tags = flagZone.tags,
 				faction = FACTION_AI, 
@@ -396,11 +398,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			flag_zones[furthest_flagZone_index] = nil
 
 			-- set up remaining neutral islands
-			for _, flagZone in pairs(flag_zones) do
+			for flagZone_index, flagZone in pairs(flag_zones) do
 				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, -7.86, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
 				local new_island = {
-					name = flagZone.name, 
-					flag_vehicle = flag, 
+					name = flagZone.name,
+					index = flagZone_index,
+					flag_vehicle = flag,
 					transform = flagZone.transform,
 					tags = flagZone.tags,
 					faction = FACTION_NEUTRAL, 
@@ -1908,7 +1911,7 @@ function tickGamemode()
 				-- does a check for how many enemy ai are capturing the island
 				if island.capture_timer > 0 then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name then
+						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name or squad.command ~= COMMAND_ATTACK and squad.command ~= COMMAND_SCOUT and squad.command ~= COMMAND_RESUPPLY then
 							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 								if isTickID(vehicle_id, tick_rate) then
 									if vehicle_object.role ~= "scout" then
@@ -1957,32 +1960,23 @@ function tickGamemode()
 					
 					-- displays tooltip on vehicle
 					local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-	
 					if island.is_contested then -- if the point is contested (both teams trying to cap)
 						s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
-	
 					elseif island.faction ~= FACTION_PLAYER then -- if the player doesn't own the point
-	
 						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
-	
 						elseif island.ai_capturing == 0 then -- if players are capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
 						else -- if ai is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-	
 						end
 					else -- if the player does own the point
-	
 						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
-	
 						elseif island.ai_capturing == 0 then -- if players are capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
-	
 						else -- if ai is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-	
 						end
 					end
 
@@ -2261,7 +2255,7 @@ function tickAI()
 											if squad.ai_type == AI_TYPE_BOAT then
 												if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
 													boats_total = boats_total + 1
-													setSquadCommandStage(squad, ally_island)
+													setSquadCommandStage(squad, objective_island)
 												end
 											else
 												air_total = air_total + 1
