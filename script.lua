@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.8)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.9)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -434,6 +434,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					end
 				end
 			end
+			s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
+			s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
 		end
 	end
 end
@@ -1765,7 +1767,6 @@ function onVehicleLoad(incoming_vehicle_id)
 							local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
 							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
 							if success then
-								s.setVehiclePos(vehicle_id, m.translation(vehicle_x, 0, vehicle_z))
 								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 							else
 								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
@@ -3393,6 +3394,7 @@ function tickVehicles()
 						[COMMAND_TURRET] = 14,
 						[COMMAND_RESUPPLY] = 11,
 						[COMMAND_SCOUT] = 4,
+						[COMMAND_INVESTIGATE] = 6,
 					}
 					local r = 55
 					local g = 0
@@ -3433,10 +3435,7 @@ function tickVehicles()
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
 									s.removeMapLine(player_debugging_id, waypoint.ui_id)
-
-									if is_render then
-										s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
-									end
+									s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
 								end
 							end
 						end
