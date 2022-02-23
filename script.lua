@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.9)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.10)"
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -155,7 +155,6 @@ g_savedata = {
 	player_vehicles = {},
 	debug_data = {},
 	constructable_vehicles = {},
-	constructable_turrets = {},
 	vehicle_list = {},
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
@@ -270,7 +269,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.ai_base_island = nil
 					g_savedata.controllable_islands = {}
 					g_savedata.constructable_vehicles = {}
-					g_savedata.constructable_turrets = {}
 					g_savedata.is_attack = {}
 					g_savedata.vehicle_list = {}
 					g_savedata.ai_history = {}
@@ -471,9 +469,7 @@ function buildPrefabs(location_index)
 		--
 		--
 
-		if hasTag(vehicle.tags, "type=wep_turret") then
-			table.insert(g_savedata.constructable_turrets, prefab_data)
-		elseif #prefab_data.survivors > 0 then
+		if #prefab_data.survivors > 0 then
 			local varient = getTagValue(vehicle.tags, "varient")
 			if not varient then
 				local role = getTagValue(vehicle.tags, "role", true) or "general"
@@ -492,7 +488,7 @@ function buildPrefabs(location_index)
 end
 
 function spawnTurret(island)
-	local selected_prefab = g_savedata.constructable_turrets[math.random(1, #g_savedata.constructable_turrets)]
+	local selected_prefab = sm.spawn(true, "turret") 
 
 	if (#island.zones < 1) then return end
 
@@ -540,7 +536,7 @@ function spawnTurret(island)
 			},
 			map_id = s.getMapID(),
 			ai_type = spawned_objects.spawned_vehicle.ai_type,
-			role = getTagValue(selected_prefab.vehicle.tags, "role") or "general",
+			role = getTagValue(selected_prefab.vehicle.tags, "role") or "turret",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			vision = {
@@ -1477,7 +1473,6 @@ function captureIsland(island, override, peer_id)
 	end
 end
 
-
 function onPlayerJoin(steam_id, name, peer_id)
 	if g_savedata.info.has_default_addon then
 		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
@@ -2335,6 +2330,7 @@ function tickAI()
 						if objective_island.is_scouting then -- if theres still a scout plane scouting the island
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								if squad.command == COMMAND_SCOUT then
+									squad.target_island = ally_island
 									setSquadCommand(squad, COMMAND_DEFEND)
 									objective_island.is_scouting = false
 								end
@@ -2624,7 +2620,7 @@ function tickSquadrons()
 			-- check if a vehicle needs resupply, removing from current squad and adding to the resupply squad
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if isVehicleNeedsResupply(vehicle_id) then
+					if isVehicleNeedsResupply(vehicle_id, "Resupply") then
 						if vehicle_object.ai_type == AI_TYPE_TURRET then
 							reload(vehicle_id)
 						else
@@ -2644,6 +2640,10 @@ function tickSquadrons()
 							end
 
 							squadInitVehicleCommand(squad, vehicle_object)
+						end
+					elseif isVehicleNeedsResupply(vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
+						if not vehicle_object.is_killed then
+							killVehicle(squad_index, vehicle_id, false, false)
 						end
 					end
 					-- check if the vehicle simply needs to reload a machine gun
@@ -2670,7 +2670,7 @@ function tickSquadrons()
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id) == false) or (vehicle_object.state.is_simulating == false and vehicle_object.is_resupply_on_load) then
+					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id, "Resupply") == false) or (vehicle_object.state.is_simulating == false and vehicle_object.is_resupply_on_load) then
 	
 						-- add to new squad
 						g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = nil
@@ -3379,7 +3379,7 @@ function tickVehicles()
 
 					if vehicle_object.state.is_simulating then
 						debug_data = debug_data .. "\n\nSIMULATING\n"
-						debug_data = debug_data .. "needs resupply: " .. tostring(isVehicleNeedsResupply(vehicle_id)) .. "\n"
+						debug_data = debug_data .. "needs resupply: " .. tostring(isVehicleNeedsResupply(vehicle_id, "Resupply")) .. "\n"
 					else
 						debug_data = debug_data .. "\n\nPSEUDO\n"
 						debug_data = debug_data .. "resupply on load: " .. tostring(vehicle_object.is_resupply_on_load) .. "\n"
@@ -3747,8 +3747,8 @@ end
 --
 --------------------------------------------------------------------------------
 
-function isVehicleNeedsResupply(vehicle_id)
-	local button_data, success = s.getVehicleButton(vehicle_id, "Resupply")
+function isVehicleNeedsResupply(vehicle_id, button_name)
+	local button_data, success = s.getVehicleButton(vehicle_id, button_name)
 	return success and button_data.on
 end
 
@@ -4123,7 +4123,7 @@ end
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
 					if veh_type ~= "mod" and type(veh_data) == "table"then
 						for strat, strat_data in pairs(veh_data) do

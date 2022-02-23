@@ -3164,7 +3164,7 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.111663" 31="-0.206443" 32="2.701355"/>
+						<vehicle_parent_transform 30="-0.111663" 31="-0.206443" 32="2.701354"/>
 						<graph_links/>
 					</c>
 				</components>
@@ -3217,7 +3217,7 @@
 			</l>
 			<l id="30" name="TURRET - CD-E1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="603" name="from=dlc_weapons,type=wep_turret,size=small,visibility_range=3000,spawning_radius=5,radar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="603" name="from=dlc_weapons,type=wep_turret,role=turret,size=small,visibility_range=3000,spawning_radius=5,radar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="-0.183271" 31="0.143647" 32="-0.183271"/>
 						<spawn_bounds>
 							<min x="-4.375" y="-4.125" z="-5.625"/>
