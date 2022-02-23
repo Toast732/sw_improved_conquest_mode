@@ -3592,6 +3592,7 @@ function onTick(tick_time)
 				IS_COUNTING_RELOAD_TICKER = false
 				RELOAD_TICK_COUNTER = 0
 				wpDLCDebug("Time expired! Run ?impwep full_reload to try again!", false, false, 0)
+				playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 			end
 		else
 			RELOAD_TICK_COUNTER = 0
