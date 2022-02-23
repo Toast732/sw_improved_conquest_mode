@@ -3,6 +3,8 @@ local spawnModifiers = {}
 local s = server
 local m = matrix
 local sm = spawnModifiers
+local RELOAD_TICK_COUNTER = 0
+local IS_COUNTING_RELOAD_TICKER = false
 
 local IMPROVED_CONQUEST_VERSION = "(0.2.1.8)"
 
@@ -1161,29 +1163,29 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 											if arg[1] == "punish" then
 												if ai_training.punishments[tonumber(arg[3])] then
 													g_savedata.constructable_vehicles[arg[2]].mod = g_savedata.constructable_vehicles[arg[2]].mod + ai_training.punishments[tonumber(arg[3])]
-													wpDLCDebug("successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
+													wpDLCDebug("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
 												else
-													wpDLCDebug("incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+													wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
 												end
 											elseif arg[1] == "reward" then
 												if ai_training.rewards[tonumber(arg[3])] then
 													g_savedata.constructable_vehicles[arg[2]].mod = g_savedata.constructable_vehicles[arg[2]].mod + ai_training.rewards[tonumber(arg[3])]
-													wpDLCDebug("successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
+													wpDLCDebug("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
 												else
-													wpDLCDebug("incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+													wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
 												end
 											end
 										else
-											wpDLCDebug("incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+											wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
 										end
 									else
-										wpDLCDebug("unknown role: "..arg[2], false, true, user_peer_id)
+										wpDLCDebug("Unknown role: "..arg[2], false, true, user_peer_id)
 									end
 								else
-									wpDLCDebug("you need to specify which role to set!", false, true, user_peer_id)
+									wpDLCDebug("You need to specify which role to set!", false, true, user_peer_id)
 								end
 							else
-								wpDLCDebug("unknown reinforcement type: "..arg[1].." valid reinforcement types: \"punish\" and \"reward\"", false, true, user_peer_id)
+								wpDLCDebug("Unknown reinforcement type: "..arg[1].." valid reinforcement types: \"punish\" and \"reward\"", false, true, user_peer_id)
 							end
 						else
 							wpDLCDebug("You need to specify wether to punish or reward!", false, true, user_peer_id)
@@ -1215,7 +1217,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								end
 							end
 						else
-							wpDLCDebug("invalid syntax! you must either choose a vehicle id, or \"all\" to remove all enemy ai vehicles", false, true, user_peer_id) 
+							wpDLCDebug("Invalid syntax! You must either choose a vehicle id, or \"all\" to remove all enemy AI vehicles", false, true, user_peer_id) 
 						end
 
 
@@ -1235,13 +1237,13 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 										wpDLCDebug("Unknown island: "..string.gsub(arg[1], "_", " "), false, true, user_peer_id)
 									end
 								else
-									wpDLCDebug("arg 2 has to be a number! unknown value: "..arg[2], false, true, user_peer_id)
+									wpDLCDebug("Arg 2 has to be a number! Unknown value: "..arg[2], false, true, user_peer_id)
 								end
 							else
-								wpDLCDebug("invalid syntax! you must specify the scout level to set it to (0-100)", false, true, user_peer_id)
+								wpDLCDebug("Invalid syntax! you must specify the scout level to set it to (0-100)", false, true, user_peer_id)
 							end
 						else
-							wpDLCDebug("invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
+							wpDLCDebug("Invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
 						end
 					end
 				else
@@ -1257,14 +1259,18 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if playerData.isDoAsISay.user_peer_id == true and arg[1] == "do_as_i_say" then
+						if arg[1] == "force" then
+							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 							onCreate(true, true, user_peer_id)
-						elseif playerData.isDoAsISay.user_peer_id == true and not arg[1] then
-							wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
+						elseif arg[1] == "cancel" and playerData.isDoAsISay.user_peer_id == true then
+							IS_COUNTING_RELOAD_TICKER = false
+							wpDLCDebug("Action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
 							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-						elseif not arg[1] then
-							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
+						end
+						if not arg[1] then
+							IS_COUNTING_RELOAD_TICKER = true
+							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do \"?impwep full_reload force\". If you want to go back now, do ?impwep full_reload cancel. Action will be automatically reverting in 15 seconds", false, false, user_peer_id)
 							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
 						end
 					end
@@ -3577,6 +3583,18 @@ function onTick(tick_time)
 		tickModifiers()
 		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
+		end
+
+		--full_reload expire countdown
+		if IS_COUNTING_RELOAD_TICKER then
+			RELOAD_TICK_COUNTER = RELOAD_TICK_COUNTER + 1
+			if RELOAD_TICK_COUNTER >= 900 then
+				IS_COUNTING_RELOAD_TICKER = false
+				RELOAD_TICK_COUNTER = 0
+				wpDLCDebug("Time expired! Run ?impwep full_reload to try again!", false, false, 0)
+			end
+		else
+			RELOAD_TICK_COUNTER = 0
 		end
 	end
 end
