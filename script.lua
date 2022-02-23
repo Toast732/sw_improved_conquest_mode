@@ -4,7 +4,10 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.10)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.11)"
+
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -209,6 +212,26 @@ function wpDLCDebugVehicle(id, message, requiresDebugging, isError, toPlayer)
 	end
 end
 
+function warningChecks(user_peer_id)
+	-- check for if they have the weapons dlc enabled
+	if not is_dlc_weapons then
+		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
+	end
+	-- check if they left the default addon enabled
+	if g_savedata.info.has_default_addon then
+		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+	end
+	-- if they are in a development verison
+	if IS_DEVELOPMENT_VERSION then
+		wpDLCDebug("hey! thanks for using and testing the development verison! just note you will very likely experience errors!", false, false, peer_id)
+	-- check for if the world is outdated
+	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
+		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous.", false, true, peer_id)
+		end
+	end
+end
+
 function onCreate(is_world_create, do_as_i_say, peer_id)
 	if not g_savedata.settings then
 		g_savedata.settings = {
@@ -235,6 +258,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
     if is_dlc_weapons then
 
 		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
+
+		warningChecks(-1)
 
         if is_world_create then
 
@@ -1066,9 +1091,9 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 							wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg[1], false, false, user_peer_id)
 						else
-							playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+							playerData.isDebugging[user_peer_id] = not playerData.isDebugging[user_peer_id]
 
-							if playerData.isDebugging.user_peer_id ~= true then
+							if playerData.isDebugging[user_peer_id] ~= true then
 								wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 							else
 								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
@@ -1255,15 +1280,15 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if playerData.isDoAsISay.user_peer_id == true and arg[1] == "do_as_i_say" then
+						if playerData.isDoAsISay[user_peer_id] == true and arg[1] == "do_as_i_say" then
 							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 							onCreate(true, true, user_peer_id)
-						elseif playerData.isDoAsISay.user_peer_id == true and not arg[1] then
+						elseif playerData.isDoAsISay[user_peer_id] == true and not arg[1] then
 							wpDLCDebug("action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+							playerData.isDoAsISay[user_peer_id] = not playerData.isDoAsISay[user_peer_id]
 						elseif not arg[1] then
 							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do ?WeaponsDLC_RELOAD_ADDON do_as_i_say, if you want to go back now, do ?WeaponsDLC_RELOAD_ADDON", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+							playerData.isDoAsISay[user_peer_id] = not playerData.isDoAsISay[user_peer_id]
 						end
 					end
 				else
@@ -1474,9 +1499,7 @@ function captureIsland(island, override, peer_id)
 end
 
 function onPlayerJoin(steam_id, name, peer_id)
-	if g_savedata.info.has_default_addon then
-		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
-	end
+	warningChecks(-1)
 	if is_dlc_weapons then
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			updatePeerIslandMapData(peer_id, island)
