@@ -6,7 +6,10 @@ local sm = spawnModifiers
 local RELOAD_TICK_COUNTER = 0
 local IS_COUNTING_RELOAD_TICKER = false
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.8)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.12)"
+
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -157,7 +160,6 @@ g_savedata = {
 	player_vehicles = {},
 	debug_data = {},
 	constructable_vehicles = {},
-	constructable_turrets = {},
 	vehicle_list = {},
 	terrain_scanner_prefab = {},
 	terrain_scanner_links = {},
@@ -212,6 +214,26 @@ function wpDLCDebugVehicle(id, message, requiresDebugging, isError, toPlayer)
 	end
 end
 
+function warningChecks(user_peer_id)
+	-- check for if they have the weapons dlc enabled
+	if not is_dlc_weapons then
+		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
+	end
+	-- check if they left the default addon enabled
+	if g_savedata.info.has_default_addon then
+		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+	end
+	-- if they are in a development verison
+	if IS_DEVELOPMENT_VERSION then
+		wpDLCDebug("hey! thanks for using and testing the development verison! just note you will very likely experience errors!", false, false, peer_id)
+	-- check for if the world is outdated
+	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
+		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous.", false, true, peer_id)
+		end
+	end
+end
+
 function onCreate(is_world_create, do_as_i_say, peer_id)
 	if not g_savedata.settings then
 		g_savedata.settings = {
@@ -238,6 +260,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
     if is_dlc_weapons then
 
 		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
+
+		warningChecks(-1)
 
         if is_world_create then
 
@@ -272,7 +296,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.ai_base_island = nil
 					g_savedata.controllable_islands = {}
 					g_savedata.constructable_vehicles = {}
-					g_savedata.constructable_turrets = {}
 					g_savedata.is_attack = {}
 					g_savedata.vehicle_list = {}
 					g_savedata.ai_history = {}
@@ -322,9 +345,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				if flag_tile.name == start_island.name or (flag_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					g_savedata.player_base_island = {
 						name = flagZone.name,
+						index = flagZone_index,
 						transform = flagZone.transform,
 						tags = flagZone.tags,
-						faction = FACTION_PLAYER, 
+						faction = FACTION_PLAYER,
 						is_contested = false,
 						capture_timer = g_savedata.settings.CAPTURE_TIME, 
 						map_id = s.getMapID(),
@@ -353,6 +377,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			local flagZone = flag_zones[furthest_flagZone_index]
 			g_savedata.ai_base_island = {
 				name = flagZone.name, 
+				index = furthest_flagZone_index,
 				transform = flagZone.transform,
 				tags = flagZone.tags,
 				faction = FACTION_AI, 
@@ -375,11 +400,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			flag_zones[furthest_flagZone_index] = nil
 
 			-- set up remaining neutral islands
-			for _, flagZone in pairs(flag_zones) do
+			for flagZone_index, flagZone in pairs(flag_zones) do
 				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, -7.86, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
 				local new_island = {
-					name = flagZone.name, 
-					flag_vehicle = flag, 
+					name = flagZone.name,
+					index = flagZone_index,
+					flag_vehicle = flag,
 					transform = flagZone.transform,
 					tags = flagZone.tags,
 					faction = FACTION_NEUTRAL, 
@@ -436,6 +462,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					end
 				end
 			end
+			s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
+			s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
 		end
 	end
 end
@@ -471,9 +499,7 @@ function buildPrefabs(location_index)
 		--
 		--
 
-		if hasTag(vehicle.tags, "type=wep_turret") then
-			table.insert(g_savedata.constructable_turrets, prefab_data)
-		elseif #prefab_data.survivors > 0 then
+		if #prefab_data.survivors > 0 then
 			local varient = getTagValue(vehicle.tags, "varient")
 			if not varient then
 				local role = getTagValue(vehicle.tags, "role", true) or "general"
@@ -492,7 +518,7 @@ function buildPrefabs(location_index)
 end
 
 function spawnTurret(island)
-	local selected_prefab = g_savedata.constructable_turrets[math.random(1, #g_savedata.constructable_turrets)]
+	local selected_prefab = sm.spawn(true, "turret") 
 
 	if (#island.zones < 1) then return end
 
@@ -540,7 +566,7 @@ function spawnTurret(island)
 			},
 			map_id = s.getMapID(),
 			ai_type = spawned_objects.spawned_vehicle.ai_type,
-			role = getTagValue(selected_prefab.vehicle.tags, "role") or "general",
+			role = getTagValue(selected_prefab.vehicle.tags, "role") or "turret",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			vision = {
@@ -1070,9 +1096,9 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 							wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg[1], false, false, user_peer_id)
 						else
-							playerData.isDebugging.user_peer_id = not playerData.isDebugging.user_peer_id
+							playerData.isDebugging[user_peer_id] = not playerData.isDebugging[user_peer_id]
 
-							if playerData.isDebugging.user_peer_id ~= true then
+							if playerData.isDebugging[user_peer_id] ~= true then
 								wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 							else
 								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
@@ -1392,13 +1418,9 @@ function captureIsland(island, override, peer_id)
 		if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
 			faction_to_set = FACTION_AI
 		elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
-			faction_to_set = FACTION_PLAYER
+			faction_to_set = override or faction_to_set or "ignore"
 		end
 	end
-
-	-- set it to the override, otherwise if its supposted to be capped then set it to the specified, otherwise set it to ignore
-	faction_to_set = override or faction_to_set or "ignore"
-
 	-- set it to ai
 	if faction_to_set == FACTION_AI then
 		island.capture_timer = 0
@@ -1481,11 +1503,8 @@ function captureIsland(island, override, peer_id)
 	end
 end
 
-
 function onPlayerJoin(steam_id, name, peer_id)
-	if g_savedata.info.has_default_addon then
-		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
-	end
+	warningChecks(-1)
 	if is_dlc_weapons then
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			updatePeerIslandMapData(peer_id, island)
@@ -1771,7 +1790,6 @@ function onVehicleLoad(incoming_vehicle_id)
 							local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
 							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
 							if success then
-								s.setVehiclePos(vehicle_id, m.translation(vehicle_x, 0, vehicle_z))
 								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 							else
 								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
@@ -1895,7 +1913,7 @@ function tickGamemode()
 				-- does a check for how many enemy ai are capturing the island
 				if island.capture_timer > 0 then
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name then
+						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name or squad.command ~= COMMAND_ATTACK and squad.command ~= COMMAND_SCOUT and squad.command ~= COMMAND_RESUPPLY then
 							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 								if isTickID(vehicle_id, tick_rate) then
 									if vehicle_object.role ~= "scout" then
@@ -1944,32 +1962,23 @@ function tickGamemode()
 					
 					-- displays tooltip on vehicle
 					local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-	
 					if island.is_contested then -- if the point is contested (both teams trying to cap)
 						s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
-	
 					elseif island.faction ~= FACTION_PLAYER then -- if the player doesn't own the point
-	
 						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
-	
 						elseif island.ai_capturing == 0 then -- if players are capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
 						else -- if ai is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-	
 						end
 					else -- if the player does own the point
-	
 						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
-	
 						elseif island.ai_capturing == 0 then -- if players are capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
-	
 						else -- if ai is capping the point
 							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-	
 						end
 					end
 
@@ -2248,7 +2257,7 @@ function tickAI()
 											if squad.ai_type == AI_TYPE_BOAT then
 												if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
 													boats_total = boats_total + 1
-													setSquadCommandStage(squad, ally_island)
+													setSquadCommandStage(squad, objective_island)
 												end
 											else
 												air_total = air_total + 1
@@ -2340,6 +2349,7 @@ function tickAI()
 						if objective_island.is_scouting then -- if theres still a scout plane scouting the island
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								if squad.command == COMMAND_SCOUT then
+									squad.target_island = ally_island
 									setSquadCommand(squad, COMMAND_DEFEND)
 									objective_island.is_scouting = false
 								end
@@ -2629,7 +2639,7 @@ function tickSquadrons()
 			-- check if a vehicle needs resupply, removing from current squad and adding to the resupply squad
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if isVehicleNeedsResupply(vehicle_id) then
+					if isVehicleNeedsResupply(vehicle_id, "Resupply") then
 						if vehicle_object.ai_type == AI_TYPE_TURRET then
 							reload(vehicle_id)
 						else
@@ -2649,6 +2659,10 @@ function tickSquadrons()
 							end
 
 							squadInitVehicleCommand(squad, vehicle_object)
+						end
+					elseif isVehicleNeedsResupply(vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
+						if not vehicle_object.is_killed then
+							killVehicle(squad_index, vehicle_id, false, false)
 						end
 					end
 					-- check if the vehicle simply needs to reload a machine gun
@@ -2675,7 +2689,7 @@ function tickSquadrons()
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id) == false) or (vehicle_object.state.is_simulating == false and vehicle_object.is_resupply_on_load) then
+					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id, "Resupply") == false) or (vehicle_object.state.is_simulating == false and vehicle_object.is_resupply_on_load) then
 	
 						-- add to new squad
 						g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = nil
@@ -3384,7 +3398,7 @@ function tickVehicles()
 
 					if vehicle_object.state.is_simulating then
 						debug_data = debug_data .. "\n\nSIMULATING\n"
-						debug_data = debug_data .. "needs resupply: " .. tostring(isVehicleNeedsResupply(vehicle_id)) .. "\n"
+						debug_data = debug_data .. "needs resupply: " .. tostring(isVehicleNeedsResupply(vehicle_id, "Resupply")) .. "\n"
 					else
 						debug_data = debug_data .. "\n\nPSEUDO\n"
 						debug_data = debug_data .. "resupply on load: " .. tostring(vehicle_object.is_resupply_on_load) .. "\n"
@@ -3399,6 +3413,7 @@ function tickVehicles()
 						[COMMAND_TURRET] = 14,
 						[COMMAND_RESUPPLY] = 11,
 						[COMMAND_SCOUT] = 4,
+						[COMMAND_INVESTIGATE] = 6,
 					}
 					local r = 55
 					local g = 0
@@ -3439,10 +3454,7 @@ function tickVehicles()
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
 									s.removeMapLine(player_debugging_id, waypoint.ui_id)
-
-									if is_render then
-										s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
-									end
+									s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
 								end
 							end
 						end
@@ -3767,8 +3779,8 @@ end
 --
 --------------------------------------------------------------------------------
 
-function isVehicleNeedsResupply(vehicle_id)
-	local button_data, success = s.getVehicleButton(vehicle_id, "Resupply")
+function isVehicleNeedsResupply(vehicle_id, button_name)
+	local button_data, success = s.getVehicleButton(vehicle_id, button_name)
 	return success and button_data.on
 end
 
@@ -4143,7 +4155,7 @@ end
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
 					if veh_type ~= "mod" and type(veh_data) == "table"then
 						for strat, strat_data in pairs(veh_data) do
