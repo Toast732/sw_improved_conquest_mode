@@ -18,8 +18,8 @@ There are ton of changes here, so many in fact that they all can't be listed her
 - AI will learn your stratigies and use your weaknesses against you (Adapative AI).
 - Tons More!
 
-## Oh. Why should I use this instead of the default?
-Because this one fixes multiple bugs over the default, which actually makes this one more optimised than the defualt.
+## Why should I use this instead of the default?
+This fixes multiple bugs over the default, which actually makes this one more optimised than the defualt.
 Also, its alot more balanced, such as AI using K and AP instead of HE ammo, removing the AA tank as it was better at killing land and sea vehicles but was trash at killing air vehicles, added VLS to the destroyer ship and also replaced some vehicles with more detailed versions!
 
 ## How can I contribute?

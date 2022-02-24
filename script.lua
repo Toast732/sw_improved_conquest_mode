@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.12)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.13)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -223,7 +223,7 @@ function warningChecks(user_peer_id)
 	end
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		wpDLCDebug("hey! thanks for using and testing the development verison! just note you will very likely experience errors!", false, false, peer_id)
+		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
@@ -250,7 +250,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
     is_dlc_weapons = s.dlcWeapons()
 
-	local addon_index, is_success = server.getAddonIndex("DLC Weapons AI")
+	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
 		g_savedata.info.has_default_addon = true
 	end
