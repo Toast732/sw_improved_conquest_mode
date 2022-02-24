@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.13)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.14)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -3369,6 +3369,11 @@ function tickVehicles()
 					debug_data = debug_data.."Damage Dealt: "..damage_dealt.."\n\n"
 					local ai_speed_pseudo = "nil"
 
+					debug_data = debug_data.."Base Visiblity Range: "..vehicle_object.vision.base_radius.."\n"
+					debug_data = debug_data.."Current Visibility Range: "..vehicle_object.vision.radius.."\n"
+					debug_data = debug_data.."Has Radar: "..(vehicle_object.vision.is_radar and "true" or "false").."\n"
+					debug_data = debug_data.."Has Sonar: "..(vehicle_object.vision.is_sonar and "true" or "false").."\n\n"
+
 					if vehicle_object.ai_type == AI_TYPE_BOAT then
 						ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT
 					elseif vehicle_object.ai_type == AI_TYPE_PLANE then
@@ -3384,6 +3389,7 @@ function tickVehicles()
 						debug_data = debug_data.."Is Agressive: "..vehicle_object.is_aggressive.."\n"
 						debug_data = debug_data.."Terrain Type: "..vehicle_object.terrain_type.."\n"
 					end
+
 
 					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
 					if ai_target then
