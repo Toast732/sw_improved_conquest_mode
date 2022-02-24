@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.14)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.15)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -296,10 +296,16 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					g_savedata.constructable_vehicles = {}
 					g_savedata.is_attack = {}
 					g_savedata.vehicle_list = {}
-					g_savedata.ai_history = {}
 					g_savedata.tick_counter = 0
-					g_savedata.ai_history = {}
-					g_savedata.ai_knowledge = {}
+					g_savedata.ai_history = {
+						has_defended = 0, -- logs the time in ticks the player attacked at
+						defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
+						scout_death = -1, -- saves the time the scout plane was destroyed, allows the players some time between each time the scout comes
+					}
+					g_savedata.ai_knowledge = {
+						last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
+						scout = {}, -- the scout progress of each island
+					}
 					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
 
 					-- save that this happened, as to aid in debugging errors
@@ -399,7 +405,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- set up remaining neutral islands
 			for flagZone_index, flagZone in pairs(flag_zones) do
-				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, -7.86, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
+				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
 				local new_island = {
 					name = flagZone.name,
 					index = flagZone_index,
@@ -1530,27 +1536,28 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 			if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
 				player_vehicle.death_pos = player_vehicle.transform
 			end
-
-			-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
-			-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
-			local valid_ai_vehicles = {}
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.target_vehicle_id == incoming_vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
-						if xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
-							valid_ai_vehicles[vehicle_id] = vehicle_object
-							if not vehicle_object.damage_dealt[incoming_vehicle_id] then vehicle_object.damage_dealt[incoming_vehicle_id] = 0 end
+			if amount > 0 then -- checks if it was actual damage and not from the player repairing their vehicle
+				-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
+				-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
+				local valid_ai_vehicles = {}
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.target_vehicle_id == incoming_vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
+							if xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
+								valid_ai_vehicles[vehicle_id] = vehicle_object
+								if not vehicle_object.damage_dealt[incoming_vehicle_id] then vehicle_object.damage_dealt[incoming_vehicle_id] = 0 end
+							end
 						end
 					end
 				end
-			end
-			-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
-			-- <ai amount> = number of <valid ai>
-			--
-			-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
-			-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
-			for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
-				vehicle_object.damage_dealt[incoming_vehicle_id] = vehicle_object.damage_dealt[incoming_vehicle_id] + amount/tableLength(valid_ai_vehicles)
+				-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
+				-- <ai amount> = number of <valid ai>
+				--
+				-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
+				-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
+				for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
+					vehicle_object.damage_dealt[incoming_vehicle_id] = vehicle_object.damage_dealt[incoming_vehicle_id] + amount/tableLength(valid_ai_vehicles)
+				end
 			end
 		end
 
