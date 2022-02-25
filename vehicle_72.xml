@@ -39,12 +39,12 @@ end"><pos x="-0.75" y="-0.5"/><in1 component_id="21"/><in2/><out1/><out2/></obje
 -- Developed &amp; Minimized using LifeBoatAPI - Stormworks Lua plugin for VSCode
 -- https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --      By Nameous Changey
--- Minimized Size: 3104 (3418) chars
-bM="normal_offroad_speed"
-bL="normal_bridge_speed"
-bK="normal_road_speed"
-bJ="aggressive_road_speed"
-bI="aggressive_bridge_speed"
+-- Minimized Size: 3110 (3424) chars
+bM="normal_road_speed"
+bL="normal_offroad_speed"
+bK="aggressive_road_speed"
+bJ="aggressive_bridge_speed"
+bI="normal_bridge_speed"
 bH="aggressive_offroad_speed"
 bG=178
 bF=57.2
@@ -63,7 +63,7 @@ bt=bz.random
 bs=property.getNumber
 local b=0
 local c=bC
-local d=bs("random_speed_range")local e={[0]={[0]=0,[1]=0},[1]={[0]=bt(bs(bK)-d,bs(bK)+d),[1]=bt(bs(bJ)-d,bs(bJ)+d)},[2]={[0]=bt(bs(bM)-d,bs(bM)+d),[1]=bt(bs(bH)-d,bs(bH)+d)},[3]={[0]=bt(bs(bL)-d,bs(bL)+d),[1]=bt(bs(bI)-d,bs(bI)+d)}}function f(g,h)return bt()*(h-g)+g
+local d=bs("random_speed_range")local e={[0]={[0]=0,[1]=0},[1]={[0]=bt(bs(bM)-d,bs(bM)+d),[1]=bt(bs(bK)-d,bs(bK)+d)},[2]={[0]=bt(bs(bL)-d,bs(bL)+d),[1]=bt(bs(bH)-d,bs(bH)+d)},[3]={[0]=bt(bs(bI)-d,bs(bI)+d),[1]=bt(bs(bJ)-d,bs(bJ)+d)}}function f(g,h)return bt()*(h-g)+g
 end
 function i(j,k,l,m)return bz.deg(bz.atan(l-j,m-k))end
 function n(l,m,j,k)return bz.sqrt((j-l)^2+(k-m)^2)end
@@ -139,8 +139,7 @@ bx(2,bC)bx(1,bC)r(0)E(0,bD)bu(7,4)end
 elseif H==1 then
 local bp=1
 if v&lt;50 then
-bp=v/50
-end
+bp=bw(v/50,.7)end
 local bq=1
 if by(bm)&lt;50 then
 bq=bw(by(bm)/50,.4)end

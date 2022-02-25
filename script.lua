@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.15)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.16)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -3388,7 +3388,11 @@ function tickVehicles()
 					elseif vehicle_object.ai_type == AI_TYPE_HELI then
 						ai_speed_pseudo = AI_SPEED_PSEUDO_HELI
 					elseif vehicle_object.ai_type == AI_TYPE_LAND then
-						ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND)
+						if vehicle_object.is_aggressive and vehicle_object.terrain_type then
+							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND)
+						else
+							ai_speed_pseudo = AI_SPEED_PSEUDO_LAND
+						end
 					end
 					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
 					
