@@ -6,7 +6,7 @@ local sm = spawnModifiers
 local RELOAD_TICK_COUNTER = 0
 local IS_COUNTING_RELOAD_TICKER = false
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.15)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.17)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
