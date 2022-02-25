@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.20)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.21)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -146,7 +146,6 @@ g_savedata = {
 	controllable_islands = {},
     ai_army = { squadrons = { [RESUPPLY_SQUAD_INDEX] = { command = COMMAND_RESUPPLY, ai_type = "", role = "", vehicles = {}, target_island = nil }} },
 	player_vehicles = {},
-	debug_data = {},
 	constructable_vehicles = {},
 	vehicle_list = {},
 	terrain_scanner_prefab = {},
@@ -156,6 +155,7 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 		has_default_addon = false,
+		awaiting_reload = false,
 	},
 	land_spawn_zones = {},
 	tick_counter = 0,
@@ -215,7 +215,7 @@ end
 
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
-	if not is_dlc_weapons then
+	if not s.dlcWeapons() then
 		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
 	end
 	-- check if they left the default addon enabled
@@ -230,6 +230,23 @@ function warningChecks(user_peer_id)
 		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
 			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous.", false, true, peer_id)
 		end
+	end
+end
+
+function checkSavedata() -- does a check for savedata, is used for backwards compatibility
+	-- lets you keep debug mode enabled after reloads
+	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
+		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+			render_debug = true
+		end
+	else -- adds the playerdata field to the savedata
+		g_savedata.playerData = {
+			isDebugging = {},
+			isDoAsISay = {},
+			timers = {
+				isDoAsISay = 0,
+			},
+		}
 	end
 end
 
@@ -249,10 +266,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		}
 	end
 
-	-- lets you keep debug mode enabled after reloads
-	for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-		render_debug = true
-	end
+	checkSavedata() -- backwards compatibility check
 
     is_dlc_weapons = s.dlcWeapons()
 
@@ -261,11 +275,19 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.info.has_default_addon = true
 	end
 
+	warningChecks(-1)
+
+	if g_savedata.info.awaiting_reload ~= false then
+		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
+			spawnAIVehicle() -- spawn initial ai
+		end
+		wpDLCDebug("Lastly, you need to save the world and then load that save to complete the full reload", false, false)
+		g_savedata.info.awaiting_reload = false
+	end
+
     if is_dlc_weapons then
 
 		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
-
-		warningChecks(-1)
 
         if is_world_create then
 
@@ -280,6 +302,22 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							killVehicle(squad_index, vehicle_id, true, true)
 						end
 					end
+
+					-- removes vehicle icons and paths
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							s.removeMapObject(-1,vehicle_object.map_id)
+							s.removeMapLine(-1,vehicle_object.map_id)
+							for i = 1, #vehicle_object.path - 1 do
+								local waypoint = vehicle_object.path[i]
+								s.removeMapLine(-1, waypoint.ui_id)
+							end
+							killVehicle(squad_index, vehicle_id, true, true)
+						end
+					end
+					s.removeMapObject(-1, g_savedata.player_base_island.map_id)
+					s.removeMapObject(-1, g_savedata.ai_base_island.map_id)
+
 					-- resets some island data
 					for island_index, island in pairs(g_savedata.controllable_islands) do
 						-- resets map icons
@@ -288,8 +326,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						-- removes all flags/capture point vehicles
 						s.despawnVehicle(island.flag_vehicle.id, true)
 					end
+					local debugging_player_data = g_savedata.playerData.isDebugging -- keeps those who are debugging
+
 					-- reset savedata
 					g_savedata.playerData = {
+						isDebugging = debugging_player_data,
 						isDoAsISay = {},
 						timers = {
 							isDoAsISay = 0
@@ -314,8 +355,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
 						scout = {}, -- the scout progress of each island
 					}
-					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
-
 					-- save that this happened, as to aid in debugging errors
 					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
 				end
@@ -459,9 +498,17 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					t.faction = FACTION_AI
 				end
 			end
-			
-			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
-				spawnAIVehicle() -- spawn initial ai
+
+			if not do_as_i_say then
+				-- if the world was just created like normal
+				
+				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
+					spawnAIVehicle() -- spawn initial ai
+				end
+			else -- say we're ready to reload scripts
+				g_savedata.info.awaiting_reload = true
+				wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
+				is_dlc_weapons = false
 			end
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -3411,7 +3458,6 @@ function tickVehicles()
 						debug_data = debug_data.."Terrain Type: "..tostring(vehicle_object.terrain_type).."\n"
 					end
 
-
 					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
 					if ai_target then
 						local ts_x, ts_y, ts_z = m.position(ai_target)
@@ -4210,7 +4256,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 	local sel_veh_type = nil
 	local sel_strat = nil
 	local sel_vehicle = nil
-	if is_specified == true and type(vehicle_list_id) == "number" then
+	if is_specified == true and type(vehicle_list_id) == "number" and g_savedata.constructable_vehicles then
 		sel_role = g_savedata.vehicle_list[vehicle_list_id].role
 		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
 		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
@@ -4222,7 +4268,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		if not sel_vehicle then
 			return false
 		end
-	elseif is_specified == false or type(vehicle_list_id) == "string" then
+	elseif is_specified == false and g_savedata.constructable_vehicles or type(vehicle_list_id) == "string" and g_savedata.constructable_vehicles then
 		local role_chances = {}
 		local veh_type_chances = {}
 		local strat_chances = {}
@@ -4239,26 +4285,34 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		else
 			sel_role = vehicle_list_id
 		end
+		wpDLCDebug("selected role: "..sel_role, true, false)
 		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
 			if type(v) == "table" then
 				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
 			end
 		end
 		sel_veh_type = randChance(veh_type_chances)
+		wpDLCDebug("selected vehicle type: "..sel_veh_type, true, false)
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
 				strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
 			end
 		end
 		sel_strat = randChance(strat_chances)
+		wpDLCDebug("selected strategy: "..sel_strat, true, false)
 		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 			if type(v) == "table" then
 				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
 			end
 		end
 		sel_vehicle = randChance(vehicle_chances)
+		wpDLCDebug("selected vehicle: "..sel_vehicle, true, false)
 	else
-		wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
+		if g_savedata.constructable_vehicles then
+			wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
+		else
+			wpDLCDebug("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, true)
+		end
 		return false
 	end
 	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
