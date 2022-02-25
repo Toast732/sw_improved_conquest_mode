@@ -4,9 +4,9 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.21)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.22)"
 
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
@@ -227,8 +227,10 @@ function warningChecks(user_peer_id)
 		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
-		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous.", false, true, peer_id)
+		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, peer_id)
+		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, peer_id)
 		end
 	end
 end
