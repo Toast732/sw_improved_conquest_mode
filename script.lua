@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.18)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.19)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -112,19 +112,6 @@ local ai_training = {
 
 local scout_requirement = time.minute*40
 
-local playerData = {
-	isDebugging = {},
-	isDoAsISay = {},
-	timers = {
-		isDoAsISay = 0
-	}
-}
-
-if render_debug then
-	local adminID = 0
-	playerData.isDebugging.adminID = true
-end
-
 local capture_speeds = {
 	1,
 	1.5,
@@ -181,7 +168,18 @@ g_savedata = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
 		scout = {}, -- the scout progress of each island
 	},
+	playerData = {
+		isDebugging = {},
+		isDoAsISay = {},
+		timers = {
+			isDoAsISay = 0,
+		},
+	},
 }
+
+if render_debug then
+	g_savedata.playerData.isDebugging[0] = true
+end
 
 --[[
         Functions
@@ -194,12 +192,12 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 		printTable(message, requiresDebugging, isError, toPlayer)
 	elseif requiresDebugging == true then
 		if toPlayer ~= -1 and toPlayer ~= nil then
-			if playerData.isDebugging.toPlayer then
+			if g_savedata.playerData.isDebugging.toPlayer then
 				s.announce(deb_err, message, toPlayer)
 			end
 		else
-			for k, v in pairs(playerData.isDebugging) do
-				if playerData.isDebugging[k] then
+			for k, v in pairs(g_savedata.playerData.isDebugging) do
+				if g_savedata.playerData.isDebugging[k] then
 					s.announce(deb_err, message, k)
 				end
 			end
@@ -251,6 +249,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		}
 	end
 
+	-- lets you keep debug mode enabled after reloads
+	for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+		render_debug = true
+	end
+
     is_dlc_weapons = s.dlcWeapons()
 
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
@@ -286,8 +289,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						s.despawnVehicle(island.flag_vehicle.id, true)
 					end
 					-- reset savedata
-					playerData = {
-						isDebugging = {},
+					g_savedata.playerData = {
 						isDoAsISay = {},
 						timers = {
 							isDoAsISay = 0
@@ -1106,17 +1108,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 							wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg[1], false, false, user_peer_id)
 						else
-							playerData.isDebugging[user_peer_id] = not playerData.isDebugging[user_peer_id]
+							g_savedata.playerData.isDebugging[user_peer_id] = not g_savedata.playerData.isDebugging[user_peer_id]
 
-							if playerData.isDebugging[user_peer_id] ~= true then
+							if g_savedata.playerData.isDebugging[user_peer_id] ~= true then
 								wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 							else
 								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
 							end
 							
 							local keep_render_debug = false
-							for k, v in pairs(playerData.isDebugging) do
-								if playerData.isDebugging[k] then
+							for k, v in pairs(g_savedata.playerData.isDebugging) do
+								if g_savedata.playerData.isDebugging[k] then
 									render_debug = true
 									keep_render_debug = true
 								end
@@ -1295,17 +1297,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if arg[1] == "confirm" and playerData.isDoAsISay[user_peer_id] then
+						if arg[1] == "confirm" and g_savedata.playerData.isDoAsISay[user_peer_id] then
 							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 							onCreate(true, true, user_peer_id)
-						elseif arg[1] == "cancel" and playerData.isDoAsISay[user_peer_id] == true then
+						elseif arg[1] == "cancel" and g_savedata.playerData.isDoAsISay[user_peer_id] == true then
 							wpDLCDebug("Action has been reverted, no longer will be fully reloading addon", false, false, user_peer_id)
-							playerData.isDoAsISay[user_peer_id] = nil
+							g_savedata.playerData.isDoAsISay[user_peer_id] = nil
 						end
 						if not arg[1] then
 							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do \n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
-							playerData.isDoAsISay[user_peer_id] = true
-							playerData.timers.isDoAsISay = g_savedata.tick_counter
+							g_savedata.playerData.isDoAsISay[user_peer_id] = true
+							g_savedata.playerData.timers.isDoAsISay = g_savedata.tick_counter
 						end
 					end
 				else
@@ -1644,8 +1646,8 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	wpDLCDebug("cleaned vehicle: "..vehicle_id, true, false)
-	for k, v in pairs(playerData.isDebugging) do
-		if playerData.isDebugging[k] then
+	for k, v in pairs(g_savedata.playerData.isDebugging) do
+		if g_savedata.playerData.isDebugging[k] then
 
 			s.removeMapObject(k ,vehicle_object.map_id)
 			s.removeMapLine(k ,vehicle_object.map_id)
@@ -2043,8 +2045,8 @@ function tickGamemode()
 				if a then
 					debug_data = debug_data .. " Ally: " .. a.name
 				end
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
+				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+					if g_savedata.playerData.isDebugging[player_debugging_id] then
 						s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
@@ -2085,8 +2087,8 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 			if not render_debug then
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
+				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+					if g_savedata.playerData.isDebugging[player_debugging_id] then
 						local debug_data = ""
 						debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
 						debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
@@ -3069,8 +3071,8 @@ function tickVision()
 				if recent_spotter ~= nil then debug_data = debug_data .. "\nspotter: " .. player_vehicle.recent_spotter end
 				if last_known_pos ~= nil then debug_data = debug_data .. "last_known_pos: " end
 				if death_pos ~= nil then debug_data = debug_data .. "death_pos: " end
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
+				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+					if g_savedata.playerData.isDebugging[player_debugging_id] then
 						s.removeMapObject(player_debugging_id, player_vehicle.map_id)
 						s.addMapObject(player_debugging_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
 					end
@@ -3459,8 +3461,8 @@ function tickVehicles()
 						b = 57
 						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
-					for player_debugging_id, v in pairs(playerData.isDebugging) do
-						if playerData.isDebugging[player_debugging_id] then
+					for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+						if g_savedata.playerData.isDebugging[player_debugging_id] then
 							s.removeMapObject(player_debugging_id ,vehicle_object.map_id)
 							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
@@ -3604,13 +3606,13 @@ function tickModifiers()
 end
 
 function tickOther()
-	if playerData.isDoAsISay[0] then
+	if g_savedata.playerData.isDoAsISay[0] then
 		-- if its been 15 or more seconds since they did the command
 		-- then cancel the command
-		if (g_savedata.tick_counter - playerData.timers.isDoAsISay) >= time.second*15 then
+		if (g_savedata.tick_counter - g_savedata.playerData.timers.isDoAsISay) >= time.second*15 then
 			wpDLCDebug("Automatically cancelled full reload!", false, false, 0)
-			playerData.isDoAsISay[0] = nil
-			playerData.timers.isDoAsISay = 0
+			g_savedata.playerData.isDoAsISay[0] = nil
+			g_savedata.playerData.timers.isDoAsISay = 0
 		end
 	end
 end
