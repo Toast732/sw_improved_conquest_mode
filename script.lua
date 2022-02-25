@@ -3,10 +3,8 @@ local spawnModifiers = {}
 local s = server
 local m = matrix
 local sm = spawnModifiers
-local RELOAD_TICK_COUNTER = 0
-local IS_COUNTING_RELOAD_TICKER = false
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.17)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.18)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -116,7 +114,10 @@ local scout_requirement = time.minute*40
 
 local playerData = {
 	isDebugging = {},
-	isDoAsISay = {}
+	isDoAsISay = {},
+	timers = {
+		isDoAsISay = 0
+	}
 }
 
 if render_debug then
@@ -287,7 +288,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					-- reset savedata
 					playerData = {
 						isDebugging = {},
-						isDoAsISay = {}
+						isDoAsISay = {},
+						timers = {
+							isDoAsISay = 0
+						}
 					}
 					g_savedata.land_spawn_zones = {}
 					g_savedata.ai_army.squadrons = {}
@@ -1291,19 +1295,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if arg[1] == "force" then
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+						if arg[1] == "confirm" and playerData.isDoAsISay[user_peer_id] then
 							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 							onCreate(true, true, user_peer_id)
-						elseif arg[1] == "cancel" and playerData.isDoAsISay.user_peer_id == true then
-							IS_COUNTING_RELOAD_TICKER = false
-							wpDLCDebug("Action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+						elseif arg[1] == "cancel" and playerData.isDoAsISay[user_peer_id] == true then
+							wpDLCDebug("Action has been reverted, no longer will be fully reloading addon", false, false, user_peer_id)
+							playerData.isDoAsISay[user_peer_id] = nil
 						end
 						if not arg[1] then
-							IS_COUNTING_RELOAD_TICKER = true
-							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do \"?impwep full_reload force\". If you want to go back now, do ?impwep full_reload cancel. Action will be automatically reverting in 15 seconds", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do \n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
+							playerData.isDoAsISay[user_peer_id] = true
+							playerData.timers.isDoAsISay = g_savedata.tick_counter
 						end
 					end
 				else
@@ -1424,9 +1426,13 @@ function captureIsland(island, override, peer_id)
 		if island.capture_timer <= 0 and island.faction ~= FACTION_AI then -- Player Lost Island
 			faction_to_set = FACTION_AI
 		elseif island.capture_timer >= g_savedata.settings.CAPTURE_TIME and island.faction ~= FACTION_PLAYER then -- Player Captured Island
-			faction_to_set = override or faction_to_set or "ignore"
+			faction_to_set = FACTION_PLAYER
 		end
 	end
+
+	-- set it to the override, otherwise if its supposted to be capped then set it to the specified, otherwise set it to ignore
+	faction_to_set = override or faction_to_set or "ignore"
+
 	-- set it to ai
 	if faction_to_set == FACTION_AI then
 		island.capture_timer = 0
@@ -3597,6 +3603,18 @@ function tickModifiers()
 	end
 end
 
+function tickOther()
+	if playerData.isDoAsISay[0] then
+		-- if its been 15 or more seconds since they did the command
+		-- then cancel the command
+		if (g_savedata.tick_counter - playerData.timers.isDoAsISay) >= time.second*15 then
+			wpDLCDebug("Automatically cancelled full reload!", false, false, 0)
+			playerData.isDoAsISay[0] = nil
+			playerData.timers.isDoAsISay = 0
+		end
+	end
+end
+
 function onTick(tick_time)
 	g_tick_counter = g_tick_counter + 1
 	g_savedata.tick_counter = g_savedata.tick_counter + 1
@@ -3613,19 +3631,7 @@ function onTick(tick_time)
 		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
 		end
-
-		--full_reload expire countdown
-		if IS_COUNTING_RELOAD_TICKER then
-			RELOAD_TICK_COUNTER = RELOAD_TICK_COUNTER + 1
-			if RELOAD_TICK_COUNTER >= 900 then
-				IS_COUNTING_RELOAD_TICKER = false
-				RELOAD_TICK_COUNTER = 0
-				wpDLCDebug("Time expired! Run ?impwep full_reload to try again!", false, false, 0)
-				playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-			end
-		else
-			RELOAD_TICK_COUNTER = 0
-		end
+		tickOther() -- not as important stuff
 	end
 end
 
