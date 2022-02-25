@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.19)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.20)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
 local IS_DEVELOPMENT_VERSION = true
@@ -3407,8 +3407,8 @@ function tickVehicles()
 					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
 					
 					if vehicle_object.ai_type == AI_TYPE_LAND then
-						debug_data = debug_data.."Is Agressive: "..vehicle_object.is_aggressive.."\n"
-						debug_data = debug_data.."Terrain Type: "..vehicle_object.terrain_type.."\n"
+						debug_data = debug_data.."Is Agressive: "..tostring(vehicle_object.is_aggressive).."\n"
+						debug_data = debug_data.."Terrain Type: "..tostring(vehicle_object.terrain_type).."\n"
 					end
 
 
