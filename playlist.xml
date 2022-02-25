@@ -5,12 +5,12 @@
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="9" name="from=dlc_weapons_flag" display_name="Capture Point" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_9.xml" vehicle_file_store="4" vehicle_is_static="true" vehicle_is_invulnerable="true">
-						<spawn_transform 30="0.003367" 31="-7.85589" 32="-0.002568"/>
+						<spawn_transform 30="0.003367" 31="4.367959" 32="-0.002568"/>
 						<spawn_bounds>
-							<min x="-2.125" y="-25.125" z="-1.875"/>
-							<max x="1.625" y="8.125" z="8.875"/>
+							<min x="-2.125" y="-0.875" z="-1.875"/>
+							<max x="2.875" y="8.125" z="8.875"/>
 						</spawn_bounds>
-						<spawn_local_offset x="0.25" y="8.5" z="-3.5"/>
+						<spawn_local_offset x="-0.375" y="-3.625" z="-3.5"/>
 						<graph_links/>
 					</c>
 				</components>
