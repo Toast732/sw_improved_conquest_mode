@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.22)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.23)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
@@ -3310,29 +3310,31 @@ function tickVehicles()
 							ai_state = 0
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
 							local target = nil
-							local squad_vision = squadGetVisionData(squad)
-							if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
-								target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-							elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
-								target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-							end
-							if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
-								ai_target = target.last_known_pos
-								local distance = m.distance(vehicle_object.transform, ai_target)
-								local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
-								local is_better_pos = false
-								for path_index, path in pairs(possiblePaths) do
-									if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
-										is_better_pos = true
-									end
+							if squad_index ~= RESUPPLY_SQUAD_INDEX then -- makes sure its not resupplying
+								local squad_vision = squadGetVisionData(squad)
+								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
-								if is_better_pos then
-									addPath(vehicle_object, ai_target)
+								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
+									ai_target = target.last_known_pos
+									local distance = m.distance(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
+									local is_better_pos = false
+									for path_index, path in pairs(possiblePaths) do
+										if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
+											is_better_pos = true
+										end
+									end
+									if is_better_pos then
+										addPath(vehicle_object, ai_target)
+									else
+										ai_state = 0
+									end
 								else
 									ai_state = 0
 								end
-							else
-								ai_state = 0
 							end
 						else
 							if #vehicle_object.path == 0 then
@@ -3695,11 +3697,15 @@ function refuel(vehicle_id)
     s.setVehicleBattery(vehicle_id, "Battery 2", 1)
 end
 
-function reload(vehicle_id)
-	wpDLCDebug("reloaded: "..vehicle_id, true, false)
-	for i=1, 15 do
-		s.setVehicleWeapon(vehicle_id, "Ammo "..i, 999)
-	end
+function reload(vehicle_id, from_storage)
+	local i = 1
+	repeat
+		local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
+		if success then
+			s.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
+		end
+		i = i + 1
+	until (not success)
 end
 
 --[[
