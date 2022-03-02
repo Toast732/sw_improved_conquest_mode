@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.25)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.26)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
