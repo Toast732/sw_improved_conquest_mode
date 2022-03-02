@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.3.1)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE" 
-local IS_DEVELOPMENT_VERSION = false
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -767,6 +767,12 @@ function spawnAIVehicle(requested_prefab)
 	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
 	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" or getTagValue(selected_prefab.vehicle.tags, "role") == "scout" then
 		target, ally = getObjectiveIsland()
+		if not target then
+			sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
+			sm.train(PUNISH, attack, 5)
+			spawnAIVehicle()
+			return
+		end
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
@@ -2679,9 +2685,11 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 				end
 			else -- if it is a scout vehicle, we instead want to reset its progress on whatever island it was on
 				target_island, origin_island = getObjectiveIsland(true)
-				g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
-				target_island.is_scouting = false
-				g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+				if target_island then
+					g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
+					target_island.is_scouting = false
+					g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+				end
 			end
 		end
 
@@ -3227,28 +3235,32 @@ function tickVehicles()
 				-- scout vehicles
 				if vehicle_object.role == "scout" then
 					local target_island, origin_island = getObjectiveIsland(true)
-					if g_savedata.ai_knowledge.scout[target_island.name].scouted < scout_requirement then
-						if #vehicle_object.path == 0 then -- if its finishing circling the island
-							setSquadCommandScout(squad)
-						end
-						local attack_target_island, attack_origin_island = getObjectiveIsland()
-						if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
-							if attack_target_island.name == target_island.name then -- if the scout is scouting the island that the ai wants to attack
-								-- scout it normally
-								if target_island.faction == FACTION_NEUTRAL then
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate * 4, 0, scout_requirement)
-								else
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
-								end
-							else -- if the scout is scouting an island that the ai is not ready to attack
-								-- scout it 4x slower
-								if target_island.faction == FACTION_NEUTRAL then
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
-								else
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate / 4, 0, scout_requirement)
+					if target_island then -- makes sure there is a target island
+						if g_savedata.ai_knowledge.scout[target_island.name].scouted < scout_requirement then
+							if #vehicle_object.path == 0 then -- if its finishing circling the island
+								setSquadCommandScout(squad)
+							end
+							local attack_target_island, attack_origin_island = getObjectiveIsland()
+							if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
+								if attack_target_island.name == target_island.name then -- if the scout is scouting the island that the ai wants to attack
+									-- scout it normally
+									if target_island.faction == FACTION_NEUTRAL then
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate * 4, 0, scout_requirement)
+									else
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
+									end
+								else -- if the scout is scouting an island that the ai is not ready to attack
+									-- scout it 4x slower
+									if target_island.faction == FACTION_NEUTRAL then
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
+									else
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate / 4, 0, scout_requirement)
+									end
 								end
 							end
 						end
+					else
+						setSquadCommandDefend(squad, g_savedata.ai_base_island)
 					end
 				end
 
