@@ -4,9 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.2)"
 
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
+-- valid values:
+-- "TRUE" if this version will be able to run perfectly fine on old worlds 
+-- "FULL_RELOAD" if this version will need to do a full reload to work properly
+-- "FALSE" if this version has not been tested or its not compatible with older versions
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE" 
 local IS_DEVELOPMENT_VERSION = false
 
 local MAX_SQUAD_SIZE = 3
@@ -737,15 +741,16 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not requested_prefab then
-		if selected_prefab.ai_type == AI_TYPE_BOAT and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
+		if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
 			return false, "boat limit reached"
-		elseif selected_prefab.ai_type == AI_TYPE_LAND and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
 			return false, "land limit reached"
-		elseif selected_prefab.ai_type == AI_TYPE_HELI and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
 			return false, "heli limit reached"
-		elseif selected_prefab.ai_type == AI_TYPE_PLANE and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
 			return false, "plane limit reached"
-		elseif army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
+		end
+		if army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
 			return false, "too many ai vehicles"
 		end
 	end
