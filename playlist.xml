@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/Improved_Conquest_Mode" folder_path="data/missions/Improved_Conquest_Mode" file_store="4" name="Improved Conquest Mode">
+<playlist path_id="app_data/data/missions/Improved_Conquest_Mode" folder_path="data/missions/Improved_Conquest_Mode" file_store="4" name="Improved Conquest Mode (0.2.1.dev)">
 	<locations location_id_counter="149" component_id_counter="2828">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
@@ -18,7 +18,7 @@
 			<l id="1" tile="data/tiles/island_15.xml" name="CREATIVE BASE" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="101" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=boat" display_name="Creative Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.662038" 02="0.74947" 20="-0.74947" 22="0.662038" 30="-155.929016" 31="4.749948" 32="167.15564"/>
+						<spawn_transform 00="0.662038" 02="0.74947" 20="-0.74947" 22="0.662038" 30="-155.929016" 31="4.594379" 32="167.15564"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -62,7 +62,7 @@
 			<l id="2" tile="data/tiles/island_34_military.xml" name="MILITARY BASE" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="106" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=boat" display_name="Military Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.477092" 02="-0.878853" 20="0.878853" 22="-0.477092" 30="-19.940189" 31="22.117254" 32="-118.133392"/>
+						<spawn_transform 00="-0.477092" 02="-0.878853" 20="0.878853" 22="-0.477092" 30="-19.940189" 31="21.88485" 32="-118.133392"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -122,7 +122,7 @@
 			<l id="3" tile="data/tiles/island_27_airbase.xml" name="AIRPORT" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="113" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane" display_name="Airport Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.821191" 31="23.545761" 32="109.974426"/>
+						<spawn_transform 30="-4.821191" 31="23.449848" 32="109.974426"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -182,7 +182,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="120" cargo_zone_import_cargo_type="capture,can_spawn=boat" display_name="Brinkfield" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="18.488598" 31="4.893591" 32="88.270569"/>
+						<spawn_transform 30="18.488598" 31="4.877653" 32="88.270569"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -210,7 +210,7 @@
 			<l id="5" tile="data/tiles/island_36_oil_refinery.xml" name="OIL REFINERY" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="123" cargo_zone_import_cargo_type="capture,can_spawn=boat" display_name="Refinery" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.724164" 02="0.689628" 20="-0.689628" 22="0.724164" 30="15.65185" 31="20.615664" 32="0.138881"/>
+						<spawn_transform 00="0.724164" 02="0.689628" 20="-0.689628" 22="0.724164" 30="15.65185" 31="20.454309" 32="0.138881"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -246,7 +246,7 @@
 			<l id="6" tile="data/tiles/oil_rig_medium.xml" name="MEDIUM OIL RIG" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="127" cargo_zone_import_cargo_type="capture,can_spawn=heli" display_name="Oil Rig" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.025357" 02="-0.999678" 20="0.999678" 22="0.025357" 30="-9.907475" 31="18.607906" 32="3.600782"/>
+						<spawn_transform 00="0.025357" 02="-0.999678" 20="0.999678" 22="0.025357" 30="-9.907475" 31="18.537622" 32="3.600782"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -298,7 +298,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="133" cargo_zone_import_cargo_type="capture" display_name="Sea Fort" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.791877" 02="-0.61068" 20="0.61068" 22="0.791877" 30="-23.821459" 31="12.876198" 32="18.499588"/>
+						<spawn_transform 00="0.791877" 02="-0.61068" 20="0.61068" 22="0.791877" 30="-23.821459" 31="12.763065" 32="18.499588"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -326,7 +326,7 @@
 			<l id="8" tile="data/tiles/island_43_multiplayer_base.xml" name="MULTIPLAYER ISLAND BASE" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="136" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=boat" display_name="Multiplayer Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.710437" 02="-0.703761" 20="0.703761" 22="0.710437" 30="57.883884" 31="13.848049" 32="73.417076"/>
+						<spawn_transform 00="0.710437" 02="-0.703761" 20="0.703761" 22="0.710437" 30="57.883884" 31="13.828106" 32="73.417076"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -394,7 +394,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="144" cargo_zone_import_cargo_type="capture,can_spawn=boat" display_name="Harbour Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="48.730297" 31="5.268484" 32="-20.172775"/>
+						<spawn_transform 30="48.730297" 31="5.20223" 32="-20.172775"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -438,7 +438,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="149" cargo_zone_import_cargo_type="capture,can_spawn=plane" display_name="Airstrip Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-28.616262" 31="5.065415" 32="48.241264"/>
+						<spawn_transform 30="-28.616262" 31="4.951669" 32="48.241264"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -450,7 +450,7 @@
 			<l id="11" tile="data/tiles/island_33_tile_32.xml" name="TERMINAL SPYCAKES" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="150" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=boat,can_spawn=land" display_name="Spycakes Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.816145" 02="-0.577848" 20="0.577848" 22="0.816145" 30="170.711075" 31="5.199003" 32="240.908188"/>
+						<spawn_transform 00="0.816145" 02="-0.577848" 20="0.577848" 22="0.816145" 30="170.711075" 31="5.124025" 32="240.908188"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -458,7 +458,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="151" cargo_zone_import_cargo_type="turret" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.997606" 02="-0.069152" 20="0.069152" 22="-0.997606" 30="189.042908" 31="5.220955" 32="175.585831"/>
+						<spawn_transform 00="-0.997606" 02="-0.069152" 20="0.069152" 22="-0.997606" 30="189.042908" 31="5.174647" 32="175.585831"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -918,7 +918,7 @@
 			<l id="12" tile="data/tiles/island_33_tile_06.xml" name="KEY CHEMICAL PLANT" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="156" cargo_zone_import_cargo_type="capture" display_name="Chemical Plant" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.022667" 02="-0.999743" 20="0.999743" 22="0.022667" 30="-184.708954" 31="7.617742" 32="181.790054"/>
+						<spawn_transform 00="0.022667" 02="-0.999743" 20="0.999743" 22="0.022667" 30="-184.708954" 31="7.608039" 32="181.790054"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1084,7 +1084,7 @@
 			<l id="13" tile="data/tiles/island_33_tile_end.xml" name="TERMINAL CAMODO" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="161" cargo_zone_import_cargo_type="capture,can_spawn=boat" display_name="Camodo Base" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.692741" 02="-0.721186" 20="0.721186" 22="-0.692741" 30="13.437214" 31="15.680088" 32="47.687336"/>
+						<spawn_transform 00="-0.692741" 02="-0.721186" 20="0.721186" 22="-0.692741" 30="13.437214" 31="15.638784" 32="47.687336"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1287,7 +1287,7 @@
 			<l id="14" tile="data/tiles/mega_island_2_9.xml" name="OLSEN BAY" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="167" cargo_zone_import_cargo_type="capture,can_spawn=land" display_name="Olsen Bay" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.886426" 02="-0.462871" 20="0.462871" 22="0.886426" 30="358.105469" 31="5.717477" 32="-345.182587"/>
+						<spawn_transform 00="0.886426" 02="-0.462871" 20="0.462871" 22="0.886426" 30="358.105469" 31="5.68012" 32="-345.182587"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1327,7 +1327,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="408" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="335.990631" 31="20" 32="-359.719757"/>
+						<spawn_transform 30="335.990631" 31="5.862889" 32="-359.719757"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1335,7 +1335,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="409" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="306.114868" 31="20" 32="-428.58136"/>
+						<spawn_transform 30="306.114868" 31="5.777156" 32="-428.58136"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1346,7 +1346,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="410" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="296.651581" 31="20" 32="-492.408691"/>
+						<spawn_transform 30="296.651581" 31="6.334898" 32="-492.408691"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1356,7 +1356,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="419" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="415.223724" 31="20" 32="-360.306824"/>
+						<spawn_transform 30="415.223724" 31="5.382176" 32="-360.306824"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1378,7 +1378,7 @@
 			<l id="15" tile="data/tiles/mega_island_9_8.xml" name="SAWYER ISLANDS' NORTH HARBOUR" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="172" cargo_zone_import_cargo_type="capture,can_spawn=boat,can_spawn=land" display_name="North Harbour" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.0047" 02="-0.999989" 20="0.999989" 22="-0.0047" 30="449.098175" 31="6.901748" 32="272.662628"/>
+						<spawn_transform 00="-0.0047" 02="-0.999989" 20="0.999989" 22="-0.0047" 30="449.098175" 31="6.772672" 32="272.662628"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1652,7 +1652,7 @@
 			<l id="16" tile="data/tiles/mega_island_8_7.xml" name="HOLT TOWN" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="173" cargo_zone_import_cargo_type="capture" display_name="Holt Town" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.96819" 02="-0.250217" 20="0.250217" 22="0.96819" 30="2.90613" 31="8.588498" 32="216.507095"/>
+						<spawn_transform 00="0.96819" 02="-0.250217" 20="0.250217" 22="0.96819" 30="2.90613" 31="8.555288" 32="216.507095"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -1692,7 +1692,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="481" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-199.207047" 31="20" 32="333.131287"/>
+						<spawn_transform 30="-199.207047" 31="9.153983" 32="333.131287"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1700,7 +1700,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="482" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-184.444901" 31="20" 32="403.720825"/>
+						<spawn_transform 30="-184.444901" 31="6.556386" 32="403.720825"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1710,7 +1710,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="483" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-165.31839" 31="20" 32="451.546814"/>
+						<spawn_transform 30="-165.31839" 31="6.686039" 32="451.546814"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1720,7 +1720,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="484" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-135.416763" 31="20" 32="497.373749"/>
+						<spawn_transform 30="-135.416763" 31="5.999264" 32="497.373749"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1730,7 +1730,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="485" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-261.944824" 31="20" 32="329.215912"/>
+						<spawn_transform 30="-261.944824" 31="8.759483" 32="329.215912"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1740,7 +1740,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="486" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-325.033783" 31="20" 32="318.650848"/>
+						<spawn_transform 30="-325.033783" 31="8.660689" 32="318.650848"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1750,7 +1750,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="487" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-382.565948" 31="20" 32="303.489594"/>
+						<spawn_transform 30="-382.565948" 31="9.456128" 32="303.489594"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1760,7 +1760,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="488" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-424.923492" 31="20" 32="285.048279"/>
+						<spawn_transform 30="-424.923492" 31="11.50212" 32="285.048279"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1770,7 +1770,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="489" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-465.005341" 31="20" 32="261.12149"/>
+						<spawn_transform 30="-465.005341" 31="12.049408" 32="261.12149"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1780,7 +1780,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="490" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-498.693298" 31="20" 32="232.80896"/>
+						<spawn_transform 30="-498.693298" 31="13.307838" 32="232.80896"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1790,7 +1790,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="491" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-203.287567" 31="20" 32="295.759766"/>
+						<spawn_transform 30="-203.287567" 31="12.51116" 32="295.759766"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1800,7 +1800,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="492" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-196.44931" 31="20" 32="270.637207"/>
+						<spawn_transform 30="-196.44931" 31="15.415891" 32="270.637207"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1810,7 +1810,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="493" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-178.228653" 31="20" 32="241.134674"/>
+						<spawn_transform 30="-178.228653" 31="14.590396" 32="241.134674"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1820,7 +1820,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="494" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-155.531738" 31="20" 32="222.375534"/>
+						<spawn_transform 30="-155.531738" 31="13.494272" 32="222.375534"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1830,7 +1830,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="495" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-125.789032" 31="20" 32="207.237854"/>
+						<spawn_transform 30="-125.789032" 31="12.771639" 32="207.237854"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1840,7 +1840,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="496" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="51.938908" 31="20" 32="152.825439"/>
+						<spawn_transform 30="51.938908" 31="8.662416" 32="152.825439"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1848,7 +1848,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="497" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="233.945999" 31="20" 32="87.980934"/>
+						<spawn_transform 30="233.945999" 31="5.648347" 32="87.980934"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1856,7 +1856,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="498" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-78.43734" 31="20" 32="190.956802"/>
+						<spawn_transform 30="-78.43734" 31="9.498969" 32="190.956802"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1866,7 +1866,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="499" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-22.455242" 31="20" 32="174.983963"/>
+						<spawn_transform 30="-22.455242" 31="8.958595" 32="174.983963"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1876,7 +1876,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="500" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="6.004148" 31="20" 32="141.601059"/>
+						<spawn_transform 30="6.004148" 31="7.524425" 32="141.601059"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1887,7 +1887,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="501" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="53.934795" 31="20" 32="119.771202"/>
+						<spawn_transform 30="53.934795" 31="6.710712" 32="119.771202"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1898,7 +1898,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="502" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="138.419556" 31="20" 32="99.182388"/>
+						<spawn_transform 30="138.419556" 31="5.732527" 32="99.182388"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1909,7 +1909,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="503" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="129.907883" 31="20" 32="123.847099"/>
+						<spawn_transform 30="129.907883" 31="6.883188" 32="123.847099"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1921,7 +1921,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="504" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="15.23772" 31="20" 32="163.598984"/>
+						<spawn_transform 30="15.23772" 31="8.533175" 32="163.598984"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1934,7 +1934,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="505" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="23.45797" 31="20" 32="198.803207"/>
+						<spawn_transform 30="23.45797" 31="8.889693" 32="198.803207"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1944,7 +1944,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="506" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="37.185299" 31="20" 32="248.475952"/>
+						<spawn_transform 30="37.185299" 31="8.525676" 32="248.475952"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1954,7 +1954,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="507" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="133.517868" 31="20" 32="191.111954"/>
+						<spawn_transform 30="133.517868" 31="8.650854" 32="191.111954"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1964,7 +1964,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="508" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-0.576228" 31="20" 32="266.477844"/>
+						<spawn_transform 30="-0.576228" 31="9.476838" 32="266.477844"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1974,7 +1974,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="509" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-87.987244" 31="20" 32="293.71344"/>
+						<spawn_transform 30="-87.987244" 31="7.995596" 32="293.71344"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1984,7 +1984,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="510" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-136.099747" 31="20" 32="316.199463"/>
+						<spawn_transform 30="-136.099747" 31="8.708489" 32="316.199463"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -1995,7 +1995,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="511" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="164.702026" 31="20" 32="164.326447"/>
+						<spawn_transform 30="164.702026" 31="9.21281" 32="164.326447"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2005,7 +2005,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="512" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="188.952591" 31="20" 32="137.565323"/>
+						<spawn_transform 30="188.952591" 31="10.932367" 32="137.565323"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2015,7 +2015,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="513" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="210.11702" 31="20" 32="109.403694"/>
+						<spawn_transform 30="210.11702" 31="6.824299" 32="109.403694"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2025,7 +2025,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="514" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="218.217316" 31="20" 32="100.042641"/>
+						<spawn_transform 30="218.217316" 31="6.137939" 32="100.042641"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2036,7 +2036,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="515" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="215.169312" 31="20" 32="93.833641"/>
+						<spawn_transform 30="215.169312" 31="5.864668" 32="93.833641"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2048,7 +2048,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="516" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="251.027435" 31="20" 32="80.107964"/>
+						<spawn_transform 30="251.027435" 31="5.865804" 32="80.107964"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2059,7 +2059,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="517" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="381.574005" 31="20" 32="32.847958"/>
+						<spawn_transform 30="381.574005" 31="5.592271" 32="32.847958"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2069,7 +2069,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="518" name="ocean_path" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="499.391602" 31="20" 32="-22.347506"/>
+						<spawn_transform 30="499.391602" 31="5.236445" 32="-22.347506"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -2083,7 +2083,7 @@
 			<l id="17" tile="data/tiles/mega_island_15_2.xml" name="SAWYER ISLANDS' SOUTH-EAST FISHING VILLAGE" is_env_mod="true" env_mod_spawn_num="1">
 				<components>
 					<c component_type="10" id="179" cargo_zone_import_cargo_type="capture,can_spawn=boat,can_spawn=land" display_name="Fishing Village" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.370885" 02="-0.928679" 20="0.928679" 22="-0.370885" 30="43.444843" 31="6.549124" 32="286.497253"/>
+						<spawn_transform 00="-0.370885" 02="-0.928679" 20="0.928679" 22="-0.370885" 30="43.444843" 31="6.4897" 32="286.497253"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -2462,7 +2462,7 @@
 						</spawn_bounds>
 						<graph_links/>
 					</c>
-					<c component_type="3" id="72" name="from=dlc_weapons,type=wep_land,size=small,role=general,visibility_range=800,spawning_radius=12" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4">
+					<c component_type="3" id="72" name="from=dlc_weapons,type=wep_land,size=small,role=general,visibility_range=800,spawning_radius=12,pseudo_speed=17" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.103493" 31="2.670889" 32="0.422675"/>
 						<spawn_bounds>
 							<min x="-2.125" y="-4.625" z="-2.125"/>
@@ -2500,7 +2500,7 @@
 			</l>
 			<l id="19" name="BOAT - BS-H1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="67" name="from=dlc_weapons,type=wep_boat,size=medium,role=defend,visibility_range=700,spawning_radius=12" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4">
+					<c component_type="3" id="67" name="from=dlc_weapons,type=wep_boat,size=medium,role=defend,visibility_range=700,spawning_radius=12,pseudo_speed=20" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.050188" 31="3.57261" 32="-0.003728"/>
 						<spawn_bounds>
 							<min x="-2.625" y="-3.625" z="3.375"/>
@@ -2578,7 +2578,7 @@
 			</l>
 			<l id="20" name="PLANE - EUROFIGHTER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="81" name="from=dlc_weapons,type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4">
+					<c component_type="3" id="81" name="from=dlc_weapons,type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing,pseudo_speed=116" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4">
 						<spawn_transform 30="-1.599282" 31="8.210866" 32="-0.878728"/>
 						<spawn_bounds>
 							<min x="-6.375" y="-1.875" z="-14.875"/>
@@ -2616,7 +2616,7 @@
 			</l>
 			<l id="21" name="BOAT - DESTROYER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" name="from=dlc_weapons,type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
+					<c component_type="3" id="84" name="from=dlc_weapons,type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,pseudo_speed=16" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
@@ -2678,7 +2678,7 @@
 			</l>
 			<l id="22" name="HELI - VENOM" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="94" name="from=dlc_weapons,type=wep_heli,size=small,role=general,visibility_range=1400,spawning_radius=5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4">
+					<c component_type="3" id="94" name="from=dlc_weapons,type=wep_heli,size=small,role=general,visibility_range=1400,spawning_radius=5,pseudo_speed=37" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.187068" 31="3.162882" 32="-1.590729"/>
 						<spawn_bounds>
 							<min x="-6.625" y="-1.375" z="-15.125"/>
@@ -2724,7 +2724,7 @@
 			</l>
 			<l id="23" name="HELI - TIGER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="98" name="from=dlc_weapons,type=wep_heli,size=small,role=attack,visibility_range=1300,spawning_radius=5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4">
+					<c component_type="3" id="98" name="from=dlc_weapons,type=wep_heli,size=small,role=attack,visibility_range=1300,spawning_radius=5,pseudo_speed=35" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.066559" 31="2.949932" 32="-3.003018"/>
 						<spawn_bounds>
 							<min x="-6.625" y="-1.125" z="-2.625"/>
@@ -2871,7 +2871,7 @@
 						</graph_links>
 					</c>
 					<c component_type="10" id="2742" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=land,no-access=boat" display_name="O'Neill Airbase" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="148.19162" 31="9.13063" 32="62.020142"/>
+						<spawn_transform 00="0.346595" 02="-0.938015" 20="0.938015" 22="0.346595" 30="148.19162" 31="8.683337" 32="62.020142"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -3079,7 +3079,7 @@
 						</graph_links>
 					</c>
 					<c component_type="10" id="2748" cargo_zone_import_cargo_type="capture,can_spawn=heli,can_spawn=plane,can_spawn=land,no-access=boat" display_name="Harrison Airbase" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="63.871613" 31="12.562406" 32="-151.441971"/>
+						<spawn_transform 00="-0.826639" 02="-0.562733" 20="0.562733" 22="-0.826639" 30="63.871613" 31="12.445057" 32="-151.441971"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -3135,7 +3135,7 @@
 			</l>
 			<l id="28" name="PLANE - O-2 SKYMASTER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="597" name="from=dlc_weapons,type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">
+					<c component_type="3" id="597" name="from=dlc_weapons,type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8,pseudo_speed=87" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.039262" 31="1.954949" 32="-0.050625"/>
 						<spawn_bounds>
 							<min x="-5.625" y="-0.375" z="-5.125"/>
@@ -3165,7 +3165,7 @@
 			</l>
 			<l id="29" name="LAND - AI-C1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="599" name="from=dlc_weapons,type=wep_land,size=medium,role=general,visibility_range=1600,radar,spawning_radius=8" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4">
+					<c component_type="3" id="599" name="from=dlc_weapons,type=wep_land,size=medium,role=general,visibility_range=1600,radar,spawning_radius=8,pseudo_speed=9" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.223219" 31="1.852892" 32="-0.199396"/>
 						<spawn_bounds>
 							<min x="-1.875" y="-0.875" z="-7.375"/>

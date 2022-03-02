@@ -8,8 +8,8 @@ local IS_COUNTING_RELOAD_TICKER = false
 
 local IMPROVED_CONQUEST_VERSION = "(0.2.1.17)"
 
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = false
-local IS_DEVELOPMENT_VERSION = true
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
+local IS_DEVELOPMENT_VERSION = false
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -114,16 +114,6 @@ local ai_training = {
 
 local scout_requirement = time.minute*40
 
-local playerData = {
-	isDebugging = {},
-	isDoAsISay = {}
-}
-
-if render_debug then
-	local adminID = 0
-	playerData.isDebugging.adminID = true
-end
-
 local capture_speeds = {
 	1,
 	1.5,
@@ -158,7 +148,6 @@ g_savedata = {
 	controllable_islands = {},
     ai_army = { squadrons = { [RESUPPLY_SQUAD_INDEX] = { command = COMMAND_RESUPPLY, ai_type = "", role = "", vehicles = {}, target_island = nil }} },
 	player_vehicles = {},
-	debug_data = {},
 	constructable_vehicles = {},
 	vehicle_list = {},
 	terrain_scanner_prefab = {},
@@ -168,6 +157,7 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 		has_default_addon = false,
+		awaiting_reload = false,
 	},
 	land_spawn_zones = {},
 	tick_counter = 0,
@@ -180,7 +170,18 @@ g_savedata = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
 		scout = {}, -- the scout progress of each island
 	},
+	playerData = {
+		isDebugging = {},
+		isDoAsISay = {},
+		timers = {
+			isDoAsISay = 0,
+		},
+	},
 }
+
+if render_debug then
+	g_savedata.playerData.isDebugging[0] = true
+end
 
 --[[
         Functions
@@ -193,12 +194,12 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 		printTable(message, requiresDebugging, isError, toPlayer)
 	elseif requiresDebugging == true then
 		if toPlayer ~= -1 and toPlayer ~= nil then
-			if playerData.isDebugging.toPlayer then
+			if g_savedata.playerData.isDebugging.toPlayer then
 				s.announce(deb_err, message, toPlayer)
 			end
 		else
-			for k, v in pairs(playerData.isDebugging) do
-				if playerData.isDebugging[k] then
+			for k, v in pairs(g_savedata.playerData.isDebugging) do
+				if g_savedata.playerData.isDebugging[k] then
 					s.announce(deb_err, message, k)
 				end
 			end
@@ -216,7 +217,7 @@ end
 
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
-	if not is_dlc_weapons then
+	if not s.dlcWeapons() then
 		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
 	end
 	-- check if they left the default addon enabled
@@ -228,9 +229,39 @@ function warningChecks(user_peer_id)
 		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
-		if not IS_COMPATIBLE_WITH_OLDER_VERSIONS then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous.", false, true, peer_id)
+		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, peer_id)
+		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, peer_id)
 		end
+	end
+end
+
+function checkSavedata() -- does a check for savedata, is used for backwards compatibility
+	-- lets you keep debug mode enabled after reloads
+	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
+		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+			if is_debugging then
+				render_debug = true
+			end
+		end
+	else -- adds the playerdata field to the savedata
+		g_savedata.playerData = {
+			isDebugging = {},
+			isDoAsISay = {},
+			timers = {
+				isDoAsISay = 0,
+			},
+		}
+	end
+
+	-- compatibility check for the new settings
+	if not g_savedata.settings.MAX_HELI_AMOUNT then
+		g_savedata.settings.MAX_BOAT_AMOUNT = 10
+		g_savedata.settings.MAX_LAND_AMOUNT = 10
+		g_savedata.settings.MAX_PLANE_AMOUNT = 10
+		g_savedata.settings.MAX_HELI_AMOUNT = 10
+		g_savedata.settings.MAX_TURRET_AMOUNT = 3
 	end
 end
 
@@ -239,16 +270,21 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
 			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
-			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
-			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
-			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 19, 1, 19),
-			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
-			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
 			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
+			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
+			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
+			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
+			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
+			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
+			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
+			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
+			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
 		}
 	end
+
+	checkSavedata() -- backwards compatibility check
 
     is_dlc_weapons = s.dlcWeapons()
 
@@ -257,11 +293,19 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.info.has_default_addon = true
 	end
 
+	warningChecks(-1)
+
+	if g_savedata.info.awaiting_reload ~= false then
+		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
+			spawnAIVehicle() -- spawn initial ai
+		end
+		wpDLCDebug("Lastly, you need to save the world and then load that save to complete the full reload", false, false)
+		g_savedata.info.awaiting_reload = false
+	end
+
     if is_dlc_weapons then
 
 		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
-
-		warningChecks(-1)
 
         if is_world_create then
 
@@ -276,6 +320,22 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							killVehicle(squad_index, vehicle_id, true, true)
 						end
 					end
+
+					-- removes vehicle icons and paths
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							s.removeMapObject(-1,vehicle_object.map_id)
+							s.removeMapLine(-1,vehicle_object.map_id)
+							for i = 1, #vehicle_object.path - 1 do
+								local waypoint = vehicle_object.path[i]
+								s.removeMapLine(-1, waypoint.ui_id)
+							end
+							killVehicle(squad_index, vehicle_id, true, true)
+						end
+					end
+					s.removeMapObject(-1, g_savedata.player_base_island.map_id)
+					s.removeMapObject(-1, g_savedata.ai_base_island.map_id)
+
 					-- resets some island data
 					for island_index, island in pairs(g_savedata.controllable_islands) do
 						-- resets map icons
@@ -284,10 +344,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						-- removes all flags/capture point vehicles
 						s.despawnVehicle(island.flag_vehicle.id, true)
 					end
+					local debugging_player_data = g_savedata.playerData.isDebugging -- keeps those who are debugging
+
 					-- reset savedata
-					playerData = {
-						isDebugging = {},
-						isDoAsISay = {}
+					g_savedata.playerData = {
+						isDebugging = debugging_player_data,
+						isDoAsISay = {},
+						timers = {
+							isDoAsISay = 0
+						}
 					}
 					g_savedata.land_spawn_zones = {}
 					g_savedata.ai_army.squadrons = {}
@@ -308,8 +373,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
 						scout = {}, -- the scout progress of each island
 					}
-					wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
-
 					-- save that this happened, as to aid in debugging errors
 					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
 				end
@@ -453,18 +516,26 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					t.faction = FACTION_AI
 				end
 			end
-			
-			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
-				spawnAIVehicle() -- spawn initial ai
+
+			if not do_as_i_say then
+				-- if the world was just created like normal
+				
+				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
+					spawnAIVehicle() -- spawn initial ai
+				end
+			else -- say we're ready to reload scripts
+				g_savedata.info.awaiting_reload = true
+				wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
+				is_dlc_weapons = false
 			end
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					s.removeMapObject(0,vehicle_object.map_id)
-					s.removeMapLine(0,vehicle_object.map_id)
+					s.removeMapObject(-1, vehicle_object.map_id)
+					s.removeMapLine(-1, vehicle_object.map_id)
 					for i = 1, #vehicle_object.path - 1 do
 						local waypoint = vehicle_object.path[i]
-						s.removeMapLine(0, waypoint.ui_id)
+						s.removeMapLine(-1, waypoint.ui_id)
 					end
 				end
 			end
@@ -524,14 +595,26 @@ function buildPrefabs(location_index)
 end
 
 function spawnTurret(island)
-	local selected_prefab = sm.spawn(true, "turret") 
+	local selected_prefab = sm.spawn(true, "turret")
 
 	if (#island.zones < 1) then return end
+
+	local turret_count = 0
+
+	for turret_zone_index, turret_zone in pairs(island.zones) do
+		if turret_zone.is_spawned then turret_count = turret_count + 1 end
+	end
+
+	if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then return end
 
 	local spawnbox_index = math.random(1, #island.zones)
 	if island.zones[spawnbox_index].is_spawned == true then
 		return
 	end
+	
+	local player_list = s.getPlayers()
+	if not playersNotNearby(player_list, island.zones[spawnbox_index].transform, 3000, true) then return end -- makes sure players are not too close before spawning a turret
+
 	island.zones[spawnbox_index].is_spawned = true
 	local spawn_transform = island.zones[spawnbox_index].transform
 
@@ -585,15 +668,20 @@ function spawnTurret(island)
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				normal = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or 0,
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or 0,
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or 0
+				land = {
+					normal = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or 0,
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or 0,
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or 0
+					},
+					aggressive = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or 0,
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or 0,
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
+					}
 				},
-				aggressive = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or 0,
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or 0,
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
+				not_land = {
+					pseudo_speed = getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
 				}
 			},
 			capabilities = {
@@ -628,6 +716,7 @@ function spawnAIVehicle(requested_prefab)
 	local heli_count = 0
 	local army_count = 0
 	local land_count = 0
+	local boat_count = 0
 	
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -635,6 +724,7 @@ function spawnAIVehicle(requested_prefab)
 			if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
+			if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
 		end
 	end
 
@@ -646,6 +736,20 @@ function spawnAIVehicle(requested_prefab)
 		selected_prefab = sm.spawn(true, requested_prefab) 
 	else
 		selected_prefab = sm.spawn(false)
+	end
+
+	if not requested_prefab then
+		if selected_prefab.ai_type == AI_TYPE_BOAT and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
+			return false, "boat limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_LAND and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
+			return false, "land limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_HELI and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
+			return false, "heli limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_PLANE and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
+			return false, "plane limit reached"
+		elseif army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
+			return false, "too many ai vehicles"
+		end
 	end
 
 	local player_list = s.getPlayers()
@@ -782,19 +886,7 @@ function spawnAIVehicle(requested_prefab)
 			return false
 		end
 	else
-		if
-			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count <= g_savedata.settings.MAX_HELI_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count <= g_savedata.settings.MAX_PLANE_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab 
-			then
-
-			spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
-		else
-			wpDLCDebug("unable to spawn vehicle, attempting to spawn another vehicle...", true, false)
-			spawnAIVehicle()
-			return false
-		end
+		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 	end
 
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -866,15 +958,20 @@ function spawnAIVehicle(requested_prefab)
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				normal = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal"),
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal"),
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal")
+				land = {
+					normal = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal"),
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal"),
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal")
+					},
+					aggressive = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive"),
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
+					}
 				},
-				aggressive = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive"),
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
+				not_land = {
+					pseudo_speed = getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
 				}
 			},
 			capabilities = {
@@ -1096,30 +1193,26 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					elseif command == "debug" then
 						if arg[1] then
 							vehicles_debugging[tonumber(arg[1])] = not vehicles_debugging[tonumber(arg[1])]
+							-- enabled or disabled message
 							local enDis = "dis"
 							if vehicles_debugging[tonumber(arg[1])] then
 								enDis = "en"
 							end
 							wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg[1], false, false, user_peer_id)
 						else
-							playerData.isDebugging[user_peer_id] = not playerData.isDebugging[user_peer_id]
+							g_savedata.playerData.isDebugging[user_peer_id] = not g_savedata.playerData.isDebugging[user_peer_id]
 
-							if playerData.isDebugging[user_peer_id] ~= true then
+							if g_savedata.playerData.isDebugging[user_peer_id] ~= true then
 								wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
 							else
 								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
 							end
 							
-							local keep_render_debug = false
-							for k, v in pairs(playerData.isDebugging) do
-								if playerData.isDebugging[k] then
+							render_debug = false
+							for k, v in pairs(g_savedata.playerData.isDebugging) do
+								if g_savedata.playerData.isDebugging[k] then
 									render_debug = true
-									keep_render_debug = true
 								end
-							end
-
-							if not keep_render_debug then
-								render_debug = false
 							end
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1132,9 +1225,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							end
-
-							s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
-							s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
+							updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
+							updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
 						end
 
 
@@ -1291,19 +1383,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if arg[1] == "force" then
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+						if arg[1] == "confirm" and g_savedata.playerData.isDoAsISay[user_peer_id] then
 							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
 							onCreate(true, true, user_peer_id)
-						elseif arg[1] == "cancel" and playerData.isDoAsISay.user_peer_id == true then
-							IS_COUNTING_RELOAD_TICKER = false
-							wpDLCDebug("Action has been reverted, no longer will be reloading addon", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+						elseif arg[1] == "cancel" and g_savedata.playerData.isDoAsISay[user_peer_id] == true then
+							wpDLCDebug("Action has been reverted, no longer will be fully reloading addon", false, false, user_peer_id)
+							g_savedata.playerData.isDoAsISay[user_peer_id] = nil
 						end
 						if not arg[1] then
-							IS_COUNTING_RELOAD_TICKER = true
-							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP. To acknowledge you've read this, do \"?impwep full_reload force\". If you want to go back now, do ?impwep full_reload cancel. Action will be automatically reverting in 15 seconds", false, false, user_peer_id)
-							playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
+							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do \n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
+							g_savedata.playerData.isDoAsISay[user_peer_id] = true
+							g_savedata.playerData.timers.isDoAsISay = g_savedata.tick_counter
 						end
 					end
 				else
@@ -1638,8 +1728,8 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	wpDLCDebug("cleaned vehicle: "..vehicle_id, true, false)
-	for k, v in pairs(playerData.isDebugging) do
-		if playerData.isDebugging[k] then
+	for k, v in pairs(g_savedata.playerData.isDebugging) do
+		if g_savedata.playerData.isDebugging[k] then
 
 			s.removeMapObject(k ,vehicle_object.map_id)
 			s.removeMapLine(k ,vehicle_object.map_id)
@@ -2037,8 +2127,8 @@ function tickGamemode()
 				if a then
 					debug_data = debug_data .. " Ally: " .. a.name
 				end
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
+				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+					if g_savedata.playerData.isDebugging[player_debugging_id] then
 						s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
@@ -2051,6 +2141,10 @@ function tickGamemode()
 	end
 end
 
+
+---@param peer_id integer the id of the player of which you want to update the map data for
+---@param island island[] the island you want to update
+---@param is_reset boolean if you want it to just reset the map, which will remove the island from the map instead of updating it
 function updatePeerIslandMapData(peer_id, island, is_reset)
 	if is_dlc_weapons then
 		local ts_x, ts_y, ts_z = m.position(island.transform)
@@ -2075,21 +2169,17 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				g = 255
 				b = 0
 			end
-
-			if not render_debug then
+			if not g_savedata.playerData.isDebugging[peer_id] then -- checks to see if the player has debug mode disabled
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
-						local debug_data = ""
-						debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
-						debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
-						debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
-						if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
+				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
+					local debug_data = ""
+					debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
+					debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
+					debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
+					if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
 
-						
-						s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
-					end
+					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -3063,8 +3153,8 @@ function tickVision()
 				if recent_spotter ~= nil then debug_data = debug_data .. "\nspotter: " .. player_vehicle.recent_spotter end
 				if last_known_pos ~= nil then debug_data = debug_data .. "last_known_pos: " end
 				if death_pos ~= nil then debug_data = debug_data .. "death_pos: " end
-				for player_debugging_id, v in pairs(playerData.isDebugging) do
-					if playerData.isDebugging[player_debugging_id] then
+				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+					if g_savedata.playerData.isDebugging[player_debugging_id] then
 						s.removeMapObject(player_debugging_id, player_vehicle.map_id)
 						s.addMapObject(player_debugging_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
 					end
@@ -3161,16 +3251,16 @@ function tickVehicles()
 				end
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
-				local ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
+				local ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT) * vehicle_update_tickrate / 60
 
 				if(vehicle_object.ai_type ~= AI_TYPE_TURRET) then
 
 					if vehicle_object.state.s == VEHICLE_STATE_PATHING then
 
 						if vehicle_object.ai_type == AI_TYPE_PLANE then
-							ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE) * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_HELI then
-							ai_speed_pseudo = AI_SPEED_PSEUDO_HELI * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI) * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
 							vehicle_object.terrain_type = "offroad"
 							vehicle_object.is_aggressive = "normal"
@@ -3185,9 +3275,9 @@ function tickVehicles()
 								vehicle_object.terrain_type = "bridge"
 							end
 
-							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.land[vehicle_object.is_aggressive][vehicle_object.terrain_type] or vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
 						else
-							ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT) * vehicle_update_tickrate / 60
 						end
 
 						if #vehicle_object.path == 0 then
@@ -3247,35 +3337,37 @@ function tickVehicles()
 						refuel(vehicle_id)
 					elseif vehicle_object.state.s == VEHICLE_STATE_HOLDING then
 
-						ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE * vehicle_update_tickrate / 60
+						ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE) * vehicle_update_tickrate / 60
 
 						if vehicle_object.ai_type == AI_TYPE_BOAT then
 							ai_state = 0
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
 							local target = nil
-							local squad_vision = squadGetVisionData(squad)
-							if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
-								target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-							elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
-								target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-							end
-							if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
-								ai_target = target.last_known_pos
-								local distance = m.distance(vehicle_object.transform, ai_target)
-								local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
-								local is_better_pos = false
-								for path_index, path in pairs(possiblePaths) do
-									if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
-										is_better_pos = true
-									end
+							if squad_index ~= RESUPPLY_SQUAD_INDEX then -- makes sure its not resupplying
+								local squad_vision = squadGetVisionData(squad)
+								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
-								if is_better_pos then
-									addPath(vehicle_object, ai_target)
+								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
+									ai_target = target.last_known_pos
+									local distance = m.distance(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
+									local is_better_pos = false
+									for path_index, path in pairs(possiblePaths) do
+										if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
+											is_better_pos = true
+										end
+									end
+									if is_better_pos then
+										addPath(vehicle_object, ai_target)
+									else
+										ai_state = 0
+									end
 								else
 									ai_state = 0
 								end
-							else
-								ai_state = 0
 							end
 						else
 							if #vehicle_object.path == 0 then
@@ -3384,25 +3476,24 @@ function tickVehicles()
 					debug_data = debug_data.."Has Sonar: "..(vehicle_object.vision.is_sonar and "true" or "false").."\n\n"
 
 					if vehicle_object.ai_type == AI_TYPE_BOAT then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT
 					elseif vehicle_object.ai_type == AI_TYPE_PLANE then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE
 					elseif vehicle_object.ai_type == AI_TYPE_HELI then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_HELI
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI
 					elseif vehicle_object.ai_type == AI_TYPE_LAND then
 						if vehicle_object.is_aggressive and vehicle_object.terrain_type then
-							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND)
+							ai_speed_pseudo = (vehicle_object.speed.land[vehicle_object.is_aggressive][vehicle_object.terrain_type] or vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND)
 						else
-							ai_speed_pseudo = AI_SPEED_PSEUDO_LAND
+							ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND
 						end
 					end
 					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
 					
 					if vehicle_object.ai_type == AI_TYPE_LAND then
-						debug_data = debug_data.."Is Agressive: "..vehicle_object.is_aggressive.."\n"
-						debug_data = debug_data.."Terrain Type: "..vehicle_object.terrain_type.."\n"
+						debug_data = debug_data.."Is Agressive: "..tostring(vehicle_object.is_aggressive).."\n"
+						debug_data = debug_data.."Terrain Type: "..tostring(vehicle_object.terrain_type).."\n"
 					end
-
 
 					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
 					if ai_target then
@@ -3453,9 +3544,9 @@ function tickVehicles()
 						b = 57
 						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
-					for player_debugging_id, v in pairs(playerData.isDebugging) do
-						if playerData.isDebugging[player_debugging_id] then
-							s.removeMapObject(player_debugging_id ,vehicle_object.map_id)
+					for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
+						if g_savedata.playerData.isDebugging[player_debugging_id] then
+							s.removeMapObject(player_debugging_id, vehicle_object.map_id)
 							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
@@ -3597,6 +3688,18 @@ function tickModifiers()
 	end
 end
 
+function tickOther()
+	if g_savedata.playerData.isDoAsISay[0] then
+		-- if its been 15 or more seconds since they did the command
+		-- then cancel the command
+		if (g_savedata.tick_counter - g_savedata.playerData.timers.isDoAsISay) >= time.second*15 then
+			wpDLCDebug("Automatically cancelled full reload!", false, false, 0)
+			g_savedata.playerData.isDoAsISay[0] = nil
+			g_savedata.playerData.timers.isDoAsISay = 0
+		end
+	end
+end
+
 function onTick(tick_time)
 	g_tick_counter = g_tick_counter + 1
 	g_savedata.tick_counter = g_savedata.tick_counter + 1
@@ -3613,19 +3716,7 @@ function onTick(tick_time)
 		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
 		end
-
-		--full_reload expire countdown
-		if IS_COUNTING_RELOAD_TICKER then
-			RELOAD_TICK_COUNTER = RELOAD_TICK_COUNTER + 1
-			if RELOAD_TICK_COUNTER >= 900 then
-				IS_COUNTING_RELOAD_TICKER = false
-				RELOAD_TICK_COUNTER = 0
-				wpDLCDebug("Time expired! Run ?impwep full_reload to try again!", false, false, 0)
-				playerData.isDoAsISay.user_peer_id = not playerData.isDoAsISay.user_peer_id
-			end
-		else
-			RELOAD_TICK_COUNTER = 0
-		end
+		tickOther() -- not as important stuff
 	end
 end
 
@@ -3639,11 +3730,15 @@ function refuel(vehicle_id)
     s.setVehicleBattery(vehicle_id, "Battery 2", 1)
 end
 
-function reload(vehicle_id)
-	wpDLCDebug("reloaded: "..vehicle_id, true, false)
-	for i=1, 15 do
-		s.setVehicleWeapon(vehicle_id, "Ammo "..i, 999)
-	end
+function reload(vehicle_id, from_storage)
+	local i = 1
+	repeat
+		local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
+		if success then
+			s.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
+		end
+		i = i + 1
+	until (not success)
 end
 
 --[[
@@ -4202,7 +4297,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 	local sel_veh_type = nil
 	local sel_strat = nil
 	local sel_vehicle = nil
-	if is_specified == true and type(vehicle_list_id) == "number" then
+	if is_specified == true and type(vehicle_list_id) == "number" and g_savedata.constructable_vehicles then
 		sel_role = g_savedata.vehicle_list[vehicle_list_id].role
 		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
 		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
@@ -4214,7 +4309,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		if not sel_vehicle then
 			return false
 		end
-	elseif is_specified == false or type(vehicle_list_id) == "string" then
+	elseif is_specified == false and g_savedata.constructable_vehicles or type(vehicle_list_id) == "string" and g_savedata.constructable_vehicles then
 		local role_chances = {}
 		local veh_type_chances = {}
 		local strat_chances = {}
@@ -4231,26 +4326,34 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		else
 			sel_role = vehicle_list_id
 		end
+		wpDLCDebug("selected role: "..sel_role, true, false)
 		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
 			if type(v) == "table" then
 				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
 			end
 		end
 		sel_veh_type = randChance(veh_type_chances)
+		wpDLCDebug("selected vehicle type: "..sel_veh_type, true, false)
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
 				strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
 			end
 		end
 		sel_strat = randChance(strat_chances)
+		wpDLCDebug("selected strategy: "..sel_strat, true, false)
 		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 			if type(v) == "table" then
 				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
 			end
 		end
 		sel_vehicle = randChance(vehicle_chances)
+		wpDLCDebug("selected vehicle: "..sel_vehicle, true, false)
 	else
-		wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
+		if g_savedata.constructable_vehicles then
+			wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
+		else
+			wpDLCDebug("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, true)
+		end
 		return false
 	end
 	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
