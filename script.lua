@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.24)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.25)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
@@ -239,7 +239,9 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 	-- lets you keep debug mode enabled after reloads
 	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
 		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-			render_debug = true
+			if is_debugging then
+				render_debug = true
+			end
 		end
 	else -- adds the playerdata field to the savedata
 		g_savedata.playerData = {
@@ -527,11 +529,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					s.removeMapObject(0,vehicle_object.map_id)
-					s.removeMapLine(0,vehicle_object.map_id)
+					s.removeMapObject(-1, vehicle_object.map_id)
+					s.removeMapLine(-1, vehicle_object.map_id)
 					for i = 1, #vehicle_object.path - 1 do
 						local waypoint = vehicle_object.path[i]
-						s.removeMapLine(0, waypoint.ui_id)
+						s.removeMapLine(-1, waypoint.ui_id)
 					end
 				end
 			end
@@ -1189,6 +1191,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					elseif command == "debug" then
 						if arg[1] then
 							vehicles_debugging[tonumber(arg[1])] = not vehicles_debugging[tonumber(arg[1])]
+							-- enabled or disabled message
 							local enDis = "dis"
 							if vehicles_debugging[tonumber(arg[1])] then
 								enDis = "en"
@@ -1203,16 +1206,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
 							end
 							
-							local keep_render_debug = false
+							render_debug = false
 							for k, v in pairs(g_savedata.playerData.isDebugging) do
 								if g_savedata.playerData.isDebugging[k] then
 									render_debug = true
-									keep_render_debug = true
 								end
-							end
-
-							if not keep_render_debug then
-								render_debug = false
 							end
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1225,9 +1223,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							end
-
-							s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
-							s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
+							updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
+							updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
 						end
 
 
@@ -2146,6 +2143,10 @@ function tickGamemode()
 	end
 end
 
+
+---@param peer_id integer the id of the player of which you want to update the map data for
+---@param island island[] the island you want to update
+---@param is_reset boolean if you want it to just reset the map, which will remove the island from the map instead of updating it
 function updatePeerIslandMapData(peer_id, island, is_reset)
 	if is_dlc_weapons then
 		local ts_x, ts_y, ts_z = m.position(island.transform)
@@ -2170,21 +2171,17 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				g = 255
 				b = 0
 			end
-
-			if not render_debug then
+			if not g_savedata.playerData.isDebugging[peer_id] then -- checks to see if the player has debug mode disabled
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
-				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-					if g_savedata.playerData.isDebugging[player_debugging_id] then
-						local debug_data = ""
-						debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
-						debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
-						debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
-						if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
+				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
+					local debug_data = ""
+					debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
+					debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
+					debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
+					if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
 
-						
-						s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
-					end
+					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -3551,7 +3548,7 @@ function tickVehicles()
 					end
 					for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
 						if g_savedata.playerData.isDebugging[player_debugging_id] then
-							s.removeMapObject(player_debugging_id ,vehicle_object.map_id)
+							s.removeMapObject(player_debugging_id, vehicle_object.map_id)
 							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
