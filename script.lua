@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.3.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.3.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1104,6 +1104,12 @@ local player_commands = {
 			desc = "lets you set the ai's scout level on a specific island, from 0 to 100 for 0% scouted to 100% scouted",
 			args = "(island_name) (0-100)",
 			example = "?impwep si North_Harbour 100",
+		},
+		setting = {
+			short_desc = "lets you change or get a specific setting and can get a list of all settings",
+			desc = "if you do not input the setting name, it will show a list of all valid settings, if you input a setting name but not a value, it will tell you the setting's current value, if you enter both the setting name and the setting value, it will change that setting to that value",
+			args = "[setting_name] [value]",
+			example = "?impwep setting MAX_BOAT_AMOUNT 5\n?impwep setting MAX_BOAT_AMOUNT\n?impwep setting",
 		}
 	},
 	host = {
@@ -1128,7 +1134,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if command == "info" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
-					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION..": The "..IMPROVED_CONQUEST_UPDATE_NAME.." Update", false, false, user_peer_id)
+					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
 					if g_savedata.info.has_default_addon then
 						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
 					end
@@ -1377,6 +1383,48 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 						else
 							wpDLCDebug("Invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
+						end
+
+					
+					-- arg 1: setting name (optional)
+					-- arg 2: value (optional)
+					elseif command == "setting" then
+						if not arg[1] then
+							-- we want to print a list of all settings they can change
+							wpDLCDebug("\nAll Improved Conquest Mode Settings", false, false, user_peer_id)
+							for setting_name, setting_value in pairs(g_savedata.settings) do
+								wpDLCDebug("-----\nSetting Name: "..setting_name.."\nSetting Type: "..type(setting_value), false, false, user_peer_id)
+							end
+						elseif g_savedata.settings[arg[1]] then -- makes sure the setting they selected exists
+							if not arg[2] then
+								-- print the current value of the setting they selected
+								wpDLCDebug(arg[1].."'s current value: "..g_savedata.settings[arg[1]])
+							else
+								-- change the value of the setting they selected
+								if type(g_savedata.settings[arg[1]]) == "number" then
+									if tonumber(arg[2]) then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = tonumber(arg[2])
+									else
+										wpDLCDebug(arg[2].." is not a valid value! it must be a number!", false, true, user_peer_id)
+									end
+								elseif g_savedata.settings[arg[1]] == true or g_savedata.settings[arg[1]] == false then
+									if arg[2] == "true" then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = true
+									elseif arg[2] == "false" then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = false
+									else
+										wpDLCDebug(arg[2].." is not a valid value! it must be either \"true\" or \"false\"!", false, true, user_peer_id)
+									end
+								else
+									wpDLCDebug("g_savedata.settings."..arg[1].." is not a number or a boolean! please report this as a bug! Value of g_savedata.settings."..arg[1]..":"..g_savedata.settings[arg[1]], false, true, user_peer_id)
+								end
+							end
+						else 
+							-- the setting they selected does not exist
+							wpDLCDebug(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, true, user_peer_id)
 						end
 					end
 				else
@@ -3077,8 +3125,9 @@ function tickSquadrons()
 	end
 end
 
-function tickVisionRadius()
+function tickVision()
 
+	-- get the ai's vision radius
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, 240) then
@@ -3093,9 +3142,6 @@ function tickVisionRadius()
 			end
 		end
 	end
-end
-
-function tickVision()
 
 	-- analyse player vehicles
 	for player_vehicle_id, player_vehicle in pairs(g_savedata.player_vehicles) do
@@ -3123,13 +3169,9 @@ function tickVision()
 
 							local local_vision_radius = vehicle_object.vision.radius
 
-							-- radar and sonar adjustments
-							if player_vehicle_transform[14] >= -1 and vehicle_object.vision.is_radar then
-								local_vision_radius = local_vision_radius * 3
-							end
-
-							if player_vehicle_transform[14] < -1 and vehicle_object.vision.is_sonar == false then
-								local_vision_radius = local_vision_radius * 0.4
+							if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
+								-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
+								local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
 							end
 							
 							if distance < local_vision_radius and player_vehicle.death_pos == nil then
@@ -3725,7 +3767,6 @@ function onTick(tick_time)
 
 	if is_dlc_weapons then
 		tickUpdateVehicleData()
-		tickVisionRadius()
 		tickVision()
 		tickGamemode()
 		tickAI()
