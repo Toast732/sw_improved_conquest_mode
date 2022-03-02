@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.2.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE" 
-local IS_DEVELOPMENT_VERSION = true
+local IS_DEVELOPMENT_VERSION = false
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
