@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.1.23)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.1.24)"
 
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
@@ -250,6 +250,15 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 			},
 		}
 	end
+
+	-- compatibility check for the new settings
+	if not g_savedata.settings.MAX_HELI_AMOUNT then
+		g_savedata.settings.MAX_BOAT_AMOUNT = 10
+		g_savedata.settings.MAX_LAND_AMOUNT = 10
+		g_savedata.settings.MAX_PLANE_AMOUNT = 10
+		g_savedata.settings.MAX_HELI_AMOUNT = 10
+		g_savedata.settings.MAX_TURRET_AMOUNT = 3
+	end
 end
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
@@ -257,14 +266,17 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		g_savedata.settings = {
 			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
 			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
-			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
-			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
-			ISLAND_COUNT = property.slider("Island Count - Total AI Max will be 3x this value", 7, 19, 1, 19),
-			MAX_PLANE_SIZE = property.slider("AI Planes Max", 0, 8, 1, 2),
-			MAX_HELI_SIZE = property.slider("AI Helis Max", 0, 8, 1, 5),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
 			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
+			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
+			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
+			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
+			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
+			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
+			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
+			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
+			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
 		}
 	end
 
@@ -579,14 +591,26 @@ function buildPrefabs(location_index)
 end
 
 function spawnTurret(island)
-	local selected_prefab = sm.spawn(true, "turret") 
+	local selected_prefab = sm.spawn(true, "turret")
 
 	if (#island.zones < 1) then return end
+
+	local turret_count = 0
+
+	for turret_zone_index, turret_zone in pairs(island.zones) do
+		if turret_zone.is_spawned then turret_count = turret_count + 1 end
+	end
+
+	if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then return end
 
 	local spawnbox_index = math.random(1, #island.zones)
 	if island.zones[spawnbox_index].is_spawned == true then
 		return
 	end
+	
+	local player_list = s.getPlayers()
+	if not playersNotNearby(player_list, island.zones[spawnbox_index].transform, 3000, true) then return end -- makes sure players are not too close before spawning a turret
+
 	island.zones[spawnbox_index].is_spawned = true
 	local spawn_transform = island.zones[spawnbox_index].transform
 
@@ -640,15 +664,20 @@ function spawnTurret(island)
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				normal = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or 0,
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or 0,
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or 0
+				land = {
+					normal = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or 0,
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or 0,
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or 0
+					},
+					aggressive = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or 0,
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or 0,
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
+					}
 				},
-				aggressive = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or 0,
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or 0,
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or 0
+				not_land = {
+					pseudo_speed = getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
 				}
 			},
 			capabilities = {
@@ -683,6 +712,7 @@ function spawnAIVehicle(requested_prefab)
 	local heli_count = 0
 	local army_count = 0
 	local land_count = 0
+	local boat_count = 0
 	
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -690,6 +720,7 @@ function spawnAIVehicle(requested_prefab)
 			if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 			if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
+			if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
 		end
 	end
 
@@ -701,6 +732,20 @@ function spawnAIVehicle(requested_prefab)
 		selected_prefab = sm.spawn(true, requested_prefab) 
 	else
 		selected_prefab = sm.spawn(false)
+	end
+
+	if not requested_prefab then
+		if selected_prefab.ai_type == AI_TYPE_BOAT and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
+			return false, "boat limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_LAND and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
+			return false, "land limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_HELI and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
+			return false, "heli limit reached"
+		elseif selected_prefab.ai_type == AI_TYPE_PLANE and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
+			return false, "plane limit reached"
+		elseif army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
+			return false, "too many ai vehicles"
+		end
 	end
 
 	local player_list = s.getPlayers()
@@ -837,19 +882,7 @@ function spawnAIVehicle(requested_prefab)
 			return false
 		end
 	else
-		if
-			hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count <= g_savedata.settings.MAX_HELI_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count <= g_savedata.settings.MAX_PLANE_SIZE 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and requested_prefab 
-			or hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and requested_prefab 
-			then
-
-			spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
-		else
-			wpDLCDebug("unable to spawn vehicle, attempting to spawn another vehicle...", true, false)
-			spawnAIVehicle()
-			return false
-		end
+		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 	end
 
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -921,15 +954,20 @@ function spawnAIVehicle(requested_prefab)
 				distance = getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				normal = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal"),
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal"),
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal")
+				land = {
+					normal = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal"),
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal"),
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal")
+					},
+					aggressive = {
+						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive"),
+						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
+						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
+					}
 				},
-				aggressive = {
-					road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive"),
-					bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive"),
-					offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive")
+				not_land = {
+					pseudo_speed = getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
 				}
 			},
 			capabilities = {
@@ -3218,16 +3256,16 @@ function tickVehicles()
 				end
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
-				local ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
+				local ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT) * vehicle_update_tickrate / 60
 
 				if(vehicle_object.ai_type ~= AI_TYPE_TURRET) then
 
 					if vehicle_object.state.s == VEHICLE_STATE_PATHING then
 
 						if vehicle_object.ai_type == AI_TYPE_PLANE then
-							ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE) * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_HELI then
-							ai_speed_pseudo = AI_SPEED_PSEUDO_HELI * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI) * vehicle_update_tickrate / 60
 						elseif vehicle_object.ai_type == AI_TYPE_LAND then
 							vehicle_object.terrain_type = "offroad"
 							vehicle_object.is_aggressive = "normal"
@@ -3242,9 +3280,9 @@ function tickVehicles()
 								vehicle_object.terrain_type = "bridge"
 							end
 
-							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.land[vehicle_object.is_aggressive][vehicle_object.terrain_type] or vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND) * vehicle_update_tickrate / 60
 						else
-							ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT * vehicle_update_tickrate / 60
+							ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT) * vehicle_update_tickrate / 60
 						end
 
 						if #vehicle_object.path == 0 then
@@ -3304,7 +3342,7 @@ function tickVehicles()
 						refuel(vehicle_id)
 					elseif vehicle_object.state.s == VEHICLE_STATE_HOLDING then
 
-						ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE * vehicle_update_tickrate / 60
+						ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE) * vehicle_update_tickrate / 60
 
 						if vehicle_object.ai_type == AI_TYPE_BOAT then
 							ai_state = 0
@@ -3443,16 +3481,16 @@ function tickVehicles()
 					debug_data = debug_data.."Has Sonar: "..(vehicle_object.vision.is_sonar and "true" or "false").."\n\n"
 
 					if vehicle_object.ai_type == AI_TYPE_BOAT then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_BOAT
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT
 					elseif vehicle_object.ai_type == AI_TYPE_PLANE then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_PLANE
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE
 					elseif vehicle_object.ai_type == AI_TYPE_HELI then
-						ai_speed_pseudo = AI_SPEED_PSEUDO_HELI
+						ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI
 					elseif vehicle_object.ai_type == AI_TYPE_LAND then
 						if vehicle_object.is_aggressive and vehicle_object.terrain_type then
-							ai_speed_pseudo = (vehicle_object.speed[vehicle_object.is_aggressive][vehicle_object.terrain_type] or AI_SPEED_PSEUDO_LAND)
+							ai_speed_pseudo = (vehicle_object.speed.land[vehicle_object.is_aggressive][vehicle_object.terrain_type] or vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND)
 						else
-							ai_speed_pseudo = AI_SPEED_PSEUDO_LAND
+							ai_speed_pseudo = vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND
 						end
 					end
 					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
