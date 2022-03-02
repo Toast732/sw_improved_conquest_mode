@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.3.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.3.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -200,9 +200,9 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 				s.announce(deb_err, message, toPlayer)
 			end
 		else
-			for k, v in pairs(g_savedata.playerData.isDebugging) do
-				if g_savedata.playerData.isDebugging[k] then
-					s.announce(deb_err, message, k)
+			for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+				if is_debugging then
+					s.announce(deb_err, message, player_id)
 				end
 			end
 		end
@@ -1224,8 +1224,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 							
 							render_debug = false
-							for k, v in pairs(g_savedata.playerData.isDebugging) do
-								if g_savedata.playerData.isDebugging[k] then
+							for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+								if is_debugging then
 									render_debug = true
 								end
 							end
@@ -1240,6 +1240,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							end
+
+							for island_index, island in pairs(g_savedata.controllable_islands) do
+								updatePeerIslandMapData(user_peer_id, island)
+							end
+							
 							updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
 							updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
 						end
@@ -1658,6 +1663,14 @@ function captureIsland(island, override, peer_id)
 	elseif island.capture_timer < 0 then -- if its less than 0% island capture
 		island.capture_timer = 0
 	end
+
+	if render_debug then
+		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+			if is_debugging then
+				updatePeerIslandMapData(player_id, island)
+			end
+		end
+	end
 end
 
 function onPlayerJoin(steam_id, name, peer_id)
@@ -1789,14 +1802,14 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	wpDLCDebug("cleaned vehicle: "..vehicle_id, true, false)
-	for k, v in pairs(g_savedata.playerData.isDebugging) do
-		if g_savedata.playerData.isDebugging[k] then
+	for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+		if is_debugging then
 
-			s.removeMapObject(k ,vehicle_object.map_id)
-			s.removeMapLine(k ,vehicle_object.map_id)
+			s.removeMapObject(player_id ,vehicle_object.map_id)
+			s.removeMapLine(player_id ,vehicle_object.map_id)
 			for i = 1, #vehicle_object.path - 1 do
 				local waypoint = vehicle_object.path[i]
-				s.removeMapLine(k, waypoint.ui_id)
+				s.removeMapLine(player_id, waypoint.ui_id)
 			end
 		end
 	end
@@ -2160,41 +2173,59 @@ function tickGamemode()
 				local heli_count = 0
 				local army_count = 0
 				local land_count = 0
+				local boat_count = 0
 				local turret_count = 0
 			
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
 					end
 				end
 
+				local ai_islands = 1
+				for island_index, island in pairs(g_savedata.controllable_islands) do
+					if island.faction == FACTION_AI then
+						ai_islands = ai_islands + 1
+					end
+				end
+
 				local t, a = getObjectiveIsland()
-				local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
-				debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
-				debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
-				debug_data = debug_data .. "Land_Count: " .. tostring(land_count) .. "\n"
-				debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
-				debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
-				debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
-				debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
+
+				local ai_base_island_turret_count = 0
+				for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones) do
+					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+				end
+
+				local debug_data = ""
+				debug_data = debug_data.."--- This Island's Statistics ---\n\n"
+				debug_data = debug_data.."Number of Turrets: "..ai_base_island_turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+				debug_data = debug_data.."\n--- Global Statistics ---\n\n"
+				debug_data = debug_data .. "Total AI Vehicles: "..army_count.."/"..(g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT).."\n"
+				debug_data = debug_data .. "Total Sea Vehicles: "..boat_count.."/"..g_savedata.settings.MAX_BOAT_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Helicopters: "..heli_count.."/"..g_savedata.settings.MAX_HELI_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Planes: "..plane_count.."/"..g_savedata.settings.MAX_PLANE_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Land Vehicles: "..land_count.."/"..g_savedata.settings.MAX_LAND_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Turrets: "..turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT*ai_islands.."\n"
+				debug_data = debug_data .. "\nNumber of Squads: "..g_count_squads.."\n"
 
 				if t then
-					debug_data = debug_data .. "Target: " .. t.name .. "\n"
+					debug_data = debug_data .. "Attacking: " .. t.name .. "\n"
 				end
 				if a then
-					debug_data = debug_data .. " Ally: " .. a.name
+					debug_data = debug_data .. " Attacking From: " .. a.name
 				end
-				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-					if g_savedata.playerData.isDebugging[player_debugging_id] then
-						s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
+				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+					if is_debugging then
+						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 255, 0, 0, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
-						s.removeMapObject(player_debugging_id, g_savedata.player_base_island.map_id)
-						s.addMapObject(player_debugging_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
+						s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
+						s.addMapObject(player_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
 					end
 				end
 			end
@@ -2234,11 +2265,19 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
+					local turret_amount = 0
+					for turret_zone_index, turret_zone in pairs(island.zones) do
+						if turret_zone.is_spawned then turret_amount = turret_amount + 1 end
+					end
+					
 					local debug_data = ""
 					debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
 					debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
 					debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
-					if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
+					if island.faction == FACTION_AI then 
+						debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders.."\n"
+						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+					end
 
 					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
@@ -3210,10 +3249,10 @@ function tickVision()
 				if recent_spotter ~= nil then debug_data = debug_data .. "\nspotter: " .. player_vehicle.recent_spotter end
 				if last_known_pos ~= nil then debug_data = debug_data .. "last_known_pos: " end
 				if death_pos ~= nil then debug_data = debug_data .. "death_pos: " end
-				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-					if g_savedata.playerData.isDebugging[player_debugging_id] then
-						s.removeMapObject(player_debugging_id, player_vehicle.map_id)
-						s.addMapObject(player_debugging_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
+				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+					if is_debugging then
+						s.removeMapObject(player_id, player_vehicle.map_id)
+						s.addMapObject(player_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
 					end
 				end
 			end
@@ -3605,15 +3644,15 @@ function tickVehicles()
 						b = 57
 						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
-					for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-						if g_savedata.playerData.isDebugging[player_debugging_id] then
-							s.removeMapObject(player_debugging_id, vehicle_object.map_id)
-							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+					for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+						if is_debugging then
+							s.removeMapObject(player_id, vehicle_object.map_id)
+							s.addMapObject(player_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
-								s.removeMapLine(player_debugging_id, vehicle_object.map_id)
+								s.removeMapLine(player_id, vehicle_object.map_id)
 
-								s.addMapLine(player_debugging_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
+								s.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
 
 								for i = 1, #vehicle_object.path - 1 do
 									local waypoint = vehicle_object.path[i]
@@ -3622,8 +3661,8 @@ function tickVehicles()
 									local waypoint_pos = m.translation(waypoint.x, waypoint.y, waypoint.z)
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
-									s.removeMapLine(player_debugging_id, waypoint.ui_id)
-									s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
+									s.removeMapLine(player_id, waypoint.ui_id)
+									s.addMapLine(player_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
 								end
 							end
 						end
