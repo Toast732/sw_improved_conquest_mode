@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.3)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.1)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
-local IS_DEVELOPMENT_VERSION = false
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -3820,13 +3820,33 @@ function onTick(tick_time)
 end
 
 function refuel(vehicle_id)
-    s.setVehicleTank(vehicle_id, "Jet 1", 999, 2)
-    s.setVehicleTank(vehicle_id, "Jet 2", 999, 2)
-    s.setVehicleTank(vehicle_id, "Jet 3", 999, 2)
-    s.setVehicleTank(vehicle_id, "Diesel 1", 999, 1)
-    s.setVehicleTank(vehicle_id, "Diesel 2", 999, 1)
-    s.setVehicleBattery(vehicle_id, "Battery 1", 1)
-    s.setVehicleBattery(vehicle_id, "Battery 2", 1)
+	-- jet fuel
+	local i = 1
+	repeat
+		local tank_data, success = s.getVehicleTank(vehicle_id, "Jet "..i) -- checks if the next jet fuel container exists
+		if success then
+			s.setVehicleTank(vehicle_id, "Jet "..i, tank_data.capacity, 2) -- refuel the jet fuel container
+		end
+		i = i + 1
+	until (not success)
+	-- diesel
+	local i = 1
+	repeat
+		local tank_data, success = s.getVehicleTank(vehicle_id, "Diesel "..i) -- checks if the next diesel container exists
+		if success then
+			s.setVehicleTank(vehicle_id, "Diesel "..i, tank_data.capacity, 1) -- refuel the jet fuel container
+		end
+		i = i + 1
+	until (not success)
+	-- batteries
+	local i = 1
+	repeat
+		local batt_data, success = s.getVehicleBattery(vehicle_id, "Diesel "..i) -- check if the next battery exists
+		if success then
+			s.setVehicleBattery(vehicle_id, "Battery "..i, 1) -- charge the battery
+		end
+		i = i + 1
+	until (not success)
 end
 
 function reload(vehicle_id, from_storage)
