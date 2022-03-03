@@ -4,13 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE" 
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
 local IS_DEVELOPMENT_VERSION = false
 
 local MAX_SQUAD_SIZE = 3
@@ -200,9 +200,9 @@ function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
 				s.announce(deb_err, message, toPlayer)
 			end
 		else
-			for k, v in pairs(g_savedata.playerData.isDebugging) do
-				if g_savedata.playerData.isDebugging[k] then
-					s.announce(deb_err, message, k)
+			for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+				if is_debugging then
+					s.announce(deb_err, message, player_id)
 				end
 			end
 		end
@@ -767,6 +767,12 @@ function spawnAIVehicle(requested_prefab)
 	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
 	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" or getTagValue(selected_prefab.vehicle.tags, "role") == "scout" then
 		target, ally = getObjectiveIsland()
+		if not target then
+			sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
+			sm.train(PUNISH, attack, 5)
+			spawnAIVehicle()
+			return
+		end
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
@@ -1098,6 +1104,12 @@ local player_commands = {
 			desc = "lets you set the ai's scout level on a specific island, from 0 to 100 for 0% scouted to 100% scouted",
 			args = "(island_name) (0-100)",
 			example = "?impwep si North_Harbour 100",
+		},
+		setting = {
+			short_desc = "lets you change or get a specific setting and can get a list of all settings",
+			desc = "if you do not input the setting name, it will show a list of all valid settings, if you input a setting name but not a value, it will tell you the setting's current value, if you enter both the setting name and the setting value, it will change that setting to that value",
+			args = "[setting_name] [value]",
+			example = "?impwep setting MAX_BOAT_AMOUNT 5\n?impwep setting MAX_BOAT_AMOUNT\n?impwep setting",
 		}
 	},
 	host = {
@@ -1122,7 +1134,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if command == "info" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
-					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION..": The "..IMPROVED_CONQUEST_UPDATE_NAME.." Update", false, false, user_peer_id)
+					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
 					if g_savedata.info.has_default_addon then
 						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
 					end
@@ -1212,8 +1224,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 							
 							render_debug = false
-							for k, v in pairs(g_savedata.playerData.isDebugging) do
-								if g_savedata.playerData.isDebugging[k] then
+							for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+								if is_debugging then
 									render_debug = true
 								end
 							end
@@ -1228,6 +1240,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							end
+
+							for island_index, island in pairs(g_savedata.controllable_islands) do
+								updatePeerIslandMapData(user_peer_id, island)
+							end
+							
 							updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
 							updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
 						end
@@ -1371,6 +1388,48 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							end
 						else
 							wpDLCDebug("Invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
+						end
+
+					
+					-- arg 1: setting name (optional)
+					-- arg 2: value (optional)
+					elseif command == "setting" then
+						if not arg[1] then
+							-- we want to print a list of all settings they can change
+							wpDLCDebug("\nAll Improved Conquest Mode Settings", false, false, user_peer_id)
+							for setting_name, setting_value in pairs(g_savedata.settings) do
+								wpDLCDebug("-----\nSetting Name: "..setting_name.."\nSetting Type: "..type(setting_value), false, false, user_peer_id)
+							end
+						elseif g_savedata.settings[arg[1]] then -- makes sure the setting they selected exists
+							if not arg[2] then
+								-- print the current value of the setting they selected
+								wpDLCDebug(arg[1].."'s current value: "..g_savedata.settings[arg[1]])
+							else
+								-- change the value of the setting they selected
+								if type(g_savedata.settings[arg[1]]) == "number" then
+									if tonumber(arg[2]) then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = tonumber(arg[2])
+									else
+										wpDLCDebug(arg[2].." is not a valid value! it must be a number!", false, true, user_peer_id)
+									end
+								elseif g_savedata.settings[arg[1]] == true or g_savedata.settings[arg[1]] == false then
+									if arg[2] == "true" then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = true
+									elseif arg[2] == "false" then
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										g_savedata.settings[arg[1]] = false
+									else
+										wpDLCDebug(arg[2].." is not a valid value! it must be either \"true\" or \"false\"!", false, true, user_peer_id)
+									end
+								else
+									wpDLCDebug("g_savedata.settings."..arg[1].." is not a number or a boolean! please report this as a bug! Value of g_savedata.settings."..arg[1]..":"..g_savedata.settings[arg[1]], false, true, user_peer_id)
+								end
+							end
+						else 
+							-- the setting they selected does not exist
+							wpDLCDebug(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, true, user_peer_id)
 						end
 					end
 				else
@@ -1604,6 +1663,14 @@ function captureIsland(island, override, peer_id)
 	elseif island.capture_timer < 0 then -- if its less than 0% island capture
 		island.capture_timer = 0
 	end
+
+	if render_debug then
+		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+			if is_debugging then
+				updatePeerIslandMapData(player_id, island)
+			end
+		end
+	end
 end
 
 function onPlayerJoin(steam_id, name, peer_id)
@@ -1735,14 +1802,14 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	wpDLCDebug("cleaned vehicle: "..vehicle_id, true, false)
-	for k, v in pairs(g_savedata.playerData.isDebugging) do
-		if g_savedata.playerData.isDebugging[k] then
+	for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+		if is_debugging then
 
-			s.removeMapObject(k ,vehicle_object.map_id)
-			s.removeMapLine(k ,vehicle_object.map_id)
+			s.removeMapObject(player_id ,vehicle_object.map_id)
+			s.removeMapLine(player_id ,vehicle_object.map_id)
 			for i = 1, #vehicle_object.path - 1 do
 				local waypoint = vehicle_object.path[i]
-				s.removeMapLine(k, waypoint.ui_id)
+				s.removeMapLine(player_id, waypoint.ui_id)
 			end
 		end
 	end
@@ -2106,41 +2173,59 @@ function tickGamemode()
 				local heli_count = 0
 				local army_count = 0
 				local land_count = 0
+				local boat_count = 0
 				local turret_count = 0
 			
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
+						if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
 						if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
 					end
 				end
 
+				local ai_islands = 1
+				for island_index, island in pairs(g_savedata.controllable_islands) do
+					if island.faction == FACTION_AI then
+						ai_islands = ai_islands + 1
+					end
+				end
+
 				local t, a = getObjectiveIsland()
-				local debug_data = "Air_Staged: " .. tostring(g_is_air_ready) .. "\n"
-				debug_data = debug_data .. "Sea_Staged: " .. tostring(g_is_boats_ready) .. "\n"
-				debug_data = debug_data .. "Army_Count: " .. tostring(army_count) .. "\n"
-				debug_data = debug_data .. "Land_Count: " .. tostring(land_count) .. "\n"
-				debug_data = debug_data .. "Turret_Count: " .. tostring(turret_count) .. "\n"
-				debug_data = debug_data .. "Squad Count: " .. tostring(g_count_squads) .. "\n"
-				debug_data = debug_data .. "Attack Count: " .. tostring(g_count_attack) .. "\n"
-				debug_data = debug_data .. "Patrol Count: " .. tostring(g_count_patrol) .. "\n"
+
+				local ai_base_island_turret_count = 0
+				for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones) do
+					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+				end
+
+				local debug_data = ""
+				debug_data = debug_data.."--- This Island's Statistics ---\n\n"
+				debug_data = debug_data.."Number of Turrets: "..ai_base_island_turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+				debug_data = debug_data.."\n--- Global Statistics ---\n\n"
+				debug_data = debug_data .. "Total AI Vehicles: "..army_count.."/"..(g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT).."\n"
+				debug_data = debug_data .. "Total Sea Vehicles: "..boat_count.."/"..g_savedata.settings.MAX_BOAT_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Helicopters: "..heli_count.."/"..g_savedata.settings.MAX_HELI_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Planes: "..plane_count.."/"..g_savedata.settings.MAX_PLANE_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Land Vehicles: "..land_count.."/"..g_savedata.settings.MAX_LAND_AMOUNT.."\n"
+				debug_data = debug_data .. "Total Turrets: "..turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT*ai_islands.."\n"
+				debug_data = debug_data .. "\nNumber of Squads: "..g_count_squads.."\n"
 
 				if t then
-					debug_data = debug_data .. "Target: " .. t.name .. "\n"
+					debug_data = debug_data .. "Attacking: " .. t.name .. "\n"
 				end
 				if a then
-					debug_data = debug_data .. " Ally: " .. a.name
+					debug_data = debug_data .. " Attacking From: " .. a.name
 				end
-				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-					if g_savedata.playerData.isDebugging[player_debugging_id] then
-						s.addMapObject(player_debugging_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 0, 0, 255, 255)
+				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+					if is_debugging then
+						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 255, 0, 0, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
-						s.removeMapObject(player_debugging_id, g_savedata.player_base_island.map_id)
-						s.addMapObject(player_debugging_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 0, 255, 255)
+						s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
+						s.addMapObject(player_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
 					end
 				end
 			end
@@ -2180,11 +2265,19 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
+					local turret_amount = 0
+					for turret_zone_index, turret_zone in pairs(island.zones) do
+						if turret_zone.is_spawned then turret_amount = turret_amount + 1 end
+					end
+					
 					local debug_data = ""
 					debug_data = debug_data.."\nScout Progress: "..math.floor(g_savedata.ai_knowledge.scout[island.name].scouted/scout_requirement*100).."%"
 					debug_data = debug_data.."\n\nNumber of AI Capturing: "..island.ai_capturing
 					debug_data = debug_data.."\nNumber of Players Capturing: "..island.players_capturing
-					if island.faction == FACTION_AI then debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders end
+					if island.faction == FACTION_AI then 
+						debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders.."\n"
+						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+					end
 
 					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
@@ -2679,9 +2772,11 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 				end
 			else -- if it is a scout vehicle, we instead want to reset its progress on whatever island it was on
 				target_island, origin_island = getObjectiveIsland(true)
-				g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
-				target_island.is_scouting = false
-				g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+				if target_island then
+					g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
+					target_island.is_scouting = false
+					g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+				end
 			end
 		end
 
@@ -3069,8 +3164,9 @@ function tickSquadrons()
 	end
 end
 
-function tickVisionRadius()
+function tickVision()
 
+	-- get the ai's vision radius
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, 240) then
@@ -3085,9 +3181,6 @@ function tickVisionRadius()
 			end
 		end
 	end
-end
-
-function tickVision()
 
 	-- analyse player vehicles
 	for player_vehicle_id, player_vehicle in pairs(g_savedata.player_vehicles) do
@@ -3115,13 +3208,9 @@ function tickVision()
 
 							local local_vision_radius = vehicle_object.vision.radius
 
-							-- radar and sonar adjustments
-							if player_vehicle_transform[14] >= -1 and vehicle_object.vision.is_radar then
-								local_vision_radius = local_vision_radius * 3
-							end
-
-							if player_vehicle_transform[14] < -1 and vehicle_object.vision.is_sonar == false then
-								local_vision_radius = local_vision_radius * 0.4
+							if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
+								-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
+								local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
 							end
 							
 							if distance < local_vision_radius and player_vehicle.death_pos == nil then
@@ -3160,10 +3249,10 @@ function tickVision()
 				if recent_spotter ~= nil then debug_data = debug_data .. "\nspotter: " .. player_vehicle.recent_spotter end
 				if last_known_pos ~= nil then debug_data = debug_data .. "last_known_pos: " end
 				if death_pos ~= nil then debug_data = debug_data .. "death_pos: " end
-				for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-					if g_savedata.playerData.isDebugging[player_debugging_id] then
-						s.removeMapObject(player_debugging_id, player_vehicle.map_id)
-						s.addMapObject(player_debugging_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
+				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+					if is_debugging then
+						s.removeMapObject(player_id, player_vehicle.map_id)
+						s.addMapObject(player_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
 					end
 				end
 			end
@@ -3227,28 +3316,32 @@ function tickVehicles()
 				-- scout vehicles
 				if vehicle_object.role == "scout" then
 					local target_island, origin_island = getObjectiveIsland(true)
-					if g_savedata.ai_knowledge.scout[target_island.name].scouted < scout_requirement then
-						if #vehicle_object.path == 0 then -- if its finishing circling the island
-							setSquadCommandScout(squad)
-						end
-						local attack_target_island, attack_origin_island = getObjectiveIsland()
-						if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
-							if attack_target_island.name == target_island.name then -- if the scout is scouting the island that the ai wants to attack
-								-- scout it normally
-								if target_island.faction == FACTION_NEUTRAL then
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate * 4, 0, scout_requirement)
-								else
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
-								end
-							else -- if the scout is scouting an island that the ai is not ready to attack
-								-- scout it 4x slower
-								if target_island.faction == FACTION_NEUTRAL then
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
-								else
-									g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate / 4, 0, scout_requirement)
+					if target_island then -- makes sure there is a target island
+						if g_savedata.ai_knowledge.scout[target_island.name].scouted < scout_requirement then
+							if #vehicle_object.path == 0 then -- if its finishing circling the island
+								setSquadCommandScout(squad)
+							end
+							local attack_target_island, attack_origin_island = getObjectiveIsland()
+							if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
+								if attack_target_island.name == target_island.name then -- if the scout is scouting the island that the ai wants to attack
+									-- scout it normally
+									if target_island.faction == FACTION_NEUTRAL then
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate * 4, 0, scout_requirement)
+									else
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
+									end
+								else -- if the scout is scouting an island that the ai is not ready to attack
+									-- scout it 4x slower
+									if target_island.faction == FACTION_NEUTRAL then
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate, 0, scout_requirement)
+									else
+										g_savedata.ai_knowledge.scout[target_island.name].scouted = math.clamp(g_savedata.ai_knowledge.scout[target_island.name].scouted + vehicle_update_tickrate / 4, 0, scout_requirement)
+									end
 								end
 							end
 						end
+					else
+						setSquadCommandDefend(squad, g_savedata.ai_base_island)
 					end
 				end
 
@@ -3551,15 +3644,15 @@ function tickVehicles()
 						b = 57
 						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
-					for player_debugging_id, v in pairs(g_savedata.playerData.isDebugging) do
-						if g_savedata.playerData.isDebugging[player_debugging_id] then
-							s.removeMapObject(player_debugging_id, vehicle_object.map_id)
-							s.addMapObject(player_debugging_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+					for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+						if is_debugging then
+							s.removeMapObject(player_id, vehicle_object.map_id)
+							s.addMapObject(player_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
-								s.removeMapLine(player_debugging_id, vehicle_object.map_id)
+								s.removeMapLine(player_id, vehicle_object.map_id)
 
-								s.addMapLine(player_debugging_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
+								s.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
 
 								for i = 1, #vehicle_object.path - 1 do
 									local waypoint = vehicle_object.path[i]
@@ -3568,8 +3661,8 @@ function tickVehicles()
 									local waypoint_pos = m.translation(waypoint.x, waypoint.y, waypoint.z)
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
-									s.removeMapLine(player_debugging_id, waypoint.ui_id)
-									s.addMapLine(player_debugging_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
+									s.removeMapLine(player_id, waypoint.ui_id)
+									s.addMapLine(player_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
 								end
 							end
 						end
@@ -3713,7 +3806,6 @@ function onTick(tick_time)
 
 	if is_dlc_weapons then
 		tickUpdateVehicleData()
-		tickVisionRadius()
 		tickVision()
 		tickGamemode()
 		tickAI()
