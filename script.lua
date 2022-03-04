@@ -1,10 +1,14 @@
+-- library prefixes
 local spawnModifiers = {}
+local cargo = {}
+local cache = {}
 
+-- shortened library names
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -28,6 +32,8 @@ local COMMAND_RESUPPLY = "resupply"
 local COMMAND_TURRET = "turret"
 local COMMAND_RETREAT = "retreat"
 local COMMAND_SCOUT = "scout"
+local COMMAND_CARGO = "cargo"
+local COMMAND_ESCORT = "escort"
 
 local AI_TYPE_BOAT = "boat"
 local AI_TYPE_LAND = "land"
@@ -179,6 +185,15 @@ g_savedata = {
 			isDoAsISay = 0,
 		},
 	},
+	cache = {
+		cargo = {
+			island_distances = {
+				sea = {},
+				land = {},
+				air = {}
+			}
+		}
+	}
 }
 
 if render_debug then
@@ -2375,7 +2390,7 @@ function tickAI()
 			end
 		end
 
-		if isTickID(0, 60) then
+		if isTickID(60, 60) then
 			g_count_squads = 0
 			g_count_attack = 0
 			g_count_patrol = 0
@@ -3305,7 +3320,7 @@ end
 
 function tickVehicles()
 	local vehicle_update_tickrate = 30
-	if isTickID(0, 60) then
+	if isTickID(60, 60) then
 		debug_mode_blinker = not debug_mode_blinker
 	end
 
@@ -3652,7 +3667,7 @@ function tickVehicles()
 							if(#vehicle_object.path >= 1) then
 								s.removeMapLine(player_id, vehicle_object.map_id)
 
-								s.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
+								server.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
 
 								for i = 1, #vehicle_object.path - 1 do
 									local waypoint = vehicle_object.path[i]
@@ -4383,12 +4398,186 @@ function randChance(t)
 	return win_name
 end
 
+--------------------------------------------------------------------------------
+--
+-- Cache Functions (mostly for debugging purposes, and is easier to see where caching is used)
+--
+--------------------------------------------------------------------------------
+
+---@param location g_savedata[] where to write the data
+---@param data any the data to write at the location
+---@return boolean write_successful if writing the data to the cache was successful
+function cache.write(location, data)
+
+	if type(g_savedata.cache[location]) ~= "table" then
+		wpDLCDebug("Data currently at the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+	end
+
+	g_savedata.cache[location] = data
+
+	if type(g_savedata.cache[location]) ~= "table" then
+		wpDLCDebug("Data written to the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+	end
+
+	if g_savedata.cache[location] == data then
+		return true
+	else
+		return false
+	end
+end
+
+
+--------------------------------------------------------------------------------
+--
+-- Transport AI Functions
+--
+--------------------------------------------------------------------------------
+
+---@param origin_island island[] the island of which the cargo is coming from
+---@param dest_island island[] the island of which the cargo is going to
+function cargo.getBestRoute(origin_island, dest_island)
+
+	-- get the vehicles we will be using for the cargo trip
+	local transport_vehicle = {
+		sea = cargo.getTransportVehicle("boat"),
+		plane = cargo.getTransportVehicle("plane"),
+		heli = cargo.getTransportVehicle("heli"),
+		land = cargo.getTransportVehicle("land")
+	}
+
+	-- get the direct routes we can take
+	local valid_transportation_methods = {
+		origin = {
+			boat = hasTag(origin_island.tags, "can_spawn=boat") and transport_vehicle.sea,
+			plane = hasTag(origin_island.tags, "can_spawn=plane") and transport_vehicle.plane,
+			helicopter = hasTag(origin_island.tags, "can_spawn=boat") and transport_vehicle.heli,
+			land_sawyer = hasTag(origin_island.tags, "land_access=sawyer") and transport_vehicle.land,
+			land_donkk = hasTag(origin_island.tags, "land_access=donkk") and transport_vehicle.land
+		},
+		dest = {
+			boat = hasTag(dest_island.tags, "can_spawn=boat") and transport_vehicle.sea,
+			plane = hasTag(dest_island.tags, "can_spawn=plane") and transport_vehicle.plane,
+			helicopter = hasTag(dest_island.tags, "can_spawn=boat") and transport_vehicle.heli,
+			land_sawyer = hasTag(dest_island.tags, "land_access=sawyer") and transport_vehicle.land,
+			land_donkk = hasTag(dest_island.tags, "land_access=donkk") and transport_vehicle.land
+		}
+	}
+end
+
+---@param vehicle_type string the type of vehicle, such as air, boat or land
+---@return vehicle_prefab vehicle_prefab[] the vehicle to spawn
+function cargo.getTransportVehicle(vehicle_type)
+	local vehicle_prefab = sm.spawn(true, "cargo", vehicle_type)
+	if not vehicle_prefab then vehicle_prefab = nil end
+	return vehicle_prefab
+end
+
+---@param island1 island[] the first island you want to get the distance from
+---@param island2 island[] the second island you want to get the distance to
+---@param vehicle_type string the type of vehicle of which will be taking the route, this is for
+---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
+function cargo.getIslandDistance(island1, island2)
+
+	local cache_index = island1.index + island2.index
+	local distance = {
+		land = nil,
+		sea = nil,
+		air = nil
+	}
+
+	------
+	-- get distance for air vehicles
+	------
+	if hasTag(island1.tags, "can_spawn=plane") and hasTag(island2.tags, "can_spawn=plane") or hasTag(island1.tags, "can_spawn=heli") and hasTag(island2.tags, "can_spawn=heli") then
+		if g_savedata.cache.cargo.island_distances.air[cache_index] then
+			
+			-- pull from cache
+
+			distance.air = g_savedata.cache.cargo.island_distances.air[cache_index]
+		else
+			
+			-- calculate the distance
+
+			distance.air = xzDistance(island1.transform, island2.transform)
+			
+			-- write to cache
+
+			cache.write(cargo.island_distances.air[cache_index], distance.air)
+		end
+	end
+
+	------
+	-- get distance for sea vehicles
+	------
+	if hasTag(island1.tags, "can_spawn=boat") and hasTag(island2.tags, "can_spawn=boat") then
+		if g_savedata.cache.cargo.island_distances.sea[cache_index] then
+			
+			-- pull from cache
+			distance.sea = g_savedata.cache.cargo.island_distances.sea[cache_index]
+		else
+			
+			-- calculate the distance
+			
+			distance.sea = 0
+			local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
+			local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
+			if noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
+				local paths = s.pathfindOcean(ocean1_transform, ocean2_transform)
+				for path_index, path in pairs(paths) do
+					if path_index ~= #paths then
+						distance.sea = distance.sea + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
+					end
+				end
+			end
+			
+			-- write to cache
+			cache.write(cargo.island_distances.sea[cache_index], distance.sea)
+		end
+	end
+
+	------
+	-- get distance for land vehicles
+	------
+	if hasTag(island1.tags, "can_spawn=land") then
+		if getTagValue(island1.tags, "land_access", true) == getTagValue(island2.tags, "land_access", true) then
+			if g_savedata.cache.cargo.island_distances.sea[cache_index] then
+				
+				-- pull from cache
+				distance.sea = g_savedata.cache.cargo.island_distances.sea[cache_index]
+			else
+				
+				-- calculate the distance
+				
+				distance.sea = 0
+				local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
+				local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
+				if noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
+					local paths = s.pathfindOcean(ocean1_transform, ocean2_transform)
+					for path_index, path in pairs(paths) do
+						if path_index ~= #paths
+						distance.sea = distance.sea + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
+					end
+				end
+				
+				-- write to cache
+				cache.write(cargo.island_distances.sea[cache_index], distance.sea)
+			end
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+--
+-- Spawn Modifier Functions (Adaptive AI)
+--
+--------------------------------------------------------------------------------
+
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
 			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
-					if veh_type ~= "mod" and type(veh_data) == "table"then
+					if veh_type ~= "mod" and type(veh_data) == "table" then
 						for strat, strat_data in pairs(veh_data) do
 							if type(strat_data) == "table" and strat ~= "mod" then
 								g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
@@ -4410,8 +4599,9 @@ end
 
 ---@param is_specified boolean true to specify what vehicle to spawn, false for random
 ---@param vehicle_list_id any vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
+---@param vehicle_type string the type of vehicle you want to spawn, such as boat, helicopter, plane or land
 ---@return prefab_data[] prefab_data the vehicle's prefab data
-function spawnModifiers.spawn(is_specified, vehicle_list_id)
+function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 	local sel_role = nil
 	local sel_veh_type = nil
 	local sel_strat = nil
@@ -4446,12 +4636,21 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 			sel_role = vehicle_list_id
 		end
 		wpDLCDebug("selected role: "..sel_role, true, false)
-		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
-			if type(v) == "table" then
-				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+		if not vehicle_type then
+			for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
+				if type(v) == "table" then
+					veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+				end
+			end
+			sel_veh_type = randChance(veh_type_chances)
+		else -- then use the vehicle type which was selected
+			if g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
+				sel_veh_type = vehicle_type
+			else
+				wpDLCDebug("theres no vehicles with the role of: "..sel_role.." and with a type of: "..vehicle_type, true, true)
+				return false
 			end
 		end
-		sel_veh_type = randChance(veh_type_chances)
 		wpDLCDebug("selected vehicle type: "..sel_veh_type, true, false)
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
@@ -4573,6 +4772,31 @@ function spawnModifiers.debug(user_peer_id, role, type, strategy, constructable_
 	else
 		wpDLCDebug("modifier of role "..role..", type "..type..", strategy "..strategy..", with the id of "..constructable_vehicle_id..": "..g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod, false, false, user_peer_id)
 	end
+end
+
+--------------------------------------------------------------------------------
+--
+-- Other
+--
+--------------------------------------------------------------------------------
+
+---@param print_error boolean if you want it to print an error if any are nil (if true, the second argument must be a name for debugging puposes)
+---@param ... any varibles to check
+---@return boolean none_are_nil returns true of none of the variables are nil or false
+function noneNil(print_error, ...) -- check for if none of the inputted variables are nil
+	local _ = table.unpack(...)
+	local none_nil = true
+	for variable_index, variable in pairs(_) do
+		if print_error and variable ~= _[1] or not print_error then
+			if not none_nil then
+				none_nil = false
+				if print_error then
+					wpDLCDebug("(noneNil) a variable was nil! index: "..variable_index.." | from: ".._[1], true, true)
+				end
+			end
+		end
+	end
+	return none_nil
 end
 
 ---@param matrix1 Matrix the first matrix
