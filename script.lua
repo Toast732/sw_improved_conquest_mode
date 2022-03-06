@@ -1,3 +1,6 @@
+local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when damaged)", "true")
+local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
+
 local spawnModifiers = {}
 
 local s = server
@@ -189,7 +192,7 @@ end
         Functions
 --]]
 
-function wpDLCDebug(message, requiresDebugging, isError, toPlayer)
+function wpDLCDebug(message, requiresDebugging, isError, toPlayer) -- glorious debug function
 	local deb_err = s.getAddonData((s.getAddonIndex())).name..(isError and " Error:" or " Debug:")
 	
 	if type(message) == "table" then
@@ -269,9 +272,9 @@ end
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
 	if not g_savedata.settings then
-		g_savedata.settings = {
-			SINKING_MODE = not property.checkbox("Disable Sinking Mode (Sinking Mode disables sea and air vehicle health)", false),
-			CONTESTED_MODE = not property.checkbox("Disable Point Contesting", false),
+		g_savedata.settings = { --set the boxes to "true" if you want them to be enabled by default (quotes )
+			SINKING_MODE = SINKING_MODE_BOX,
+			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
@@ -1335,8 +1338,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							wpDLCDebug("You need to specify wether to punish or reward!", false, true, user_peer_id)
 						end
 
-
-					elseif command == "dv" then
+					-- arg 1 = id
+					elseif command == "dv" then -- delete vehicle
 						if arg[1] then
 							if arg[1] == "all" then
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1357,7 +1360,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 								if not found_vehicle then
-									wpDLCDebug("Unable to find vehicle with id "..arg[1], false, true, user_peer_id)
+									wpDLCDebug("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, true, user_peer_id)
 								end
 							end
 						else
@@ -3790,7 +3793,7 @@ end
 
 function tickOther()
 	if g_savedata.playerData.isDoAsISay[0] then
-		-- if its been 15 or more seconds since they did the command
+		-- if its been 15 or more seconds since player did the ?impwep full_reload
 		-- then cancel the command
 		if (g_savedata.tick_counter - g_savedata.playerData.timers.isDoAsISay) >= time.second*15 then
 			wpDLCDebug("Automatically cancelled full reload!", false, false, 0)
@@ -4426,6 +4429,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 			sel_role = vehicle_list_id
 		end
 		wpDLCDebug("selected role: "..sel_role, true, false)
+
 		for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
 			if type(v) == "table" then
 				veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
@@ -4433,6 +4437,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		end
 		sel_veh_type = randChance(veh_type_chances)
 		wpDLCDebug("selected vehicle type: "..sel_veh_type, true, false)
+
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
 				strat_chances[strat] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][strat].mod
@@ -4440,6 +4445,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id)
 		end
 		sel_strat = randChance(strat_chances)
 		wpDLCDebug("selected strategy: "..sel_strat, true, false)
+		
 		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 			if type(v) == "table" then
 				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
