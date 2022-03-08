@@ -8,13 +8,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
 local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
@@ -167,7 +167,6 @@ g_savedata = {
 		has_default_addon = false,
 		awaiting_reload = false,
 	},
-	land_spawn_zones = {},
 	tick_counter = 0,
 	ai_history = {
 		has_defended = 0, -- logs the time in ticks the player attacked at
@@ -191,8 +190,15 @@ g_savedata = {
 				sea = {},
 				land = {},
 				air = {}
-			}
+			},
+			best_routes = {}
 		}
+	},
+	cache_stats = {
+		reads = 0,
+		writes = 0,
+		failed_writes = 0,
+		resets = 0
 	}
 }
 
@@ -371,7 +377,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							isDoAsISay = 0
 						}
 					}
-					g_savedata.land_spawn_zones = {}
 					g_savedata.ai_army.squadrons = {}
 					g_savedata.ai_base_island.zones = {}
 					g_savedata.player_base_island = nil
@@ -405,9 +410,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			turret_zones = s.getZones("turret")
 
-			for land_spawn_index, land_spawn in pairs(s.getZones("land_spawn")) do
-				table.insert(g_savedata.land_spawn_zones, land_spawn.transform)
-			end
+			land_zones = s.getZones("land_spawn")
 
             for i in iterPlaylists() do
                 for j in iterLocations(i) do
@@ -472,7 +475,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				map_id = s.getMapID(), 
 				assigned_squad_index = -1, 
 				production_timer = 0,
-				zones = {},
+				zones = {
+					turrets = {},
+					land = {}
+				},
 				ai_capturing = 0,
 				players_capturing = 0,
 				defenders = 0,
@@ -480,7 +486,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
-					table.insert(g_savedata.ai_base_island.zones, turretZone)
+					table.insert(g_savedata.ai_base_island.zones.turrets, turretZone)
+				end
+			end
+
+			for _, landZone in pairs(land_zones) do
+				if(m.distance(landZone.transform, flagZone.transform) <= 1000) then
+					table.insert(new_island.zones.land, landZone)
 				end
 			end
 			flag_zones[furthest_flagZone_index] = nil
@@ -499,7 +511,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					capture_timer = g_savedata.settings.CAPTURE_TIME / 2,
 					map_id = s.getMapID(), 
 					assigned_squad_index = -1, 
-					zones = {},
+					zones = {
+						turrets = {},
+						land = {}
+					},
 					ai_capturing = 0,
 					players_capturing = 0,
 					defenders = 0,
@@ -508,7 +523,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 				for _, turretZone in pairs(turret_zones) do
 					if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
-						table.insert(new_island.zones, turretZone)
+						table.insert(new_island.zones.turrets, turretZone)
+					end
+				end
+
+				for _, landZone in pairs(land_zones) do
+					if(m.distance(landZone.transform, flagZone.transform) <= 1000) then
+						table.insert(new_island.zones.land, landZone)
 					end
 				end
 
@@ -614,26 +635,26 @@ end
 function spawnTurret(island)
 	local selected_prefab = sm.spawn(true, "turret")
 
-	if (#island.zones < 1) then return end
+	if (#island.zones.turrets < 1) then return end
 
 	local turret_count = 0
 
-	for turret_zone_index, turret_zone in pairs(island.zones) do
+	for turret_zone_index, turret_zone in pairs(island.zones.turrets) do
 		if turret_zone.is_spawned then turret_count = turret_count + 1 end
 	end
 
 	if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then return end
 
-	local spawnbox_index = math.random(1, #island.zones)
-	if island.zones[spawnbox_index].is_spawned == true then
+	local spawnbox_index = math.random(1, #island.zones.turrets)
+	if island.zones.turrets[spawnbox_index].is_spawned == true then
 		return
 	end
 	
 	local player_list = s.getPlayers()
-	if not playersNotNearby(player_list, island.zones[spawnbox_index].transform, 3000, true) then return end -- makes sure players are not too close before spawning a turret
+	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 3000, true) then return end -- makes sure players are not too close before spawning a turret
 
-	island.zones[spawnbox_index].is_spawned = true
-	local spawn_transform = island.zones[spawnbox_index].transform
+	island.zones.turrets[spawnbox_index].is_spawned = true
+	local spawn_transform = island.zones.turrets[spawnbox_index].transform
 
 	-- spawn objects
 	local all_addon_components = {}
@@ -727,6 +748,12 @@ function spawnTurret(island)
 		wpDLCDebug("spawning island turret", true, false)
 	end
 end
+
+--------------------------------------------------------------------------------
+--
+-- Spawn AI Vehicle
+--
+--------------------------------------------------------------------------------
 
 function spawnAIVehicle(requested_prefab)
 	local plane_count = 0
@@ -864,11 +891,13 @@ function spawnAIVehicle(requested_prefab)
 	-- spawn it at a random ai island
 	else
 		local valid_islands = {}
+		local valid_island_index = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then
 					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
 						table.insert(valid_islands, island)
+						table.insert(valid_island_index, island_index)
 					end
 				end
 			end
@@ -876,8 +905,13 @@ function spawnAIVehicle(requested_prefab)
 		if #valid_islands > 0 then
 			random_island = math.random(1, #valid_islands)
 			selected_spawn_transform = valid_islands[random_island].transform
-			selected_spawn = random_island
+			selected_spawn = valid_island_index[random_island]
 		end
+	end
+
+	if not g_savedata.controllable_islands[selected_spawn] then
+		wpDLCDebug("(spawnAIVehicle) selected island is nil! island index: "..selected_spawn, true, true)
+		return false
 	end
 
 	local spawn_transform = selected_spawn_transform
@@ -886,29 +920,7 @@ function spawnAIVehicle(requested_prefab)
 		if found_ocean == false then wpDLCDebug("unable to find ocean to spawn boat!", true, false); return end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
-		local land_spawn_locations = {}
-		for island_index, island in pairs(g_savedata.controllable_islands) do
-			if island.faction == FACTION_AI then
-				if g_savedata.land_spawn_zones then
-					for land_spawn_index, land_spawn in pairs(g_savedata.land_spawn_zones) do
-						if m.distance(land_spawn, island.transform) <= 1000 or m.distance(land_spawn, g_savedata.ai_base_island.transform) <= 1000 then
-							table.insert(land_spawn_locations, land_spawn)
-						end
-					end
-				else
-					for land_spawn_index, land_spawn in pairs(s.getZones("land_spawn")) do
-						table.insert(g_savedata.land_spawn_zones, land_spawn.transform)
-					end
-				end
-			end
-		end
-		if #land_spawn_locations > 0 then
-			spawn_transform = land_spawn_locations[math.random(1, #land_spawn_locations)]
-		else
-			wpDLCDebug("No suitible spawn location found for land vehicle, attempting to spawn a different vehicle", true, false)
-			spawnAIVehicle()
-			return false
-		end
+		spawn_transform = g_savedata.controllable_islands[selected_spawn].zones.land[math.random(1, #g_savedata.controllable_islands[selected_spawn].zones.land)].transform
 	else
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 	end
@@ -1125,6 +1137,30 @@ local player_commands = {
 			desc = "if you do not input the setting name, it will show a list of all valid settings, if you input a setting name but not a value, it will tell you the setting's current value, if you enter both the setting name and the setting value, it will change that setting to that value",
 			args = "[setting_name] [value]",
 			example = "?impwep setting MAX_BOAT_AMOUNT 5\n?impwep setting MAX_BOAT_AMOUNT\n?impwep setting",
+		},
+		debug_cache = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
+		},
+		debug_cargo1 = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
+		},
+		debug_cargo2 = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
+		},
+		clear_cache = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
@@ -1446,6 +1482,38 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							-- the setting they selected does not exist
 							wpDLCDebug(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, true, user_peer_id)
 						end
+					elseif command == "debug_cache" then
+						wpDLCDebug("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, false, user_peer_id)
+					elseif command == "debug_cargo1" then
+						wpDLCDebug("asking cargo to do things...(get island distance)", false, false, user_peer_id)
+						for island_index, island in pairs(g_savedata.controllable_islands) do
+							if island.faction == FACTION_AI then
+								cargo.getIslandDistance(g_savedata.ai_base_island, island)
+							end
+						end
+					elseif command == "debug_cargo2" then
+						wpDLCDebug("asking cargo to do things...(get best route)", false, false, user_peer_id)
+						island_selected = g_savedata.controllable_islands[tonumber(arg[1])]
+						if island_selected then
+							local best_route = cargo.getBestRoute(g_savedata.ai_base_island, island_selected)
+							if best_route[1] then
+								wpDLCDebug("first transportation method: "..best_route[1].transport_method, false, false, user_peer_id)
+							else
+								wpDLCDebug("unable to find cargo route!", false, false, user_peer_id)
+							end
+							if best_route[2] then
+								wpDLCDebug("second transportation method: "..best_route[2].transport_method, false, false, user_peer_id)
+							end
+							if best_route[3] then
+								wpDLCDebug("third transportation method: "..best_route[3].transport_method, false, false, user_peer_id)
+							end
+						else
+							wpDLCDebug("incorrect island id: "..arg[1], false, false, user_peer_id)
+						end
+					elseif command == "clear_cache" then
+						wpDLCDebug("clearing cache", false, false, user_peer_id)
+						cache.reset()
+						wpDLCDebug("cache reset", false, false, user_peer_id)
 					end
 				else
 					for command_name, command_info in pairs(player_commands.admin) do
@@ -1832,7 +1900,7 @@ function cleanVehicle(squad_index, vehicle_id)
 	if vehicle_object.ai_type == AI_TYPE_TURRET and vehicle_object.spawnbox_index ~= nil then
 		for island_index, island in pairs(g_savedata.controllable_islands) do		
 			if island.name == vehicle_object.home_island then
-				island.zones[vehicle_object.spawnbox_index].is_spawned = false
+				island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
 			end
 		end
 	end
@@ -2212,7 +2280,7 @@ function tickGamemode()
 				local t, a = getObjectiveIsland()
 
 				local ai_base_island_turret_count = 0
-				for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones) do
+				for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
 					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
 				end
 
@@ -2281,7 +2349,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
 					local turret_amount = 0
-					for turret_zone_index, turret_zone in pairs(island.zones) do
+					for turret_zone_index, turret_zone in pairs(island.zones.turrets) do
 						if turret_zone.is_spawned then turret_amount = turret_amount + 1 end
 					end
 					
@@ -2294,7 +2362,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
 					end
 
-					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\n island.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -3667,7 +3735,7 @@ function tickVehicles()
 							if(#vehicle_object.path >= 1) then
 								s.removeMapLine(player_id, vehicle_object.map_id)
 
-								server.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
+								s.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
 
 								for i = 1, #vehicle_object.path - 1 do
 									local waypoint = vehicle_object.path[i]
@@ -4404,28 +4472,80 @@ end
 --
 --------------------------------------------------------------------------------
 
----@param location g_savedata[] where to write the data
+---@param location ?g_savedata.cache[] where to reset the data, if left blank then resets all cache data
+---@param boolean success returns true if successfully cleared the cache
+function cache.reset(location) -- resets the cache
+	if not location then
+		g_savedata.cache = {
+			cargo = {
+				island_distances = {
+					sea = {},
+					land = {},
+					air = {}
+				},
+				best_routes = {}
+			}
+		}
+	else
+		if g_savedata.cache[location] then
+			g_savedata.cache[location] = nil
+		else
+			g_savedata.cache_stats.failed_resets = g_savedata.cache_stats.failed_resets + 1
+			return false
+		end
+	end
+	g_savedata.cache_stats.resets = g_savedata.cache_stats.resets + 1
+	return true
+end
+
+---@param location g_savedata.cache[] where to write the data
 ---@param data any the data to write at the location
 ---@return boolean write_successful if writing the data to the cache was successful
 function cache.write(location, data)
 
 	if type(g_savedata.cache[location]) ~= "table" then
 		wpDLCDebug("Data currently at the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+	else
+		wpDLCDebug("Data currently at the cache of "..tostring(location)..": (table)", true, false)
 	end
 
 	g_savedata.cache[location] = data
 
 	if type(g_savedata.cache[location]) ~= "table" then
 		wpDLCDebug("Data written to the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+	else
+		wpDLCDebug("Data written to the cache of "..tostring(location)..": (table)", true, false)
 	end
 
 	if g_savedata.cache[location] == data then
+		g_savedata.cache_stats.writes = g_savedata.cache_stats.writes + 1
 		return true
 	else
+		g_savedata.cache_stats.failed_writes = g_savedata.cache_stats.failed_writes + 1
 		return false
 	end
 end
 
+---@param location g_savedata.cache[] where to read the data from
+---@return any data the data that was at the location
+function cache.read(location)
+	g_savedata.cache_stats.reads = g_savedata.cache_stats.reads + 1
+	if type(g_savedata.cache[location]) ~= "table" then
+		wpDLCDebug("reading cache data at \ng_savedata.cache."..tostring(location).."\n\nData: "..g_savedata.cache[location], true, false)
+	else
+		wpDLCDebug("reading cache data at \ng_savedata.cache."..tostring(location).."\n\nData: (table)", true, false)
+	end
+	return g_savedata.cache[location]
+end
+
+---@param location g_savedata.cache[] where to check
+---@return boolean exists if the data exists at the location
+function cache.exists(location)
+	if g_savedata.cache[location] or g_savedata.cache[location] == false then
+		return true
+	end
+	return false
+end
 
 --------------------------------------------------------------------------------
 --
@@ -4433,35 +4553,338 @@ end
 --
 --------------------------------------------------------------------------------
 
+
 ---@param origin_island island[] the island of which the cargo is coming from
 ---@param dest_island island[] the island of which the cargo is going to
 function cargo.getBestRoute(origin_island, dest_island)
 
+	local best_route = {}
+
 	-- get the vehicles we will be using for the cargo trip
 	local transport_vehicle = {
-		sea = cargo.getTransportVehicle("boat"),
-		plane = cargo.getTransportVehicle("plane"),
 		heli = cargo.getTransportVehicle("heli"),
-		land = cargo.getTransportVehicle("land")
+		land = cargo.getTransportVehicle("land"),
+		plane = cargo.getTransportVehicle("plane"),
+		sea = cargo.getTransportVehicle("boat")
 	}
 
-	-- get the direct routes we can take
-	local valid_transportation_methods = {
-		origin = {
-			boat = hasTag(origin_island.tags, "can_spawn=boat") and transport_vehicle.sea,
-			plane = hasTag(origin_island.tags, "can_spawn=plane") and transport_vehicle.plane,
-			helicopter = hasTag(origin_island.tags, "can_spawn=boat") and transport_vehicle.heli,
-			land_sawyer = hasTag(origin_island.tags, "land_access=sawyer") and transport_vehicle.land,
-			land_donkk = hasTag(origin_island.tags, "land_access=donkk") and transport_vehicle.land
-		},
-		dest = {
-			boat = hasTag(dest_island.tags, "can_spawn=boat") and transport_vehicle.sea,
-			plane = hasTag(dest_island.tags, "can_spawn=plane") and transport_vehicle.plane,
-			helicopter = hasTag(dest_island.tags, "can_spawn=boat") and transport_vehicle.heli,
-			land_sawyer = hasTag(dest_island.tags, "land_access=sawyer") and transport_vehicle.land,
-			land_donkk = hasTag(dest_island.tags, "land_access=donkk") and transport_vehicle.land
+	-- checks for all vehicles, and fills in some info to avoid errors if it doesnt exist
+	if not transport_vehicle.heli then
+		transport_vehicle.heli = {
+			name = "none"
 		}
-	}
+	end
+	if not transport_vehicle.land then
+		transport_vehicle.land = {
+			name = "none"
+		}
+	end
+	if not transport_vehicle.plane then
+		transport_vehicle.plane = {
+			name = "none"
+		}
+	end
+	if not transport_vehicle.sea then
+		transport_vehicle.sea = {
+			name = "none"
+		}
+	end
+	
+
+
+	local cache_index = origin_island.index + dest_island.index
+
+	-- check if the best route here is already cached
+	if cache.exists("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]") then
+		------
+		-- read data from cache
+		------
+
+		best_route = cache.read("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]")
+	else
+		------
+		-- calculate best route (resource intensive)
+		------
+
+		--
+		-- gets the speed of all of the vehicles we were given
+		--
+		for vehicle_index, vehicle_object in pairs(transport_vehicle) do
+			if vehicle_object then -- checks if the vehicle exists (would return nil if there are none of those vehicles)
+
+				local movement_speed = 0.001
+				if vehicle_object.name ~= "none" then
+					if vehicle_object.vehicle.ai_type == AI_TYPE_BOAT then
+						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT
+					elseif vehicle_object.vehicle.ai_type == AI_TYPE_PLANE then
+						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE
+					elseif vehicle_object.vehicle.ai_type == AI_TYPE_HELI then
+						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI
+					elseif vehicle_object.vehicle.ai_type == AI_TYPE_LAND then
+						if vehicle_object.vehicle.is_aggressive and vehicle_object.vehicle.terrain_type then
+							movement_speed = (vehicle_object.speed.land[vehicle_object.vehicle.is_aggressive][vehicle_object.vehicle.terrain_type] or vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND)
+						else
+							movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND
+						end
+					end
+				end
+
+				transport_vehicle[vehicle_index].movement_speed = movement_speed or 0.001
+			end
+		end
+
+		local paths = {}
+
+		-- get the first path for all islands
+		for island_index, island in pairs(g_savedata.controllable_islands) do
+			if island.transform ~= origin_island.transform then -- makes sure its not the origin island
+				if island.faction == FACTION_AI then -- makes sure the ai owns the island
+					paths[island_index] = { island = island, distance = cargo.getIslandDistance(origin_island, island) }
+				end
+			end
+		end
+
+		-- get the second path for all islands
+		for first_path_island_index, first_path_island in pairs(paths) do
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				-- makes sure the island we are at is not the destination island, and that we are not trying to go to the island we are at
+				if first_path_island.island.transform ~= dest_island.transform and island_index ~= first_path_island_index then
+					if island.faction == FACTION_AI then -- makes sure the ai owns the island
+						paths[first_path_island_index][island_index] = { island = island, distance = cargo.getIslandDistance(first_path_island.island, island) }
+					end
+				end
+			end
+		end
+
+		-- get the third path for all islands (to destination island)
+		for first_path_island_index, first_path_island in pairs(paths) do
+			for second_path_island_index, second_path_island in pairs(paths[first_path_island_index]) do
+				if second_path_island.island and second_path_island.island.transform ~= dest_island.transform and dest_island.index ~= first_path_island_index and dest_island.index ~= second_path_island_index then
+					paths[first_path_island_index][second_path_island_index][dest_island.index] = { island = dest_island, distance = cargo.getIslandDistance(second_path_island.island, dest_island) }
+				end 
+			end
+		end
+
+		local total_travel_time = {}
+
+		-- get the total travel times for all the routes
+		for first_path_island_index, first_path_island in pairs(paths) do
+			--
+			-- get the travel time from the origin island to the next one for each vehicle type
+			--
+			if first_path_island.distance then
+				if first_path_island.distance.air then
+					if transport_vehicle.heli then
+						--
+						total_travel_time[first_path_island_index].heli = 
+						(total_travel_time[first_path_island_index].heli or 0) + 
+						(first_path_island.distance.air/transport_vehicle.heli.movement_speed)
+						--
+					end
+					if transport_vehicle.plane then
+						--
+						total_travel_time[first_path_island_index].plane = 
+						(total_travel_time[first_path_island_index].plane or 0) + 
+						(first_path_island.distance.air/transport_vehicle.plane.movement_speed)
+						--
+					end
+				end
+				if first_path_island.distance.land then
+					if transport_vehicle.land then
+						--
+						total_travel_time[first_path_island_index].land = 
+						(total_travel_time[first_path_island_index].land or 0) + 
+						(first_path_island.distance.land/transport_vehicle.land.movement_speed)
+						--
+					end
+				end
+				if first_path_island.distance.sea then
+					if transport_vehicle.sea then
+						--
+						total_travel_time[first_path_island_index].sea = 
+						(total_travel_time[first_path_island_index].sea or 0) + 
+						(first_path_island.distance.sea/transport_vehicle.sea.movement_speed)
+						--
+					end
+				end
+				if first_path_island_index ~= dest_island.index then
+					for second_path_island_index in pairs(paths[first_path_island_index]) do
+						--
+						-- get the travel time from the first island to the next one for each vehicle type
+						--
+						if second_path_island.distance.air then
+							if transport_vehicle.heli then
+								--
+								total_travel_time[first_path_island_index][second_path_island_index].heli = 
+								(total_travel_time[first_path_island_index].heli or 0) + 
+								(second_path_island.distance.air/transport_vehicle.heli.movement_speed)
+								--
+							end
+							if transport_vehicle.plane then
+								--
+								total_travel_time[first_path_island_index][second_path_island_index].plane = 
+								(total_travel_time[first_path_island_index].plane or 0) + 
+								(second_path_island.distance.air/transport_vehicle.plane.movement_speed)
+								--
+							end
+						end
+						if second_path_island.distance.land then
+							if transport_vehicle.land then
+								--
+								total_travel_time[first_path_island_index][second_path_island_index].land = 
+								(total_travel_time[first_path_island_index].land or 0) + 
+								(second_path_island.distance.land/transport_vehicle.land.movement_speed)
+								--
+							end
+						end
+						if second_path_island.distance.sea then
+							if transport_vehicle.sea then
+								--
+								total_travel_time[first_path_island_index][second_path_island_index].sea = 
+								(total_travel_time[first_path_island_index].sea or 0) + 
+								(second_path_island.distance.sea/transport_vehicle.sea.movement_speed)
+								--
+							end
+						end
+						if second_path_island_index ~= dest_island.index then
+							for third_path_island_index in pairs(paths[first_path_island_index][second_path_island_index]) do
+								--
+								-- get the travel time from the second island to the destination for each vehicle type
+								--
+								if third_path_island.distance.air then
+									if transport_vehicle.heli then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].heli = 
+										(total_travel_time[first_path_island_index][second_path_island_index].heli or 0) + 
+										(third_path_island.distance.air/transport_vehicle.heli.movement_speed)
+										--
+									end
+									if transport_vehicle.plane then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].plane = 
+										(total_travel_time[first_path_island_index][second_path_island_index].plane or 0) + 
+										(third_path_island.distance.air/transport_vehicle.plane.movement_speed)
+										--
+									end
+								end
+								if third_path_island.distance.land then
+									if transport_vehicle.land then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
+										(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
+										(third_path_island.distance.land/transport_vehicle.land.movement_speed)
+										--
+									end
+								end
+								if third_path_island.distance.sea then
+									if transport_vehicle.sea then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].sea = 
+										(total_travel_time[first_path_island_index][second_path_island_index].sea or 0) + 
+										(third_path_island.distance.sea/transport_vehicle.sea.movement_speed)
+										--
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		
+		------
+		-- get the best route from all of the routes we've gotten
+		------
+
+		local best_route_time = time.day
+
+		for first_path_island_index, first_path_island_travel_time in pairs(total_travel_time) do
+			if first_path_island_index ~= dest_island.index then
+				for second_path_island_index, second_path_island_travel_time in pairs(total_travel_time[first_path_island_index]) do
+					if second_path_island_index ~= dest_island.index then
+						for third_path_island_index, third_path_island_travel_time in pairs(total_travel_time[first_path_island_index][second_path_island_index]) do
+							local first_route_time = time.day
+							local first_route = {}
+							for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
+								if type(path_travel_time) == "number" then
+									if path_travel_time < first_route_time then
+										first_route_time = path_travel_time
+										first_route = {
+											[1] = {island_index = first_path_island_index, transport_method = transport_type}
+										}
+									end
+								end
+							end
+							local second_route_time = time.day
+							local second_route = {}
+							for transport_type, path_travel_time in pairs(second_path_island_travel_time) do
+								if type(path_travel_time) == "number" then
+									if path_travel_time < second_route_time then
+										second_route_time = path_travel_time
+										second_route = {
+											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method},
+											[2] = {island_index = second_path_island_index, transport_method = transport_type}
+										}
+									end
+								end
+							end
+							for transport_type, path_travel_time in pairs(path_island_travel_time) do
+								if type(path_travel_time) == "number" then
+									if path_travel_time + first_route_time + second_route_time < best_route_time then
+										best_route = {
+											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
+											[2] = {island_index = second_path_island_index, transport_method = second_route[2].transport_method},
+											[3] = {island_index = third_path_island_index, transport_method = transport_type}
+										}
+									end
+								end
+							end
+						end
+					else
+						local first_route_time = time.day
+						local first_route = {}
+						for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
+							if type(path_travel_time) == "number" then
+								if path_travel_time < first_route_time then
+									first_route_time = path_travel_time
+									first_route = {
+										[1] = {island_index = first_path_island_index, transport_method = transport_type}
+									}
+								end
+							end
+						end
+						for transport_type, path_travel_time in pairs(path_island_travel_time) do
+							if type(path_travel_time) == "number" then
+								if path_travel_time + first_route_time < best_route_time then
+									best_route = {
+										[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
+										[2] = {island_index = second_path_island_index, transport_method = transport_type}
+									}
+								end
+							end
+						end
+					end
+				end
+			else
+				for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
+					if type(path_travel_time) == "number" then
+						if path_travel_time < best_route_time then
+							best_route_time = path_travel_time
+							best_route = {
+								[1] = {island_index = first_path_island_index, transport_method = transport_type}
+							}
+						end
+					end
+				end
+			end
+		end
+
+		------
+		-- write to cache
+		------
+		cache.write("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]", best_route)
+	end
+	return best_route
 end
 
 ---@param vehicle_type string the type of vehicle, such as air, boat or land
@@ -4474,10 +4897,12 @@ end
 
 ---@param island1 island[] the first island you want to get the distance from
 ---@param island2 island[] the second island you want to get the distance to
----@param vehicle_type string the type of vehicle of which will be taking the route, this is for
 ---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
 function cargo.getIslandDistance(island1, island2)
 
+
+	wpDLCDebug("(cargo.getIslandDistance)\nisland1: "..island1.name, true, false)
+	wpDLCDebug("island2: "..island2.name, true, false)
 	local cache_index = island1.index + island2.index
 	local distance = {
 		land = nil,
@@ -4489,11 +4914,11 @@ function cargo.getIslandDistance(island1, island2)
 	-- get distance for air vehicles
 	------
 	if hasTag(island1.tags, "can_spawn=plane") and hasTag(island2.tags, "can_spawn=plane") or hasTag(island1.tags, "can_spawn=heli") and hasTag(island2.tags, "can_spawn=heli") then
-		if g_savedata.cache.cargo.island_distances.air[cache_index] then
+		if cache.exists("cargo.island_distances.air["..cache_index.."]") then
 			
 			-- pull from cache
 
-			distance.air = g_savedata.cache.cargo.island_distances.air[cache_index]
+			distance.air = cache.read("cargo.island_distances.air["..cache_index.."]")
 		else
 			
 			-- calculate the distance
@@ -4502,7 +4927,7 @@ function cargo.getIslandDistance(island1, island2)
 			
 			-- write to cache
 
-			cache.write(cargo.island_distances.air[cache_index], distance.air)
+			cache.write("cargo.island_distances.air["..cache_index.."]", distance.air)
 		end
 	end
 
@@ -4510,10 +4935,10 @@ function cargo.getIslandDistance(island1, island2)
 	-- get distance for sea vehicles
 	------
 	if hasTag(island1.tags, "can_spawn=boat") and hasTag(island2.tags, "can_spawn=boat") then
-		if g_savedata.cache.cargo.island_distances.sea[cache_index] then
+		if cache.exists("cargo.island_distances.sea["..cache_index.."]") then
 			
 			-- pull from cache
-			distance.sea = g_savedata.cache.cargo.island_distances.sea[cache_index]
+			distance.sea =  cache.read("cargo.island_distances.sea["..cache_index.."]")
 		else
 			
 			-- calculate the distance
@@ -4531,7 +4956,7 @@ function cargo.getIslandDistance(island1, island2)
 			end
 			
 			-- write to cache
-			cache.write(cargo.island_distances.sea[cache_index], distance.sea)
+			cache.write("cargo.island_distances.sea["..cache_index.."]", distance.sea)
 		end
 	end
 
@@ -4540,27 +4965,31 @@ function cargo.getIslandDistance(island1, island2)
 	------
 	if hasTag(island1.tags, "can_spawn=land") then
 		if getTagValue(island1.tags, "land_access", true) == getTagValue(island2.tags, "land_access", true) then
-			if g_savedata.cache.cargo.island_distances.sea[cache_index] then
+			if cache.exists("cargo.island_distances.land["..cache_index.."]") then
 				
 				-- pull from cache
-				distance.sea = g_savedata.cache.cargo.island_distances.sea[cache_index]
+				distance.land = cache.read("cargo.island_distances.land["..cache_index.."]")
 			else
 				
 				-- calculate the distance
+
+				-- makes sure that theres at least 1 land spawn
+				if #g_savedata.controllable_islands[island1.index].zones.land > 0 then
 				
-				distance.sea = 0
-				local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
-				local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
-				if noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
-					local paths = s.pathfindOcean(ocean1_transform, ocean2_transform)
-					for path_index, path in pairs(paths) do
-						if path_index ~= #paths
-						distance.sea = distance.sea + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
+					distance.land = 0
+					local start_transform = g_savedata.controllable_islands[island1.index].zones.land[math.random(1, #g_savedata.controllable_islands[island1.index].zones.land)].transform
+					if noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
+						local paths = s.pathfindOcean(start_transform, island2.transform)
+						for path_index, path in pairs(paths) do
+							if path_index ~= #paths then
+								distance.land = distance.land + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
+							end
+						end
 					end
+					
+					-- write to cache
+					cache.write("cargo.island_distances.land["..cache_index.."]", distance.land)
 				end
-				
-				-- write to cache
-				cache.write(cargo.island_distances.sea[cache_index], distance.sea)
 			end
 		end
 	end
@@ -4644,7 +5073,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 			sel_veh_type = randChance(veh_type_chances)
 		else -- then use the vehicle type which was selected
-			if g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
+			if g_savedata.constructable_vehicles[sel_role] and g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
 				sel_veh_type = vehicle_type
 			else
 				wpDLCDebug("theres no vehicles with the role of: "..sel_role.." and with a type of: "..vehicle_type, true, true)
@@ -4784,7 +5213,7 @@ end
 ---@param ... any varibles to check
 ---@return boolean none_are_nil returns true of none of the variables are nil or false
 function noneNil(print_error, ...) -- check for if none of the inputted variables are nil
-	local _ = table.unpack(...)
+	local _ = table.pack(...)
 	local none_nil = true
 	for variable_index, variable in pairs(_) do
 		if print_error and variable ~= _[1] or not print_error then
