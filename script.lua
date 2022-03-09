@@ -4,13 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.4.4)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.4.5)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
 local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
@@ -270,13 +270,12 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 	end
 end
 
-
 function onCreate(is_world_create, do_as_i_say, peer_id)
 	if not g_savedata.settings then
 		g_savedata.settings = { --set the boxes to "true" if you want them to be enabled by default (quotes )
 			SINKING_MODE = SINKING_MODE_BOX,
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
-			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
+			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
 			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
@@ -572,7 +571,7 @@ function buildPrefabs(location_index)
 		if hasTag(vehicle.tags, "vehicle_type=wep_turret") or #prefab_data.survivors > 0 then
 			table.insert(g_savedata.vehicle_list, vehicle_index, prefab_data)
 			g_savedata.vehicle_list[vehicle_index].role = getTagValue(vehicle.tags, "role", true) or "general"
-			g_savedata.vehicle_list[vehicle_index].vehicle_type = string.gsub(getTagValue(vehicle.tags, "type", true), "wep_", "") or "unknown"
+			g_savedata.vehicle_list[vehicle_index].vehicle_type = string.gsub(getTagValue(vehicle.tags, "vehicle_type", true), "wep_", "") or "unknown"
 			g_savedata.vehicle_list[vehicle_index].strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
 		end
 
@@ -586,7 +585,7 @@ function buildPrefabs(location_index)
 			local varient = getTagValue(vehicle.tags, "varient")
 			if not varient then
 				local role = getTagValue(vehicle.tags, "role", true) or "general"
-				local vehicle_type = string.gsub(getTagValue(vehicle.tags, "type", true), "wep_", "") or "unknown"
+				local vehicle_type = string.gsub(getTagValue(vehicle.tags, "vehicle_type", true), "wep_", "") or "unknown"
 				local strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
 				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
@@ -701,6 +700,7 @@ function spawnTurret(island)
 			target_vehicle_id = -1,
 			home_island = island.name,
 			current_damage = 0,
+			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
 			damage_dealt = {},
 			fire_id = nil,
 			spawnbox_index = spawnbox_index,
@@ -784,7 +784,7 @@ function spawnAIVehicle(requested_prefab)
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
 					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
-						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 							selected_spawn_transform = island.transform
 							selected_spawn = island_index
 						end
@@ -802,7 +802,7 @@ function spawnAIVehicle(requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then -- make sure no players are within 3km of the island
-					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 						if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
 							lowest_defenders = island.defenders -- set the new lowest defender amount on an island
 							selected_spawn_transform = island.transform
@@ -826,7 +826,7 @@ function spawnAIVehicle(requested_prefab)
 					if player_to_island_dist < 6000 then
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
 							if playersNotNearby(player_list, island_transform, 3000, true) then
-								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 									closest_player_pos = player_transform
 									selected_spawn_transform = island_transform
 									selected_spawn = island_index
@@ -842,7 +842,7 @@ function spawnAIVehicle(requested_prefab)
 						if player_island.faction == FACTION_PLAYER then
 							if xzDistance(selected_spawn_transform, island_transform) > xzDistance(player_island.transform, island_transform) then
 								if playersNotNearby(player_list, island_transform, 3000, true) then
-									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 										selected_spawn_transform = island_transform
 										selected_spawn = island_index
 									end
@@ -859,7 +859,7 @@ function spawnAIVehicle(requested_prefab)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if playersNotNearby(player_list, island.transform, 3000, true) then
-					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
+					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
 						table.insert(valid_islands, island)
 					end
 				end
@@ -999,6 +999,7 @@ function spawnAIVehicle(requested_prefab)
 			target_vehicle_id = -1,
 			target_player_id = -1,
 			current_damage = 0,
+			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
 			damage_dealt = {},
 			fire_id = nil,
 		}
@@ -1874,16 +1875,7 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 					local damage_prev = vehicle_object.current_damage
 					vehicle_object.current_damage = vehicle_object.current_damage + amount
 
-					local enemy_hp = g_savedata.settings.ENEMY_HP
-					if vehicle_object.size == "large" then
-						enemy_hp = enemy_hp * 4
-					elseif vehicle_object.size == "medium" then
-						enemy_hp = enemy_hp * 2
-					end
-
-					if g_savedata.settings.SINKING_MODE or vehicle_object.capabilities.gps_missiles then
-						enemy_hp = enemy_hp * 8
-					end
+					local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
 					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_turret") then
 
@@ -3704,15 +3696,8 @@ function tickVehicles()
 						debug_data = debug_data .. "squad investigate vehicles: " .. #squad_vision.investigate_vehicles .."\n\n"
 					end
 
-					local hp = g_savedata.settings.ENEMY_HP
-					if vehicle_object.size == "large" then
-						hp = hp * 4
-					elseif vehicle_object.size == "medium" then
-						hp = hp * 2
-					end
-					if g_savedata.settings.SINKING_MODE or vehicle_object.capabilities.gps_missiles then
-						hp = hp * 8
-					end
+					local hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
+					
 					debug_data = debug_data .. "hp: " .. vehicle_object.current_damage .. " / " .. hp .. "\n"
 
 					local damage_dealt = 0

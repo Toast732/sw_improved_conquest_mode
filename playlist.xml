@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/sw_improved_conquest_mode" folder_path="data/missions/sw_improved_conquest_mode" file_store="4" name="Improved Conquest Mode (0.2.4.dev)">
+<playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Minor_Updates" folder_path="data/missions/Improved_Conquest_Mode_Minor_Updates" file_store="4" name="Improved Conquest Mode (0.2.4.dev)">
 	<locations location_id_counter="149" component_id_counter="2831">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
@@ -2462,7 +2462,7 @@
 						</spawn_bounds>
 						<graph_links/>
 					</c>
-					<c component_type="3" id="72" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=general,visibility_range=800,spawning_radius=12,pseudo_speed=17" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4">
+					<c component_type="3" id="72" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=general,visibility_range=800,spawning_radius=12,pseudo_speed=17,health=525" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.103493" 31="2.670889" 32="0.422675"/>
 						<spawn_bounds>
 							<min x="-2.125" y="-4.625" z="-2.125"/>
@@ -2500,7 +2500,7 @@
 			</l>
 			<l id="19" name="BOAT - BS-H1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="67" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=defend,visibility_range=700,spawning_radius=12,pseudo_speed=20" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4">
+					<c component_type="3" id="67" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=defend,visibility_range=700,spawning_radius=12,pseudo_speed=20,health=500" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.050188" 31="3.57261" 32="-0.003728"/>
 						<spawn_bounds>
 							<min x="-2.625" y="-3.625" z="3.375"/>
@@ -2578,7 +2578,7 @@
 			</l>
 			<l id="20" name="PLANE - EUROFIGHTER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="81" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing,pseudo_speed=116" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4">
+					<c component_type="3" id="81" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing,pseudo_speed=116,health=700" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4">
 						<spawn_transform 30="-1.599282" 31="8.210866" 32="-0.878728"/>
 						<spawn_bounds>
 							<min x="-6.375" y="-1.875" z="-14.875"/>
@@ -2616,7 +2616,7 @@
 			</l>
 			<l id="21" name="BOAT - DESTROYER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,pseudo_speed=16" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
+					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,pseudo_speed=16,health=1800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
@@ -2678,7 +2678,7 @@
 			</l>
 			<l id="22" name="HELI - VENOM" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="94" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=general,visibility_range=1400,spawning_radius=5,pseudo_speed=37" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4">
+					<c component_type="3" id="94" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=general,visibility_range=1400,spawning_radius=5,pseudo_speed=37,health=600" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.187068" 31="3.162882" 32="-1.590729"/>
 						<spawn_bounds>
 							<min x="-6.625" y="-1.375" z="-15.125"/>
@@ -2724,7 +2724,7 @@
 			</l>
 			<l id="23" name="HELI - TIGER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="98" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=attack,visibility_range=1300,spawning_radius=5,pseudo_speed=35" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4">
+					<c component_type="3" id="98" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=attack,visibility_range=1300,spawning_radius=5,pseudo_speed=35,health=600" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.066559" 31="2.949932" 32="-3.003018"/>
 						<spawn_bounds>
 							<min x="-6.625" y="-1.125" z="-2.625"/>
@@ -3160,7 +3160,7 @@
 			</l>
 			<l id="28" name="PLANE - O-2 SKYMASTER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="597" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8,pseudo_speed=87" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">
+					<c component_type="3" id="597" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8,pseudo_speed=87,health=325" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.039262" 31="1.954949" 32="-0.050625"/>
 						<spawn_bounds>
 							<min x="-5.625" y="-0.375" z="-5.125"/>
@@ -3190,7 +3190,7 @@
 			</l>
 			<l id="29" name="LAND - AI-C1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="599" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=1600,radar,spawning_radius=8,pseudo_speed=9" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4">
+					<c component_type="3" id="599" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=1600,radar,spawning_radius=8,pseudo_speed=9,health=750" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.223219" 31="1.852892" 32="-0.199396"/>
 						<spawn_bounds>
 							<min x="-1.875" y="-0.875" z="-7.375"/>
@@ -3236,7 +3236,7 @@
 			</l>
 			<l id="30" name="TURRET - CD-E1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="603" name="type=dlc_weapons,vehicle_type=wep_turret,role=turret,size=small,visibility_range=3000,spawning_radius=5,radar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="603" name="type=dlc_weapons,vehicle_type=wep_turret,role=turret,size=small,visibility_range=3000,spawning_radius=5,radar,health=325" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="-0.183271" 31="0.143647" 32="-0.183271"/>
 						<spawn_bounds>
 							<min x="-4.375" y="-4.125" z="-5.625"/>
@@ -6847,7 +6847,7 @@
 			</l>
 			<l id="48" name="LAND - AL-A1" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="931" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=attack,visibility_range=800,spawning_radius=6,road_speed_normal=26,bridge_speed_normal=15,offroad_speed_normal=11,road_speed_aggressive=38,bridge_speed_aggressive=21,offroad_speed_aggressive=17" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_931.xml" vehicle_file_store="4">
+					<c component_type="3" id="931" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=attack,visibility_range=800,spawning_radius=6,road_speed_normal=26,bridge_speed_normal=15,offroad_speed_normal=11,road_speed_aggressive=38,bridge_speed_aggressive=21,offroad_speed_aggressive=17,health=450" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_931.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.07598" 31="1.599742" 32="-0.162885"/>
 						<spawn_bounds>
 							<min x="-1.375" y="-1.375" z="-4.125"/>
