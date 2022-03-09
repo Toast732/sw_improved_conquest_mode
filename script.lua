@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.4.3)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.4.4)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -277,14 +277,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			SINKING_MODE = SINKING_MODE_BOX,
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP = property.slider("AI HP Base - Medium and Large AI will have 2x and 4x this. then 8x if in sinking mode", 0, 2500, 5, 325),
-			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 20, 1, 10) * 60 * 60,
+			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
 			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
 			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
 			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
 			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
 			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count (* by the amount of initial ai islands)", 0, 15, 1, 10),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
 			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
 		}
@@ -569,7 +569,7 @@ function buildPrefabs(location_index)
 		end
 
 		
-		if hasTag(vehicle.tags, "type=wep_turret") or #prefab_data.survivors > 0 then
+		if hasTag(vehicle.tags, "vehicle_type=wep_turret") or #prefab_data.survivors > 0 then
 			table.insert(g_savedata.vehicle_list, vehicle_index, prefab_data)
 			g_savedata.vehicle_list[vehicle_index].role = getTagValue(vehicle.tags, "role", true) or "general"
 			g_savedata.vehicle_list[vehicle_index].vehicle_type = string.gsub(getTagValue(vehicle.tags, "type", true), "wep_", "") or "unknown"
@@ -748,13 +748,13 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not requested_prefab then
-		if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
+		if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
 			return false, "boat limit reached"
-		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_land") and land_count >= g_savedata.settings.MAX_LAND_AMOUNT then
 			return false, "land limit reached"
-		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_heli") and heli_count >= g_savedata.settings.MAX_HELI_AMOUNT then
 			return false, "heli limit reached"
-		elseif hasTag(selected_prefab.vehicle.tags, "type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
+		elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_plane") and plane_count >= g_savedata.settings.MAX_PLANE_AMOUNT then
 			return false, "plane limit reached"
 		end
 		if army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
@@ -873,11 +873,11 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	local spawn_transform = selected_spawn_transform
-	if hasTag(selected_prefab.vehicle.tags, "type=wep_boat") then
+	if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
 		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 2000)
 		if found_ocean == false then wpDLCDebug("unable to find ocean to spawn boat!", true, false); return end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
-	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
+	elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_land") then
 		local land_spawn_locations = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
@@ -1885,7 +1885,7 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 						enemy_hp = enemy_hp * 8
 					end
 
-					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "type=wep_turret") then
+					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_turret") then
 
 						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
 							killVehicle(squad_index, vehicle_id, true)
@@ -3857,7 +3857,7 @@ function tickTerrainScanners()
 		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
 		
 		if vehicle_object then
-			if hasTag(terrain_scanner_data.tags, "from=dlc_weapons_terrain_scanner") then
+			if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
 				wpDLCDebug("terrain scanner loading!", true, false)
 				wpDLCDebug("ter id: "..terrain_scanner, true, false)
 				wpDLCDebug("veh id: "..vehicle_id, true, false)
@@ -4014,15 +4014,15 @@ function build_locations(playlist_index, location_index)
 
         for tag_index, tag_object in pairs(object_data.tags) do
 
-            if tag_object == "from=dlc_weapons" then
+            if tag_object == "type=dlc_weapons" then
                 is_valid_location = true
             end
-			if tag_object == "from=dlc_weapons_terrain_scanner" then
+			if tag_object == "type=dlc_weapons_terrain_scanner" then
 				if object_data.type == "vehicle" then
 					g_savedata.terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
 				end
 			end
-			if tag_object == "from=dlc_weapons_flag" then
+			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
 					flag_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
 				end
@@ -4078,22 +4078,22 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
 
 		local l_ai_type = AI_TYPE_HELI
-		if hasTag(object.tags, "type=wep_plane") then
+		if hasTag(object.tags, "vehicle_type=wep_plane") then
 			l_ai_type = AI_TYPE_PLANE
 		end
-		if hasTag(object.tags, "type=wep_boat") then
+		if hasTag(object.tags, "vehicle_type=wep_boat") then
 			l_ai_type = AI_TYPE_BOAT
 		end
-		if hasTag(object.tags, "type=wep_land") then
+		if hasTag(object.tags, "vehicle_type=wep_land") then
 			l_ai_type = AI_TYPE_LAND
 		end
-		if hasTag(object.tags, "type=wep_turret") then
+		if hasTag(object.tags, "vehicle_type=wep_turret") then
 			l_ai_type = AI_TYPE_TURRET
 		end
-		if hasTag(object.tags, "from=dlc_weapons_flag") then
+		if hasTag(object.tags, "type=dlc_weapons_flag") then
 			l_ai_type = "flag"
 		end
-		if hasTag(object.tags, "from=dlc_weapons_terrain_scanner") then
+		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
 			wpDLCDebug("terrain scanner!", true, false)
 			l_ai_type = "terrain_scanner"
 		end
