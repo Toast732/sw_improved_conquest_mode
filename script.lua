@@ -1,20 +1,17 @@
-local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when damaged)", "true")
-local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
-
 local spawnModifiers = {}
 
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.3)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.4.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
-local IS_DEVELOPMENT_VERSION = false
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -242,6 +239,9 @@ function warningChecks(user_peer_id)
 	end
 end
 
+local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when damaged)", "true")
+local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
+
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
 	-- lets you keep debug mode enabled after reloads
 	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
@@ -269,6 +269,7 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 		g_savedata.settings.MAX_TURRET_AMOUNT = 3
 	end
 end
+
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
 	if not g_savedata.settings then
@@ -716,6 +717,9 @@ function spawnTurret(island)
 	end
 end
 
+---@param requested_prefab any vehicle name or vehicle type, such as scout, will try to spawn that vehicle or type
+---@return boolean spawned_vehicle if the vehicle successfully spawned or not
+---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
 function spawnAIVehicle(requested_prefab)
 	local plane_count = 0
 	local heli_count = 0
@@ -1009,7 +1013,7 @@ function spawnAIVehicle(requested_prefab)
 		elseif getTagValue(selected_prefab.vehicle.tags, "role", true) == "turret" then
 			setSquadCommand(squad, COMMAND_TURRET)
 		end
-		return true
+		return true, vehicle_data
 	end
 	return false
 end
@@ -1056,9 +1060,9 @@ local player_commands = {
 		},
 		sv = { -- spawn vehicle
 			short_desc = "lets you spawn in an ai vehicle",
-			desc = "this lets you spawn in a ai vehicle, if you dont specify one, it will spawn a random ai vehicle, and if you specify \"scout\", it will spawn a scout vehicle if it can spawn",
-			args = "[vehicle_id|\"scout\"]",
-			example = "?impwep sv PLANE_-_EUROFIGHTER",
+			desc = "this lets you spawn in a ai vehicle, if you dont specify one, it will spawn a random ai vehicle, and if you specify \"scout\", it will spawn a scout vehicle if it can spawn. specify x and y to spawn it at a certain location, or \"near\" and then a minimum distance and then a maximum distance",
+			args = "[vehicle_id|\"scout\"] [x & y|\"near\" & min_range & max_range] ",
+			example = "?impwep sv PLANE_-_EUROFIGHTER\n?impwep sv PLANE_-_EUROFIGHTER -500 500\n?impwep sv PLANE_-_EUROFIGHTER near 1000 5000",
 		},
 		vl = { -- vehicle list
 			short_desc = "prints a list of all vehicles",
@@ -1187,9 +1191,142 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								valid_vehicle = true
 								wpDLCDebug("Spawning \""..arg[1].."\"", false, false, user_peer_id)
 								if arg[1] ~= "scout" then
-									spawnAIVehicle(vehicle_id)
-								else
-									spawnAIVehicle(arg[1])
+									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id)
+									if successfully_spawned then
+										if arg[2] ~= nil then
+											if arg[2] == "near" then -- the player selected to spawn it in a range
+												if tonumber(arg[3]) >= 150 then -- makes sure the min range is equal or greater than 150
+													if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
+														if vehicle_data.ai_type == AI_TYPE_BOAT then
+															local player_pos = s.getPlayerPos(user_peer_id)
+															local new_location found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+															if found_new_location then
+																-- teleport vehicle to new position
+																local veh_x, veh_y, veh_z = m.position(new_location)
+																s.setVehiclePos(vehicle_data.id, new_location)
+																wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, false, user_peer_id)
+															else
+																-- delete vehicle as it was unable to find a valid position
+																for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+																	for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+																		if vehicle_object.id == vehicle_data.id then
+																			killVehicle(squad_index, vehicle_index, true, true)
+																			wpDLCDebug("unable to find a valid area to spawn the ship! Try increasing the radius!", false, true, user_peer_id)
+																		end
+																	end
+																end
+															end
+														elseif vehicle_data.ai_type == AI_TYPE_LAND then
+															--[[
+															local possible_islands = {}
+															for island_index, island in pairs(g_savedata.controllable_islands) do
+																if island.faction ~= FACTION_PLAYER then
+																	if hasTag(island.tags, "can_spawn=land") then
+																		for in pairs(island.zones.land)
+																	for g_savedata.controllable_islands[island_index]
+																	table.insert(possible_islands.)
+																end
+															end
+															--]]
+															wpDLCDebug("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, true, user_peer_id)
+															for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+																for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+																	if vehicle_object.id == vehicle_data.id then
+																		killVehicle(squad_index, vehicle_index, true, true)
+																	end
+																end
+															end
+														else
+															local player_pos = s.getPlayerPos(user_peer_id)
+															local player_x, player_y, player_z = m.position(player_pos)
+															local veh_x, veh_y, veh_z = m.position(vehicle_data.transform)
+															local new_location = m.translation(player_x + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])), veh_y * 1.5, player_z + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])))
+															local new_veh_x, new_veh_y, new_veh_z = m.position(new_location)
+															s.setVehiclePos(vehicle_data.id, new_location)
+															vehicle_data.transform = new_location
+															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..new_veh_x.." y:"..new_veh_y.." z:"..new_veh_z, false, false, user_peer_id)
+														end
+													else
+														wpDLCDebug("your maximum range must be greater or equal to the minimum range!", false, true, user_peer_id)
+														for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+															for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+																if vehicle_object.id == vehicle_data.id then
+																	killVehicle(squad_index, vehicle_index, true, true)
+																end
+															end
+														end
+													end
+												else
+													wpDLCDebug("the minimum range must be at least 150!", false, true, user_peer_id)
+													for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+														for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+															if vehicle_object.id == vehicle_data.id then
+																killVehicle(squad_index, vehicle_index, true, true)
+															end
+														end
+													end
+												end
+											else
+												if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
+													if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
+														if vehicle_data.ai_type == AI_TYPE_BOAT then
+															local new_pos = m.translation(arg[2], 0, arg[3])
+															s.setVehiclePos(vehicle_data.id, new_pos)
+															vehicle_data.transform = new_pos
+															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, false, user_peer_id)
+														elseif vehicle_data.ai_type == AI_TYPE_LAND then
+															wpDLCDebug("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, true, user_peer_id)
+															for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+																for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+																	if vehicle_object.id == vehicle_data.id then
+																		killVehicle(squad_index, vehicle_index, true, true)
+																	end
+																end
+															end
+														else -- air vehicle
+															local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
+															s.setVehiclePos(vehicle_data.id, new_pos)
+															vehicle_data.transform = new_pos
+															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, false, user_peer_id)
+														end
+													else
+														wpDLCDebug("invalid z coordinate: "..tostring(arg[3]), false, true, user_peer_id)
+														for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+															for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+																if vehicle_object.id == vehicle_data.id then
+																	killVehicle(squad_index, vehicle_index, true, true)
+																end
+															end
+														end
+													end
+												else
+													wpDLCDebug("invalid x coordinate: "..tostring(arg[2]), false, true, user_peer_id)
+													for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+														for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+															if vehicle_object.id == vehicle_data.id then
+																killVehicle(squad_index, vehicle_index, true, true)
+															end
+														end
+													end
+												end
+											end
+										end
+									end
+								elseif arg[1] == "scout" then
+									local scout_exists = false
+									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+										for vehicle_index, vehicle in pairs(squad.vehicles) do
+											if vehicle.role == "scout" then
+												scout_exists = true
+												if squad.command ~= COMMAND_SCOUT then not_scouting = true; squad_to_set = squad_index end
+											end
+										end
+									end
+									if not scout_exists then -- if a scout vehicle does not exist
+										spawnAIVehicle(arg[1])
+									else
+										wpDLCDebug("unable to spawn scout vehicle: theres already a scout vehicle!", false, true, user_peer_id)
+									end
 								end
 							else
 								wpDLCDebug("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, true, user_peer_id)
@@ -1403,10 +1540,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							for setting_name, setting_value in pairs(g_savedata.settings) do
 								wpDLCDebug("-----\nSetting Name: "..setting_name.."\nSetting Type: "..type(setting_value), false, false, user_peer_id)
 							end
-						elseif g_savedata.settings[arg[1]] then -- makes sure the setting they selected exists
+						elseif g_savedata.settings[arg[1]] ~= nil then -- makes sure the setting they selected exists
 							if not arg[2] then
 								-- print the current value of the setting they selected
-								wpDLCDebug(arg[1].."'s current value: "..g_savedata.settings[arg[1]])
+								wpDLCDebug(arg[1].."'s current value: "..tostring(g_savedata.settings[arg[1]]))
 							else
 								-- change the value of the setting they selected
 								if type(g_savedata.settings[arg[1]]) == "number" then
@@ -1418,10 +1555,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								elseif g_savedata.settings[arg[1]] == true or g_savedata.settings[arg[1]] == false then
 									if arg[2] == "true" then
-										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, false, -1)
 										g_savedata.settings[arg[1]] = true
 									elseif arg[2] == "false" then
-										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, false, -1)
 										g_savedata.settings[arg[1]] = false
 									else
 										wpDLCDebug(arg[2].." is not a valid value! it must be either \"true\" or \"false\"!", false, true, user_peer_id)
@@ -1926,6 +2063,18 @@ function onVehicleLoad(incoming_vehicle_id)
 					wpDLCDebug("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, false)
 					vehicle_object.state.is_simulating = true
 					vehicle_object.transform = s.getVehiclePos(vehicle_id)
+					-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
+					for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
+						for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
+							if checking_vehicle_object.id ~= vehicle_id then
+								if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (getTagValue(vehicle_object.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + checking_vehicle_object.spawning_transform.distance) then
+									wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
+									killVehicle(squad_index, vehicle_id, true, true)
+									return
+								end
+							end
+						end
+					end
 
 					if vehicle_object.is_resupply_on_load then
 						vehicle_object.is_resupply_on_load = false
