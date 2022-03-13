@@ -9,7 +9,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.5)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.6)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
