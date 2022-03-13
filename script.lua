@@ -2,13 +2,14 @@
 local spawnModifiers = {}
 local cargo = {}
 local cache = {}
+local squad = {}
 
 -- shortened library names
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.4)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.5)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -67,9 +68,6 @@ local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 
 local VISIBLE_DISTANCE = 1500
 local WAYPOINT_CONSUME_DISTANCE = 100
-
--- plane ai tuning settings
-local PLANE_STRAFE_LOCK_DISTANCE = 800
 
 local PLANE_EXPLOSION_DEPTH = -4
 local HELI_EXPLOSION_DEPTH = -4
@@ -154,7 +152,18 @@ g_savedata = {
 	ai_base_island = nil,
 	player_base_island = nil,
 	controllable_islands = {},
-    ai_army = { squadrons = { [RESUPPLY_SQUAD_INDEX] = { command = COMMAND_RESUPPLY, ai_type = "", role = "", vehicles = {}, target_island = nil }} },
+    ai_army = { 
+		squadrons = { 
+			[RESUPPLY_SQUAD_INDEX] = { 
+				command = COMMAND_RESUPPLY, 
+				ai_type = "", 
+				role = "", 
+				vehicles = {}, 
+				target_island = nil 
+			}
+		},
+		squad_vehicles = {} -- stores which squad the vehicles are assigned to, indexed via the vehicle's id, with this we can get the vehicle we want the data for without needing to check every single enemy ai vehicle
+	},
 	player_vehicles = {},
 	constructable_vehicles = {},
 	vehicle_list = {},
@@ -211,24 +220,29 @@ end
 --]]
 
 function wpDLCDebug(message, requiresDebugging, isError, toPlayer) -- glorious debug function
-	local deb_err = s.getAddonData((s.getAddonIndex())).name..(isError and " Error:" or " Debug:")
+	local suffix = s.getAddonData((s.getAddonIndex())).name..(isError and " Error:" or " Debug:")
+	local deb_err = isError and " Error:" or " Debug:"
+
+	if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
+		debug.log("SW IMPWEP "..deb_err.." | "..string.gsub(message, "\n", " \\n "))
+	end
 	
 	if type(message) == "table" then
 		printTable(message, requiresDebugging, isError, toPlayer)
 	elseif requiresDebugging == true then
 		if toPlayer ~= -1 and toPlayer ~= nil then
 			if g_savedata.playerData.isDebugging.toPlayer then
-				s.announce(deb_err, message, toPlayer)
+				s.announce(suffix, message, toPlayer)
 			end
 		else
 			for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
 				if is_debugging then
-					s.announce(deb_err, message, player_id)
+					s.announce(suffix, message, player_id)
 				end
 			end
 		end
 	else
-		s.announce(deb_err, message, toPlayer or "-1")
+		s.announce(suffix, message, toPlayer or "-1")
 	end
 end
 
@@ -241,11 +255,11 @@ end
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
 	if not s.dlcWeapons() then
-		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
+		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, true, peer_id)
 	end
 	-- check if they left the default addon enabled
 	if g_savedata.info.has_default_addon then
-		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+		wpDLCDebug("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
 	end
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
@@ -317,6 +331,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
 		g_savedata.info.has_default_addon = true
+		is_dlc_weapons = false
 	end
 
 	warningChecks(-1)
@@ -626,7 +641,7 @@ function buildPrefabs(location_index)
 				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
-				wpDLCDebug("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy], true, false)
+				wpDLCDebug("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, false)
 			else
 				tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
@@ -726,7 +741,8 @@ function spawnTurret(island)
 				}
 			},
 			capabilities = {
-				gps_missiles = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE")
+				gps_target = hasTag(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
+				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE") -- used to press a button to fire the missiles
 			},
 			is_aggressive = "normal",
 			terrain_type = "offroad",
@@ -789,6 +805,11 @@ function spawnAIVehicle(requested_prefab)
 		selected_prefab = sm.spawn(false)
 	end
 
+	if not selected_prefab then
+		wpDLCDebug("Unable to spawn AI vehicle! (prefab not recieved)", true, true)
+		return false
+	end
+
 	if not requested_prefab then
 		if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
 			return false, "boat limit reached"
@@ -814,7 +835,7 @@ function spawnAIVehicle(requested_prefab)
 	-------
 
 	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
-	if getTagValue(selected_prefab.vehicle.tags, "role") == "attack" or getTagValue(selected_prefab.vehicle.tags, "role") == "scout" then
+	if getTagValue(selected_prefab.vehicle.tags, "role", true) == "attack" or getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
 		target, ally = getObjectiveIsland()
 		if not target then
 			sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
@@ -837,7 +858,7 @@ function spawnAIVehicle(requested_prefab)
 	-- (A) if the vehicle we want to spawn is a defensive vehicle, we want to spawn it on the island that has the least amount of defence
 	-- (B) if theres multiple, pick the island we saw the player closest to
 	-- (C) if none, then spawn it at the island which is closest to the player's island
-	elseif getTagValue(selected_prefab.vehicle.tags, "role") == "defend" then
+	elseif getTagValue(selected_prefab.vehicle.tags, "role", true) == "defend" then
 		local lowest_defenders = nil
 		local check_last_seen = false
 		local islands_needing_checked = {}
@@ -917,7 +938,7 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not g_savedata.controllable_islands[selected_spawn] then
-		wpDLCDebug("(spawnAIVehicle) selected island is nil! island index: "..selected_spawn, true, true)
+		wpDLCDebug("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, true)
 		return false
 	end
 
@@ -1018,7 +1039,8 @@ function spawnAIVehicle(requested_prefab)
 				}
 			},
 			capabilities = {
-				gps_missiles = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE")
+				gps_target = hasTag(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
+				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE") -- used to press a button to fire the missiles
 			},
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			is_resupply_on_load = false,
@@ -1239,10 +1261,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					elseif command == "sv" then --spawn vehicle
 						if arg[1] then
 							vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
-							if vehicle_id or arg[1] == "scout" then
+							if vehicle_id or arg[1] == "scout" or arg[1] == "cargo" then
 								valid_vehicle = true
 								wpDLCDebug("Spawning \""..arg[1].."\"", false, false, user_peer_id)
-								if arg[1] ~= "scout" then
+								if arg[1] ~= "scout" and arg[1] ~= "cargo" then
 									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id)
 									if successfully_spawned then
 										if arg[2] ~= nil then
@@ -1364,6 +1386,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 											end
 										end
 									end
+								elseif arg[1] == "cargo" then
+									spawnAIVehicle(arg[1])
 								elseif arg[1] == "scout" then
 									local scout_exists = false
 									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -1636,6 +1660,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 						wpDLCDebug("asking cargo to do things...(get best route)", false, false, user_peer_id)
 						island_selected = g_savedata.controllable_islands[tonumber(arg[1])]
 						if island_selected then
+							wpDLCDebug("selected island index: "..island_selected.index, false, false)
 							local best_route = cargo.getBestRoute(g_savedata.ai_base_island, island_selected)
 							if best_route[1] then
 								wpDLCDebug("first transportation method: "..best_route[1].transport_method, false, false, user_peer_id)
@@ -1677,7 +1702,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							g_savedata.playerData.isDoAsISay[user_peer_id] = nil
 						end
 						if not arg[1] then
-							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do \n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
+							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do\n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
 							g_savedata.playerData.isDoAsISay[user_peer_id] = true
 							g_savedata.playerData.timers.isDoAsISay = g_savedata.tick_counter
 						end
@@ -1729,7 +1754,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								else
 									wpDLCDebug("-----\nCommand\n?impwep "..command_name, false, false, user_peer_id)
 								end
-								wpDLCDebug("Short Description\n "..command_info.short_desc.."\n", false, false, user_peer_id)
+								wpDLCDebug("Short Description\n"..command_info.short_desc.."\n", false, false, user_peer_id)
 							end
 						end
 
@@ -1951,23 +1976,30 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 			end
 		end
 
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-				if vehicle_id == incoming_vehicle_id and body_id == 0 then
-					if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
-					local damage_prev = vehicle_object.current_damage
-					vehicle_object.current_damage = vehicle_object.current_damage + amount
+		local squad_index = squad.getSquad(incoming_vehicle_id)
 
-					local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
+		if squad_index then
+			local squad = g_savedata.ai_army.squadrons[squad_index]
+			local vehicle_object = squad.vehicles[incoming_vehicle_id] 
+			if vehicle_id == incoming_vehicle_id and body_id == 0 then
+				if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
+				local damage_prev = vehicle_object.current_damage
+				vehicle_object.current_damage = vehicle_object.current_damage + amount
 
-					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_turret") then
+				local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
-						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
-							killVehicle(squad_index, vehicle_id, true)
-						elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
-							killVehicle(squad_index, vehicle_id, false)
-						end
+				if g_savedata.settings.SINKING_MODE then
+					if vehicle_object.ai_type == AI_TYPE_TURRET or vehicle_object.ai_type == AI_TYPE_LAND then
+						enemy_hp = enemy_hp * 2.5
+					else
+						enemy_hp = enemy_hp * 8
 					end
+				end
+
+				if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+					killVehicle(squad_index, vehicle_id, true)
+				elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
+					killVehicle(squad_index, vehicle_id, false)
 				end
 			end
 		end
@@ -2091,10 +2123,12 @@ function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	end
 	if target then
 		tx, ty, tz = matrix.position(target.last_known_pos)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_X", tx)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_Y", ty)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_MISSILE_TARGET_Z", tz)
-		s.pressVehicleButton(vehicle_id, "AI_GPS_MISSILE_FIRE")
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", tx)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", ty)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", tz)
+		if vehicle_object.capabilities.gps_missile then
+			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
+		end
 	end
 end
 
@@ -2126,8 +2160,10 @@ function onVehicleLoad(incoming_vehicle_id)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
-			g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
-			g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			if player_vehicle_data.voxels then
+				g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
+				g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			end
 		end
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2142,7 +2178,7 @@ function onVehicleLoad(incoming_vehicle_id)
 					for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
 						for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
 							if checking_vehicle_object.id ~= vehicle_id then
-								if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (getTagValue(vehicle_object.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + checking_vehicle_object.spawning_transform.distance) then
+								if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
 									wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
 									killVehicle(squad_index, vehicle_id, true, true)
 									return
@@ -2448,7 +2484,7 @@ function tickGamemode()
 				end
 				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
 					if is_debugging then
-						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island \n" .. g_savedata.ai_base_island.production_timer .. "/" .. g_savedata.settings.AI_PRODUCTION_TIME_BASE, 1, debug_data, 255, 0, 0, 255)
+						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
 						s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
@@ -2506,7 +2542,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
 					end
 
-					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\n island.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -2977,7 +3013,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
 
 			wpDLCDebug("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, false)
-			if vehicle_object.role ~= "scout" then -- makes sure the vehicle isnt a scout vehicle
+			if vehicle_object.role ~= "scout" and vehicle_object.role ~= "cargo" then -- makes sure the vehicle isnt a scout vehicle or a cargo vehicle
 				if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
 					local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
 					sm.train(
@@ -3383,7 +3419,7 @@ function tickSquadrons()
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
-						if vehicle_object.capabilities.gps_missiles then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
+						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
 			end
@@ -3461,7 +3497,7 @@ function tickVision()
 
 			if player_vehicle.death_pos ~= nil then
 				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
-					local player_vehicle_data = s.getVehicleData(player_vehicle_id)
+					local player_vehicle_data is_= s.getVehicleData(player_vehicle_id)
 					player_vehicle.death_pos = nil
 					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
 				end
@@ -4605,7 +4641,23 @@ end
 
 --------------------------------------------------------------------------------
 --
--- Cache Functions (mostly for debugging purposes, and is easier to see where caching is used)
+-- Squad Functions
+--
+--------------------------------------------------------------------------------
+
+---@param vehicle_id integer the id of the vehicle you want to get the squad ID of
+---@return integer squad_id the id of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+function squad.getSquad(vehicle_id)
+	if g_savedata.ai_army.squad_vehicles[vehicle_id] then
+		return g_savedata.ai_army.squad_vehicles[vehicle_id]
+	else
+		return nil
+	end
+end
+
+--------------------------------------------------------------------------------
+--
+-- Cache Functions
 --
 --------------------------------------------------------------------------------
 
@@ -4668,9 +4720,9 @@ end
 function cache.read(location)
 	g_savedata.cache_stats.reads = g_savedata.cache_stats.reads + 1
 	if type(g_savedata.cache[location]) ~= "table" then
-		wpDLCDebug("reading cache data at \ng_savedata.cache."..tostring(location).."\n\nData: "..g_savedata.cache[location], true, false)
+		wpDLCDebug("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: "..g_savedata.cache[location], true, false)
 	else
-		wpDLCDebug("reading cache data at \ng_savedata.cache."..tostring(location).."\n\nData: (table)", true, false)
+		wpDLCDebug("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: (table)", true, false)
 	end
 	return g_savedata.cache[location]
 end
@@ -4679,8 +4731,10 @@ end
 ---@return boolean exists if the data exists at the location
 function cache.exists(location)
 	if g_savedata.cache[location] or g_savedata.cache[location] == false then
+		wpDLCDebug("g_savedata.cache."..location.." exists", true, false)
 		return true
 	end
+	wpDLCDebug("g_savedata.cache."..location.." doesn't exist", true, false)
 	return false
 end
 
@@ -4710,34 +4764,56 @@ function cargo.getBestRoute(origin_island, dest_island)
 		transport_vehicle.heli = {
 			name = "none"
 		}
+	elseif not transport_vehicle.heli.name then
+		transport_vehicle.heli = {
+			name = "unknown"
+		}
 	end
 	if not transport_vehicle.land then
 		transport_vehicle.land = {
 			name = "none"
+		}
+	elseif not transport_vehicle.land.name then
+		transport_vehicle.land = {
+			name = "unknown"
 		}
 	end
 	if not transport_vehicle.plane then
 		transport_vehicle.plane = {
 			name = "none"
 		}
+	elseif not transport_vehicle.plane.name then
+		transport_vehicle.plane = {
+			name = "unknown"
+		}
 	end
 	if not transport_vehicle.sea then
 		transport_vehicle.sea = {
 			name = "none"
 		}
+	elseif not transport_vehicle.sea.name then
+		transport_vehicle.sea = {
+			name = "unknown"
+		}
 	end
 	
 
 
-	local cache_index = origin_island.index + dest_island.index
+	local first_cache_index = dest_island.index
+	local second_cache_index = origin_island.index
+
+	if origin_island.index > dest_island.index then
+		first_cache_index = origin_island.index
+		second_cache_index = dest_island.index
+	end
 
 	-- check if the best route here is already cached
-	if cache.exists("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]") then
+	if cache.exists("cargo.best_routes["..first_cache_index.."]["..second_cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]") then
 		------
 		-- read data from cache
 		------
 
-		best_route = cache.read("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]")
+		best_route = cache.read("cargo.best_routes["..first_cache_index.."]["..second_cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]")
 	else
 		------
 		-- calculate best route (resource intensive)
@@ -4750,7 +4826,7 @@ function cargo.getBestRoute(origin_island, dest_island)
 			if vehicle_object then -- checks if the vehicle exists (would return nil if there are none of those vehicles)
 
 				local movement_speed = 0.001
-				if vehicle_object.name ~= "none" then
+				if vehicle_object.name ~= "none" and vehicle_object.vehicle then
 					if vehicle_object.vehicle.ai_type == AI_TYPE_BOAT then
 						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT
 					elseif vehicle_object.vehicle.ai_type == AI_TYPE_PLANE then
@@ -5019,7 +5095,7 @@ function cargo.getBestRoute(origin_island, dest_island)
 		------
 		-- write to cache
 		------
-		cache.write("cargo.best_routes["..cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]", best_route)
+		cache.write("cargo.best_routes["..first_cache_index.."]["..second_cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]", best_route)
 	end
 	return best_route
 end
@@ -5040,7 +5116,13 @@ function cargo.getIslandDistance(island1, island2)
 
 	wpDLCDebug("(cargo.getIslandDistance)\nisland1: "..island1.name, true, false)
 	wpDLCDebug("island2: "..island2.name, true, false)
-	local cache_index = island1.index + island2.index
+	local first_cache_index = island2.index
+	local second_cache_index = island1.index
+
+	if origin_island.index > dest_island.index then
+		first_cache_index = island1.index
+		second_cache_index = island2.index
+	end
 	local distance = {
 		land = nil,
 		sea = nil,
@@ -5051,11 +5133,11 @@ function cargo.getIslandDistance(island1, island2)
 	-- get distance for air vehicles
 	------
 	if hasTag(island1.tags, "can_spawn=plane") and hasTag(island2.tags, "can_spawn=plane") or hasTag(island1.tags, "can_spawn=heli") and hasTag(island2.tags, "can_spawn=heli") then
-		if cache.exists("cargo.island_distances.air["..cache_index.."]") then
+		if cache.exists("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]") then
 			
 			-- pull from cache
 
-			distance.air = cache.read("cargo.island_distances.air["..cache_index.."]")
+			distance.air = cache.read("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]")
 		else
 			
 			-- calculate the distance
@@ -5064,7 +5146,7 @@ function cargo.getIslandDistance(island1, island2)
 			
 			-- write to cache
 
-			cache.write("cargo.island_distances.air["..cache_index.."]", distance.air)
+			cache.write("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]", distance.air)
 		end
 	end
 
@@ -5072,10 +5154,10 @@ function cargo.getIslandDistance(island1, island2)
 	-- get distance for sea vehicles
 	------
 	if hasTag(island1.tags, "can_spawn=boat") and hasTag(island2.tags, "can_spawn=boat") then
-		if cache.exists("cargo.island_distances.sea["..cache_index.."]") then
+		if cache.exists("cargo.island_distances.sea["..first_cache_index.."]["..second_cache_index.."]") then
 			
 			-- pull from cache
-			distance.sea =  cache.read("cargo.island_distances.sea["..cache_index.."]")
+			distance.sea =  cache.read("cargo.island_distances.sea["..first_cache_index.."]["..second_cache_index.."]")
 		else
 			
 			-- calculate the distance
@@ -5093,7 +5175,7 @@ function cargo.getIslandDistance(island1, island2)
 			end
 			
 			-- write to cache
-			cache.write("cargo.island_distances.sea["..cache_index.."]", distance.sea)
+			cache.write("cargo.island_distances.sea["..first_cache_index.."]["..second_cache_index.."]", distance.sea)
 		end
 	end
 
@@ -5102,16 +5184,16 @@ function cargo.getIslandDistance(island1, island2)
 	------
 	if hasTag(island1.tags, "can_spawn=land") then
 		if getTagValue(island1.tags, "land_access", true) == getTagValue(island2.tags, "land_access", true) then
-			if cache.exists("cargo.island_distances.land["..cache_index.."]") then
+			if cache.exists("cargo.island_distances.land["..first_cache_index.."]["..second_cache_index.."]") then
 				
 				-- pull from cache
-				distance.land = cache.read("cargo.island_distances.land["..cache_index.."]")
+				distance.land = cache.read("cargo.island_distances.land["..first_cache_index.."]["..second_cache_index.."]")
 			else
 				
 				-- calculate the distance
 
 				-- makes sure that theres at least 1 land spawn
-				if #g_savedata.controllable_islands[island1.index].zones.land > 0 then
+				if g_savedata.controllable_islands[island1.index] and #g_savedata.controllable_islands[island1.index].zones.land > 0 then
 				
 					distance.land = 0
 					local start_transform = g_savedata.controllable_islands[island1.index].zones.land[math.random(1, #g_savedata.controllable_islands[island1.index].zones.land)].transform
@@ -5125,7 +5207,7 @@ function cargo.getIslandDistance(island1, island2)
 					end
 					
 					-- write to cache
-					cache.write("cargo.island_distances.land["..cache_index.."]", distance.land)
+					cache.write("cargo.island_distances.land["..first_cache_index.."]["..second_cache_index.."]", distance.land)
 				end
 			end
 		end
@@ -5141,7 +5223,7 @@ end
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" or role == "cargo" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
 					if veh_type ~= "mod" and type(veh_data) == "table" then
 						for strat, strat_data in pairs(veh_data) do
@@ -5203,17 +5285,22 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		wpDLCDebug("selected role: "..sel_role, true, false)
 		if not vehicle_type then
-			for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
-				if type(v) == "table" then
-					veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+			if g_savedata.constructable_vehicles[sel_role] then
+				for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
+					if type(v) == "table" then
+						veh_type_chances[veh_type] = g_savedata.constructable_vehicles[sel_role][veh_type].mod
+					end
 				end
+				sel_veh_type = randChance(veh_type_chances)
+			else
+				wpDLCDebug("There are no vehicles with the role \""..sel_role.."\"", true, true)
+				return false
 			end
-			sel_veh_type = randChance(veh_type_chances)
 		else -- then use the vehicle type which was selected
 			if g_savedata.constructable_vehicles[sel_role] and g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
 				sel_veh_type = vehicle_type
 			else
-				wpDLCDebug("theres no vehicles with the role of: "..sel_role.." and with a type of: "..vehicle_type, true, true)
+				wpDLCDebug("There are no vehicles with the role \""..sel_role.."\" and with the type \""..vehicle_type.."\"", true, true)
 				return false
 			end
 		end
