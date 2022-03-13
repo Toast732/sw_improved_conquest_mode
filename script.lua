@@ -466,6 +466,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				defenders = 0,
 				is_scouting = false
 			}
+			
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
 					table.insert(g_savedata.ai_base_island.zones, turretZone)
