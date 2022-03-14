@@ -2,14 +2,15 @@
 local spawnModifiers = {}
 local cargo = {}
 local cache = {}
-local squad = {}
+local squads = {}
+local profiler = {}
 
 -- shortened library names
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.6)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.7)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -208,6 +209,12 @@ g_savedata = {
 		writes = 0,
 		failed_writes = 0,
 		resets = 0
+	},
+	profiler = {},
+	debug = {
+		map = false,
+		profiler = false,
+		chat = false
 	}
 }
 
@@ -1562,17 +1569,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							else
-								local found_vehicle = false
-								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-										if vehicle_id == tonumber(arg[1]) then
-											found_vehicle = true
-											killVehicle(squad_index, vehicle_id, true, true)
-											wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, false, user_peer_id)
-										end
-									end
-								end
-								if not found_vehicle then
+								local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+
+								if vehicle_object and squad_index and squad then
+									killVehicle(squad_index, vehicle_id, true, true)
+									wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, false, user_peer_id)
+								else
 									wpDLCDebug("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, true, user_peer_id)
 								end
 							end
@@ -1939,10 +1941,10 @@ function onPlayerJoin(steam_id, name, peer_id)
 	end
 end
 
-function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
+function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 	if is_dlc_weapons then
-		vehicleData = s.getVehicleData(incoming_vehicle_id)
-		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
+		vehicleData = s.getVehicleData(vehicle_id)
+		local player_vehicle = g_savedata.player_vehicles[vehicle_id]
 
 		if player_vehicle ~= nil then
 			local damage_prev = player_vehicle.current_damage
@@ -1957,10 +1959,10 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 				local valid_ai_vehicles = {}
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						if vehicle_object.target_vehicle_id == incoming_vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
+						if vehicle_object.target_vehicle_id == vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
 							if xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
 								valid_ai_vehicles[vehicle_id] = vehicle_object
-								if not vehicle_object.damage_dealt[incoming_vehicle_id] then vehicle_object.damage_dealt[incoming_vehicle_id] = 0 end
+								if not vehicle_object.damage_dealt[vehicle_id] then vehicle_object.damage_dealt[vehicle_id] = 0 end
 							end
 						end
 					end
@@ -1971,16 +1973,14 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 				-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
 				-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
 				for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
-					vehicle_object.damage_dealt[incoming_vehicle_id] = vehicle_object.damage_dealt[incoming_vehicle_id] + amount/tableLength(valid_ai_vehicles)
+					vehicle_object.damage_dealt[vehicle_id] = vehicle_object.damage_dealt[vehicle_id] + amount/tableLength(valid_ai_vehicles)
 				end
 			end
 		end
 
-		local squad_index = squad.getSquad(incoming_vehicle_id)
+		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
 		if squad_index then
-			local squad = g_savedata.ai_army.squadrons[squad_index]
-			local vehicle_object = squad.vehicles[incoming_vehicle_id] 
 			if vehicle_id == incoming_vehicle_id and body_id == 0 then
 				if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
 				local damage_prev = vehicle_object.current_damage
@@ -2035,12 +2035,10 @@ function onVehicleDespawn(vehicle_id, peer_id)
 		end
 	end
 
-	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		for ai_vehicle_id, vehicle_object in pairs(squad.vehicles) do
-			if vehicle_id == ai_vehicle_id then
-				cleanVehicle(squad_index, vehicle_id)
-			end
-		end
+	local squad_index, squad = squads.getSquad(vehicle_id)
+
+	if squad_index then
+		cleanVehicle(squad_index, vehicle_id)
 	end
 end
 
@@ -2078,6 +2076,7 @@ function cleanVehicle(squad_index, vehicle_id)
 	end
 
 	g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] = nil
+	g_savedata.ai_army.squad_vehicles[vehicle_id] = nil -- reset squad vehicle list
 
 	if squad_index ~= RESUPPLY_SQUAD_INDEX then
 		if tableLength(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
@@ -2092,22 +2091,20 @@ function cleanVehicle(squad_index, vehicle_id)
 	end
 end
 
-function onVehicleUnload(incoming_vehicle_id)
+function onVehicleUnload(vehicle_id)
 	if is_dlc_weapons then
-		wpDLCDebug("onVehicleUnload: "..incoming_vehicle_id, true, false)
+		wpDLCDebug("onVehicleUnload: "..vehicle_id, true, false)
 
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-				if incoming_vehicle_id == vehicle_id then
-					if vehicle_object.is_killed == true then
-						cleanVehicle(squad_index, vehicle_id)
-					else
-						wpDLCDebug("onVehicleUnload: set vehicle pseudo: "..vehicle_id, true, false)
-						if not vehicle_object.name then vehicle_object.name = "nil" end
-						wpDLCDebug("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, false)
-						vehicle_object.state.is_simulating = false
-					end
-				end
+		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+
+		if squad_index then
+			if vehicle_object.is_killed == true then
+				cleanVehicle(squad_index, vehicle_id)
+			else
+				wpDLCDebug("onVehicleUnload: set vehicle pseudo: "..vehicle_id, true, false)
+				if not vehicle_object.name then vehicle_object.name = "nil" end
+				wpDLCDebug("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, false)
+				vehicle_object.state.is_simulating = false
 			end
 		end
 	end
@@ -2154,105 +2151,103 @@ function setLandTarget(vehicle_id, vehicle_object)
 	end
 end
 
-function onVehicleLoad(incoming_vehicle_id)
+function onVehicleLoad(vehicle_id)
 	if is_dlc_weapons then
-		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..incoming_vehicle_id, true, false)
+		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..vehicle_id, true, false)
 
-		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
-			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
+		if g_savedata.player_vehicles[vehicle_id] ~= nil then
+			local player_vehicle_data = s.getVehicleData(vehicle_id)
 			if player_vehicle_data.voxels then
-				g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
-				g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+				g_savedata.player_vehicles[vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
+				g_savedata.player_vehicles[vehicle_id].transform = s.getVehiclePos(vehicle_id)
 			end
 		end
 
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-				if incoming_vehicle_id == vehicle_id then
-					wpDLCDebug("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, false)
-					if not vehicle_object.name then vehicle_object.name = "nil" end
-					wpDLCDebug("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, false)
-					vehicle_object.state.is_simulating = true
-					vehicle_object.transform = s.getVehiclePos(vehicle_id)
-					-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
-					for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
-						for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
-							if checking_vehicle_object.id ~= vehicle_id then
-								if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
-									wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
-									killVehicle(squad_index, vehicle_id, true, true)
-									return
-								end
-							end
-						end
-					end
+		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
-					if vehicle_object.is_resupply_on_load then
-						vehicle_object.is_resupply_on_load = false
-						reload(vehicle_id)
-					end
-
-					for i, char in pairs(vehicle_object.survivors) do
-						if vehicle_object.ai_type == AI_TYPE_TURRET then
-							--Gunners
-							s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
-							local c = s.getCharacterData(char.id)
-							s.setCharacterData(char.id, c.hp, true, true)
-						else
-							if i == 1 then
-								if vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_object.ai_type == AI_TYPE_LAND then
-									s.setCharacterSeated(char.id, vehicle_id, "Captain")
-								else
-									s.setCharacterSeated(char.id, vehicle_id, "Pilot")
-								end
-								local c = s.getCharacterData(char.id)
-								s.setCharacterData(char.id, c.hp, true, true)
-							else
-								--Gunners
-								s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
-								local c = s.getCharacterData(char.id)
-								s.setCharacterData(char.id, c.hp, true, true)
-							end
+		if squad_index then
+			wpDLCDebug("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, false)
+			if not vehicle_object.name then vehicle_object.name = "nil" end
+			wpDLCDebug("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, false)
+			vehicle_object.state.is_simulating = true
+			vehicle_object.transform = s.getVehiclePos(vehicle_id)
+			-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
+			for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
+				for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
+					if checking_vehicle_object.id ~= vehicle_id then
+						if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
+							wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
+							killVehicle(squad_index, vehicle_id, true, true)
+							return
 						end
 					end
-					if vehicle_object.ai_type == AI_TYPE_LAND then
-						if(#vehicle_object.path >= 1) then
-							setLandTarget(vehicle_id, vehicle_object)
-						end
-						if g_savedata.terrain_scanner_links[vehicle_id] == nil then
-							local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-							local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
-							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
-							if success then
-								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
-							else
-								wpDLCDebug("Unable to spawn terrain height checker!", true, true)
-							end
-						elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
-							g_savedata.terrain_scanner_links[vehicle_id] = nil
-						end
-					elseif vehicle_object.ai_type == AI_TYPE_BOAT then
-						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-						if vehicle_y > 10 then -- if its above y 10
-							local playerList = s.getPlayers()
-							local is_player_close = false
-							-- checks if any players are within 750m of the vehicle
-							for _, player in pairs(playerList) do
-								local player_transform = s.getPlayerPos(player.id)
-								if m.distance(player_transform, vehicle_object.transform) < 250 then
-									is_player_close = true
-								end
-							end
-							if not is_player_close then
-								wpDLCDebug("a vehicle was removed as it tried to spawn in the air!", true, false)
-								killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
-							end
-						end
-					end
-					refuel(vehicle_id)
-					return
 				end
 			end
+
+			if vehicle_object.is_resupply_on_load then
+				vehicle_object.is_resupply_on_load = false
+				reload(vehicle_id)
+			end
+
+			for i, char in pairs(vehicle_object.survivors) do
+				if vehicle_object.ai_type == AI_TYPE_TURRET then
+					--Gunners
+					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
+					local c = s.getCharacterData(char.id)
+					s.setCharacterData(char.id, c.hp, true, true)
+				else
+					if i == 1 then
+						if vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_object.ai_type == AI_TYPE_LAND then
+							s.setCharacterSeated(char.id, vehicle_id, "Captain")
+						else
+							s.setCharacterSeated(char.id, vehicle_id, "Pilot")
+						end
+						local c = s.getCharacterData(char.id)
+						s.setCharacterData(char.id, c.hp, true, true)
+					else
+						--Gunners
+						s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
+						local c = s.getCharacterData(char.id)
+						s.setCharacterData(char.id, c.hp, true, true)
+					end
+				end
+			end
+			if vehicle_object.ai_type == AI_TYPE_LAND then
+				if(#vehicle_object.path >= 1) then
+					setLandTarget(vehicle_id, vehicle_object)
+				end
+				if g_savedata.terrain_scanner_links[vehicle_id] == nil then
+					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+					local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
+					local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
+					if success then
+						g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
+					else
+						wpDLCDebug("Unable to spawn terrain height checker!", true, true)
+					end
+				elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
+					g_savedata.terrain_scanner_links[vehicle_id] = nil
+				end
+			elseif vehicle_object.ai_type == AI_TYPE_BOAT then
+				local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+				if vehicle_y > 10 then -- if its above y 10
+					local playerList = s.getPlayers()
+					local is_player_close = false
+					-- checks if any players are within 750m of the vehicle
+					for _, player in pairs(playerList) do
+						local player_transform = s.getPlayerPos(player.id)
+						if m.distance(player_transform, vehicle_object.transform) < 250 then
+							is_player_close = true
+						end
+					end
+					if not is_player_close then
+						wpDLCDebug("a vehicle was removed as it tried to spawn in the air!", true, false)
+						killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
+					end
+				end
+			end
+			refuel(vehicle_id)
+			return
 		end
 	end
 end
@@ -2964,6 +2959,7 @@ function addToSquadron(vehicle_object)
 					if vehicle_object.role ~= "scout" and squad.ai_type ~= "scout" then
 						if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 							squad.vehicles[vehicle_object.id] = vehicle_object
+							g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
 							new_squad = squad
 							break
 						end
@@ -2974,11 +2970,13 @@ function addToSquadron(vehicle_object)
 	end
 
 	if new_squad == nil then
+		new_squad_index = #g_savedata.ai_army.squadrons + 1
 		new_squad = { 
-			command = COMMAND_NONE, 
-			ai_type = vehicle_object.ai_type, 
+			command = COMMAND_NONE,
+			index = new_squad_index,
+			ai_type = vehicle_object.ai_type,
 			role = vehicle_object.role,
-			vehicles = {}, 
+			vehicles = {},
 			target_island = nil,
 			target_players = {},
 			target_vehicles = {},
@@ -2987,6 +2985,7 @@ function addToSquadron(vehicle_object)
 
 		new_squad.vehicles[vehicle_object.id] = vehicle_object
 		table.insert(g_savedata.ai_army.squadrons, new_squad)
+		g_savedata.ai_army.squad_vehicles[vehicle_object.id] = new_squad_index
 	end
 
 	squadInitVehicleCommand(new_squad, vehicle_object)
@@ -3107,6 +3106,7 @@ function tickSquadrons()
 						else
 							g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 							g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] = nil
+							g_savedata.ai_army.squad_vehicles[vehicle_id] = nil
 
 							wpDLCDebug(vehicle_id.." leaving squad "..squad_index.." to resupply", true, false)
 
@@ -3948,15 +3948,8 @@ end
 function tickTerrainScanners()
 	printTable(g_savedata.terrain_scanner_links, true, false)
 	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
-		local vehicle_object = nil
-
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_index, vehicle_data in pairs(squad.vehicles) do
-				if vehicle_index == vehicle_id then
-					vehicle_object = vehicle_data
-				end
-			end
-		end
+	
+		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
 		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
 		
@@ -3968,7 +3961,7 @@ function tickTerrainScanners()
 				dial_read_attempts = 0
 				repeat
 					dial_read_attempts = dial_read_attempts + 1
-					terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
+					local terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
 					if success and terrain_height.value ~= 0 then
 						printTable(terrain_height, true, false)
 						local new_terrain_height = (1000 - terrain_height.value) + 5
@@ -4646,14 +4639,42 @@ end
 --------------------------------------------------------------------------------
 
 ---@param vehicle_id integer the id of the vehicle you want to get the squad ID of
----@return integer squad_id the id of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
-function squad.getSquad(vehicle_id)
-	if g_savedata.ai_army.squad_vehicles[vehicle_id] then
-		return g_savedata.ai_army.squad_vehicles[vehicle_id]
+---@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return squad[] squad the info of the squad, if not found, then returns nil
+function squads.getSquad(vehicle_id) -- input a vehicle's id, and it will return the squad index its from and the squad's data
+	local squad_index = g_savedata.ai_army.squad_vehicles[vehicle_id]
+	if squad_index then
+		local squad = g_savedata.ai_army.squadrons[squad_index]
+		if squad then
+			return squad_index, squad
+		else
+			return squad_index, nil
+		end
 	else
-		return nil
+		return nil, nil
 	end
 end
+
+---@param vehicle_id integer the vehicle's id
+---@return vehicle_object[] vehicle_object the vehicle object, nil if not found
+---@return squad[] squad the info of the squad, if not found, then returns nil
+---@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+function squads.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
+
+	if not vehicle_id then -- makes sure vehicle id was provided
+		wpDLCDebug("(squads.getVehicle) vehicle_id is nil!", true, true)
+		return nil
+	else
+		squad_index, squad = squads.getSquad(vehicle_id)
+	end
+
+	if not squad_index then -- if we were not able to get a squad index then return nil
+		return nil
+	end
+
+	return g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], squad_index, squad
+end
+
 
 --------------------------------------------------------------------------------
 --
@@ -5104,7 +5125,11 @@ end
 ---@return vehicle_prefab vehicle_prefab[] the vehicle to spawn
 function cargo.getTransportVehicle(vehicle_type)
 	local vehicle_prefab = sm.spawn(true, "cargo", vehicle_type)
-	if not vehicle_prefab then vehicle_prefab = nil end
+	if not vehicle_prefab then 
+		vehicle_prefab = nil 
+	else
+		vehicle_prefab.name = vehicle_prefab.location.data.name
+	end
 	return vehicle_prefab
 end
 
@@ -5428,6 +5453,30 @@ function spawnModifiers.debug(user_peer_id, role, type, strategy, constructable_
 		wpDLCDebug("modifier of role "..role..", type "..type..", strategy "..strategy..", with the id of "..constructable_vehicle_id..": "..g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod, false, false, user_peer_id)
 	end
 end
+
+--------------------------------------------------------------------------------
+--
+-- Profiler
+--
+--------------------------------------------------------------------------------
+
+---@param unique_name string a unique name for the profiler  
+function profiler.start(unique_name, requires_debug)
+	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+		if unique_name then	
+			if not g_savedata.profiler[unique_name]
+				g_savedata.profiler[unique_name] = s.getTimeMillisec()
+			else
+				wpDLCDebug("A profiler named "..unique_name.." already exists!", true, true)
+		else
+			wpDLCDebug("A profiler was attempted to be started without a name!", true, true)
+		end
+	end
+end
+
+function profiler.stop(unique_name, requires_debug)
+	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+
 
 --------------------------------------------------------------------------------
 --
