@@ -3,14 +3,15 @@ local spawnModifiers = {}
 local cargo = {}
 local cache = {}
 local squads = {}
-local profiler = {}
+local debugging = {}
 
 -- shortened library names
+local d = debugging
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.7)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.8)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -80,7 +81,6 @@ local CRUISE_HEIGHT = 300
 local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
-local render_debug = false
 local g_debug_speed_multiplier = 1
 
 local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
@@ -187,13 +187,7 @@ g_savedata = {
 		last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
 		scout = {}, -- the scout progress of each island
 	},
-	playerData = {
-		isDebugging = {},
-		isDoAsISay = {},
-		timers = {
-			isDoAsISay = 0,
-		},
-	},
+	player_data = {},
 	cache = {
 		cargo = {
 			island_distances = {
@@ -212,71 +206,34 @@ g_savedata = {
 	},
 	profiler = {},
 	debug = {
-		map = false,
+		chat = false,
 		profiler = false,
-		chat = false
+		map = false
 	}
 }
-
-if render_debug then
-	g_savedata.playerData.isDebugging[0] = true
-end
 
 --[[
         Functions
 --]]
 
-function wpDLCDebug(message, requiresDebugging, isError, toPlayer) -- glorious debug function
-	local suffix = s.getAddonData((s.getAddonIndex())).name..(isError and " Error:" or " Debug:")
-	local deb_err = isError and " Error:" or " Debug:"
-
-	if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
-		debug.log("SW IMPWEP "..deb_err.." | "..string.gsub(message, "\n", " \\n "))
-	end
-	
-	if type(message) == "table" then
-		printTable(message, requiresDebugging, isError, toPlayer)
-	elseif requiresDebugging == true then
-		if toPlayer ~= -1 and toPlayer ~= nil then
-			if g_savedata.playerData.isDebugging.toPlayer then
-				s.announce(suffix, message, toPlayer)
-			end
-		else
-			for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-				if is_debugging then
-					s.announce(suffix, message, player_id)
-				end
-			end
-		end
-	else
-		s.announce(suffix, message, toPlayer or "-1")
-	end
-end
-
-function wpDLCDebugVehicle(id, message, requiresDebugging, isError, toPlayer)
-	if vehicles_debugging[id] then
-		wpDLCDebug(message, requiresDebugging, isError, toPlayer)
-	end
-end
-
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
 	if not s.dlcWeapons() then
-		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, true, peer_id)
+		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, peer_id)
 	end
 	-- check if they left the default addon enabled
 	if g_savedata.info.has_default_addon then
-		wpDLCDebug("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+		d.print("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, 1, peer_id)
 	end
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
+		d.print("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, 0, peer_id)
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, peer_id)
+			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, 1, peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, peer_id)
+			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, peer_id)
 		end
 	end
 end
@@ -286,21 +243,23 @@ local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
 
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
 	-- lets you keep debug mode enabled after reloads
-	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
-		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
+	--[[
+	if g_savedata.player_data then -- backwards compatibilty check for versions before 0.2.1
+		for player_id, is_debugging in pairs(g_savedata.player_data.is_debugging) do
 			if is_debugging then
 				render_debug = true
 			end
 		end
 	else -- adds the playerdata field to the savedata
-		g_savedata.playerData = {
+		g_savedata.player_data = {
 			isDebugging = {},
-			isDoAsISay = {},
+			do_as_i_say = {},
 			timers = {
-				isDoAsISay = 0,
+				do_as_i_say = 0,
 			},
 		}
 	end
+	]]
 
 	-- compatibility check for the new settings
 	if not g_savedata.settings.MAX_HELI_AMOUNT then
@@ -347,7 +306,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
 			spawnAIVehicle() -- spawn initial ai
 		end
-		wpDLCDebug("Lastly, you need to save the world and then load that save to complete the full reload", false, false)
+		d.print("Lastly, you need to save the world and then load that save to complete the full reload", false, 0)
 		g_savedata.info.awaiting_reload = false
 	end
 
@@ -361,7 +320,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			-- this command is very dangerous
 			if do_as_i_say then
 				if peer_id then
-					wpDLCDebug(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, false)
+					d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
 					-- removes all ai vehicles
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -392,16 +351,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						-- removes all flags/capture point vehicles
 						s.despawnVehicle(island.flag_vehicle.id, true)
 					end
-					local debugging_player_data = g_savedata.playerData.isDebugging -- keeps those who are debugging
 
 					-- reset savedata
-					g_savedata.playerData = {
-						isDebugging = debugging_player_data,
-						isDoAsISay = {},
-						timers = {
-							isDoAsISay = 0
-						}
-					}
 					g_savedata.ai_army.squadrons = {}
 					g_savedata.ai_base_island.zones = {}
 					g_savedata.player_base_island = nil
@@ -517,7 +468,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			for _, landZone in pairs(land_zones) do
 				if(m.distance(landZone.transform, flagZone.transform) <= 1000) then
-					table.insert(new_island.zones.land, landZone)
+					table.insert(g_savedata.ai_base_island.zones.land, landZone)
 				end
 			end
 			flag_zones[furthest_flagZone_index] = nil
@@ -588,7 +539,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				end
 			else -- say we're ready to reload scripts
 				g_savedata.info.awaiting_reload = true
-				wpDLCDebug("to complete this process, do ?reload_scripts", false, false, peer_id)
+				d.print("to complete this process, do ?reload_scripts", false, 0, peer_id)
 				is_dlc_weapons = false
 			end
 		else
@@ -648,7 +599,7 @@ function buildPrefabs(location_index)
 				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
-				wpDLCDebug("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, false)
+				d.print("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, 0)
 			else
 				tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
@@ -772,7 +723,7 @@ function spawnTurret(island)
 		local squad = addToSquadron(vehicle_data)
 		setSquadCommand(squad, COMMAND_TURRET)
 
-		wpDLCDebug("spawning island turret", true, false)
+		d.print("spawning island turret", true, 0)
 	end
 end
 
@@ -813,7 +764,7 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not selected_prefab then
-		wpDLCDebug("Unable to spawn AI vehicle! (prefab not recieved)", true, true)
+		d.print("Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false
 	end
 
@@ -945,14 +896,14 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not g_savedata.controllable_islands[selected_spawn] then
-		wpDLCDebug("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, true)
+		d.print("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
 		return false
 	end
 
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
 		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 2000)
-		if found_ocean == false then wpDLCDebug("unable to find ocean to spawn boat!", true, false); return end
+		if found_ocean == false then d.print("unable to find ocean to spawn boat!", true, 0); return end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
 		spawn_transform = g_savedata.controllable_islands[selected_spawn].zones.land[math.random(1, #g_savedata.controllable_islands[selected_spawn].zones.land)].transform
@@ -964,7 +915,7 @@ function spawnAIVehicle(requested_prefab)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if m.distance(spawn_transform, vehicle_object.transform) < (getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
-				wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
+				d.print("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
 				return false
 			end
 		end
@@ -979,12 +930,12 @@ function spawnAIVehicle(requested_prefab)
 	}
 	local vehX, vehY, vehZ = m.position(spawn_transform)
 	if selected_prefab.vehicle.display_name ~= nil then
-		wpDLCDebug("spawned vehicle: "..selected_prefab.vehicle.display_name.." at X: "..vehX.." Y: "..vehY.." Z: "..vehZ, true, false)
+		d.print("spawned vehicle: "..selected_prefab.vehicle.display_name.." at X: "..vehX.." Y: "..vehY.." Z: "..vehZ, true, 0)
 	else
-		wpDLCDebug("the selected vehicle is nil", true, true)
+		d.print("the selected vehicle is nil", true, 1)
 	end
 
-	wpDLCDebug("spawning army vehicle: "..selected_prefab.location.data.name.." / "..selected_prefab.location.playlist_index.." / "..selected_prefab.vehicle.display_name, true, false)
+	d.print("spawning army vehicle: "..selected_prefab.location.data.name.." / "..selected_prefab.location.playlist_index.." / "..selected_prefab.vehicle.display_name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -1129,9 +1080,9 @@ local player_commands = {
 		},
 		debug = {
 			short_desc = "enables or disables debug mode",
-			desc = "lets you toggle debug mode, also shows all the AI vehicles on the map with tons of info",
-			args = "[vehicle_id]",
-			example = "?impwep debug",
+			desc = "lets you toggle debug mode, also shows all the AI vehicles on the map with tons of info valid debug types: \"all\", \"chat\", \"profiler\" and \"map\"",
+			args = "(debug_type) [peer_id]",
+			example = "?impwep debug all\n?impwep debug map 0",
 		},
 		st = { -- spawn turret
 			short_desc = "spawns a turret at every enemy AI island",
@@ -1221,17 +1172,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				-- commands all players can execute
 				--
 				if command == "info" then
-					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
-					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
+					d.print("------ Improved Conquest Mode Info ------", false, 0, user_peer_id)
+					d.print("Version: "..IMPROVED_CONQUEST_VERSION, false, 0, user_peer_id)
 					if g_savedata.info.has_default_addon then
-						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
+						d.print("Has default conquest mode addon enabled, this will cause issues and errors!", false, 1, user_peer_id)
 					end
-					wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
-					wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
+					d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, user_peer_id)
+					d.print("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, 0, user_peer_id)
 					if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
-						wpDLCDebug("Fully Reloaded Versions: ", false, false, user_peer_id)
+						d.print("Fully Reloaded Versions: ", false, 0, user_peer_id)
 						for i = 1, #g_savedata.info.full_reload_versions do
-							wpDLCDebug(g_savedata.info.full_reload_versions[i], false, false, user_peer_id)
+							d.print(g_savedata.info.full_reload_versions[i], false, 0, user_peer_id)
 						end
 					end
 				end
@@ -1270,7 +1221,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
 							if vehicle_id or arg[1] == "scout" or arg[1] == "cargo" then
 								valid_vehicle = true
-								wpDLCDebug("Spawning \""..arg[1].."\"", false, false, user_peer_id)
+								d.print("Spawning \""..arg[1].."\"", false, 0, user_peer_id)
 								if arg[1] ~= "scout" and arg[1] ~= "cargo" then
 									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id)
 									if successfully_spawned then
@@ -1285,14 +1236,14 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 																-- teleport vehicle to new position
 																local veh_x, veh_y, veh_z = m.position(new_location)
 																s.setVehiclePos(vehicle_data.id, new_location)
-																wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, false, user_peer_id)
+																d.print("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, 0, user_peer_id)
 															else
 																-- delete vehicle as it was unable to find a valid position
 																for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 																	for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 																		if vehicle_object.id == vehicle_data.id then
 																			killVehicle(squad_index, vehicle_index, true, true)
-																			wpDLCDebug("unable to find a valid area to spawn the ship! Try increasing the radius!", false, true, user_peer_id)
+																			d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, user_peer_id)
 																		end
 																	end
 																end
@@ -1309,7 +1260,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 																end
 															end
 															--]]
-															wpDLCDebug("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, true, user_peer_id)
+															d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, user_peer_id)
 															for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 																for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 																	if vehicle_object.id == vehicle_data.id then
@@ -1325,10 +1276,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 															local new_veh_x, new_veh_y, new_veh_z = m.position(new_location)
 															s.setVehiclePos(vehicle_data.id, new_location)
 															vehicle_data.transform = new_location
-															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..new_veh_x.." y:"..new_veh_y.." z:"..new_veh_z, false, false, user_peer_id)
+															d.print("Spawned "..vehicle_data.name.." at x:"..new_veh_x.." y:"..new_veh_y.." z:"..new_veh_z, false, 0, user_peer_id)
 														end
 													else
-														wpDLCDebug("your maximum range must be greater or equal to the minimum range!", false, true, user_peer_id)
+														d.print("your maximum range must be greater or equal to the minimum range!", false, 1, user_peer_id)
 														for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 															for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 																if vehicle_object.id == vehicle_data.id then
@@ -1338,7 +1289,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 														end
 													end
 												else
-													wpDLCDebug("the minimum range must be at least 150!", false, true, user_peer_id)
+													d.print("the minimum range must be at least 150!", false, 1, user_peer_id)
 													for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 														for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 															if vehicle_object.id == vehicle_data.id then
@@ -1354,9 +1305,9 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 															local new_pos = m.translation(arg[2], 0, arg[3])
 															s.setVehiclePos(vehicle_data.id, new_pos)
 															vehicle_data.transform = new_pos
-															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, false, user_peer_id)
+															d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, user_peer_id)
 														elseif vehicle_data.ai_type == AI_TYPE_LAND then
-															wpDLCDebug("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, true, user_peer_id)
+															d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, user_peer_id)
 															for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 																for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 																	if vehicle_object.id == vehicle_data.id then
@@ -1368,10 +1319,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 															local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
 															s.setVehiclePos(vehicle_data.id, new_pos)
 															vehicle_data.transform = new_pos
-															wpDLCDebug("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, false, user_peer_id)
+															d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, user_peer_id)
 														end
 													else
-														wpDLCDebug("invalid z coordinate: "..tostring(arg[3]), false, true, user_peer_id)
+														d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, user_peer_id)
 														for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 															for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 																if vehicle_object.id == vehicle_data.id then
@@ -1381,7 +1332,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 														end
 													end
 												else
-													wpDLCDebug("invalid x coordinate: "..tostring(arg[2]), false, true, user_peer_id)
+													d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, user_peer_id)
 													for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 														for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 															if vehicle_object.id == vehicle_data.id then
@@ -1408,69 +1359,95 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									if not scout_exists then -- if a scout vehicle does not exist
 										spawnAIVehicle(arg[1])
 									else
-										wpDLCDebug("unable to spawn scout vehicle: theres already a scout vehicle!", false, true, user_peer_id)
+										d.print("unable to spawn scout vehicle: theres already a scout vehicle!", false, 1, user_peer_id)
 									end
 								end
 							else
-								wpDLCDebug("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, true, user_peer_id)
+								d.print("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, 1, user_peer_id)
 							end
 						else -- if vehicle not specified, spawn random vehicle
-							wpDLCDebug("Spawning Random Enemy AI Vehicle", false, false, user_peer_id)
+							d.print("Spawning Random Enemy AI Vehicle", false, 0, user_peer_id)
 							spawnAIVehicle()
 						end
 
 
 					elseif command == "vl" then --vehicle list
-						wpDLCDebug("Valid Vehicles:", false, false, user_peer_id)
+						d.print("Valid Vehicles:", false, 0, user_peer_id)
 						for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
-							wpDLCDebug("raw name: \""..vehicle_object.location.data.name.."\"", false, false, user_peer_id)
-							wpDLCDebug("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, false, user_peer_id)
+							d.print("raw name: \""..vehicle_object.location.data.name.."\"", false, 0, user_peer_id)
+							d.print("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, 0, user_peer_id)
 						end
 
 
 					elseif command == "debug" then
-						if arg[1] then
-							vehicles_debugging[tonumber(arg[1])] = not vehicles_debugging[tonumber(arg[1])]
-							-- enabled or disabled message
-							local enDis = "dis"
-							if vehicles_debugging[tonumber(arg[1])] then
-								enDis = "en"
-							end
-							wpDLCDebug(enDis.."abled debugging for vehicle id: "..arg[1], false, false, user_peer_id)
-						else
-							g_savedata.playerData.isDebugging[user_peer_id] = not g_savedata.playerData.isDebugging[user_peer_id]
 
-							if g_savedata.playerData.isDebugging[user_peer_id] ~= true then
-								wpDLCDebug("Debugging Disabled", false, false, user_peer_id)
-							else
-								wpDLCDebug("Debugging Enabled", false, false, user_peer_id)
-							end
-							
-							render_debug = false
-							for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-								if is_debugging then
-									render_debug = true
+						-- get type of debug
+						if arg[1] == "all" then 
+							-- all debug
+							arg[1] = -1
+
+						elseif arg[1] == "chat" then 
+							-- chat debug
+							arg[1] = 0
+
+						elseif arg[1] == "error" then 
+							-- chat debug but only errors
+							arg[1] = 1
+
+						elseif arg[1] == "profiler" then 
+							-- profiler debug
+							arg[1] = 2
+
+						elseif arg[1] == "map" then 
+							-- map debug
+							arg[1] = 3
+
+						elseif not arg[1] or tonumber(arg[1]) then 
+							-- none specified
+							d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, user_peer_id)
+							return
+						else 
+							-- unknown debug type
+							d.print("Unknown debug type: "..arg[1].." valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, user_peer_id)
+							return
+						end
+						-- if they specified a player, then toggle it for that specified player
+						if arg[2] then
+							local player_list = s.getPlayers()
+							for player_index, player in pairs(player_list) do
+								if player.id == tonumber(arg[2]) then
+									local debug_output = d.setDebug(tonumber(arg[1]), tonumber(arg[2]))
+									d.print(s.getPlayerName(user_peer_id).." "..debug_output.." for you", false, 0, tonumber(arg[2]))
+									d.print(debug_output.." for "..s.getPlayerName(tonumber(arg[2])), false, 0, user_peer_id)
+									return
 								end
 							end
+							d.print("unknown peer id: "..arg[2], false, 1, user_peer_id)
+						else -- if they did not specify a player
+							local debug_output = d.setDebug(tonumber(arg[1]), user_peer_id)
+							d.print(debug_output, false, 0, user_peer_id)
+						end
+
+						--[[
 
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-									s.removeMapObject(user_peer_id, vehicle_object.map_id)
-									s.removeMapLine(user_peer_id, vehicle_object.map_id)
-									for i = 1, #vehicle_object.path - 1 do
-										local waypoint = vehicle_object.path[i]
-										s.removeMapLine(user_peer_id, waypoint.ui_id)
-									end
+							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+								s.removeMapObject(user_peer_id, vehicle_object.map_id)
+								s.removeMapLine(user_peer_id, vehicle_object.map_id)
+								for i = 1, #vehicle_object.path - 1 do
+									local waypoint = vehicle_object.path[i]
+									s.removeMapLine(user_peer_id, waypoint.ui_id)
 								end
 							end
-
-							for island_index, island in pairs(g_savedata.controllable_islands) do
-								updatePeerIslandMapData(user_peer_id, island)
-							end
-							
-							updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
-							updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
 						end
+
+						for island_index, island in pairs(g_savedata.controllable_islands) do
+							updatePeerIslandMapData(user_peer_id, island)
+						end
+						
+						updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
+						updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
+						]]
 
 
 					elseif command == "st" then --spawn turret
@@ -1482,7 +1459,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								turrets_spawned = turrets_spawned + 1
 							end
 						end
-						wpDLCDebug("attempted to spawn "..turrets_spawned.." turrets", false, false, user_peer_id)
+						d.print("attempted to spawn "..turrets_spawned.." turrets", false, 0, user_peer_id)
 
 
 					elseif command == "cp" then --capture point
@@ -1495,18 +1472,18 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 										if arg[2] == FACTION_AI or arg[2] == FACTION_NEUTRAL or arg[2] == FACTION_PLAYER then
 											captureIsland(island, arg[2], user_peer_id)
 										else
-											wpDLCDebug(arg[2].." is not a valid faction! valid factions: | ai | neutral | player", false, true, user_peer_id)
+											d.print(arg[2].." is not a valid faction! valid factions: | ai | neutral | player", false, 1, user_peer_id)
 										end
 									else
-										wpDLCDebug(island.name.." is already set to "..island.faction..".", false, true, user_peer_id)
+										d.print(island.name.." is already set to "..island.faction..".", false, 1, user_peer_id)
 									end
 								end
 							end
 							if not is_island then
-								wpDLCDebug(arg[1].." is not a valid island! Did you replace spaces with _?", false, true, user_peer_id)
+								d.print(arg[1].." is not a valid island! Did you replace spaces with _?", false, 1, user_peer_id)
 							end
 						else
-							wpDLCDebug("Invalid Syntax! command usage: ?impwep cp (island_name) (faction)", false, true, user_peer_id)
+							d.print("Invalid Syntax! command usage: ?impwep cp (island_name) (faction)", false, 1, user_peer_id)
 						end
 
 
@@ -1517,7 +1494,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 						if arg[1] then
 							sm.debug(user_peer_id, arg[1], arg[2], arg[3], arg[4])
 						else
-							wpDLCDebug("you need to specify which type to debug!", false, true, user_peer_id)
+							d.print("you need to specify which type to debug!", false, 1, user_peer_id)
 						end
 
 
@@ -1530,32 +1507,32 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 											if arg[1] == "punish" then
 												if ai_training.punishments[tonumber(arg[3])] then
 													g_savedata.constructable_vehicles[arg[2]].mod = g_savedata.constructable_vehicles[arg[2]].mod + ai_training.punishments[tonumber(arg[3])]
-													wpDLCDebug("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
+													d.print("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, 0, user_peer_id)
 												else
-													wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+													d.print("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, 1, user_peer_id)
 												end
 											elseif arg[1] == "reward" then
 												if ai_training.rewards[tonumber(arg[3])] then
 													g_savedata.constructable_vehicles[arg[2]].mod = g_savedata.constructable_vehicles[arg[2]].mod + ai_training.rewards[tonumber(arg[3])]
-													wpDLCDebug("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, false, user_peer_id)
+													d.print("Successfully set role "..arg[2].." to modifier: "..g_savedata.constructable_vehicles[arg[2]].mod, false, 0, user_peer_id)
 												else
-													wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+													d.print("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, 1, user_peer_id)
 												end
 											end
 										else
-											wpDLCDebug("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, true, user_peer_id)
+											d.print("Incorrect syntax! "..arg[3].." has to be a number from 1-5!", false, 1, user_peer_id)
 										end
 									else
-										wpDLCDebug("Unknown role: "..arg[2], false, true, user_peer_id)
+										d.print("Unknown role: "..arg[2], false, 1, user_peer_id)
 									end
 								else
-									wpDLCDebug("You need to specify which role to set!", false, true, user_peer_id)
+									d.print("You need to specify which role to set!", false, 1, user_peer_id)
 								end
 							else
-								wpDLCDebug("Unknown reinforcement type: "..arg[1].." valid reinforcement types: \"punish\" and \"reward\"", false, true, user_peer_id)
+								d.print("Unknown reinforcement type: "..arg[1].." valid reinforcement types: \"punish\" and \"reward\"", false, 1, user_peer_id)
 							end
 						else
-							wpDLCDebug("You need to specify wether to punish or reward!", false, true, user_peer_id)
+							d.print("You need to specify wether to punish or reward!", false, 1, user_peer_id)
 						end
 
 					-- arg 1 = id
@@ -1565,7 +1542,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 										killVehicle(squad_index, vehicle_id, true, true)
-										wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id, false, false, user_peer_id)
+										d.print("Sucessfully deleted vehicle "..vehicle_id, false, 0, user_peer_id)
 									end
 								end
 							else
@@ -1573,13 +1550,13 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 								if vehicle_object and squad_index and squad then
 									killVehicle(squad_index, vehicle_id, true, true)
-									wpDLCDebug("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, false, user_peer_id)
+									d.print("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, 0, user_peer_id)
 								else
-									wpDLCDebug("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, true, user_peer_id)
+									d.print("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, 1, user_peer_id)
 								end
 							end
 						else
-							wpDLCDebug("Invalid syntax! You must either choose a vehicle id, or \"all\" to remove all enemy AI vehicles", false, true, user_peer_id) 
+							d.print("Invalid syntax! You must either choose a vehicle id, or \"all\" to remove all enemy AI vehicles", false, 1, user_peer_id) 
 						end
 
 
@@ -1596,16 +1573,16 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 										local name = s.getPlayerName(user_peer_id)
 										s.notify(-1, "(Improved Conquest Mode) Scout Level Changed", name.." set "..arg[2].."'s scout level to "..(g_savedata.ai_knowledge.scout[string.gsub(arg[1], "_", " ")].scouted/scout_requirement*100).."%", 1)
 									else
-										wpDLCDebug("Unknown island: "..string.gsub(arg[1], "_", " "), false, true, user_peer_id)
+										d.print("Unknown island: "..string.gsub(arg[1], "_", " "), false, 1, user_peer_id)
 									end
 								else
-									wpDLCDebug("Arg 2 has to be a number! Unknown value: "..arg[2], false, true, user_peer_id)
+									d.print("Arg 2 has to be a number! Unknown value: "..arg[2], false, 1, user_peer_id)
 								end
 							else
-								wpDLCDebug("Invalid syntax! you must specify the scout level to set it to (0-100)", false, true, user_peer_id)
+								d.print("Invalid syntax! you must specify the scout level to set it to (0-100)", false, 1, user_peer_id)
 							end
 						else
-							wpDLCDebug("Invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, true, user_peer_id)
+							d.print("Invalid syntax! you must specify the island and the scout level (0-100) to set it to!", false, 1, user_peer_id)
 						end
 
 					
@@ -1614,79 +1591,79 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					elseif command == "setting" then
 						if not arg[1] then
 							-- we want to print a list of all settings they can change
-							wpDLCDebug("\nAll Improved Conquest Mode Settings", false, false, user_peer_id)
+							d.print("\nAll Improved Conquest Mode Settings", false, 0, user_peer_id)
 							for setting_name, setting_value in pairs(g_savedata.settings) do
-								wpDLCDebug("-----\nSetting Name: "..setting_name.."\nSetting Type: "..type(setting_value), false, false, user_peer_id)
+								d.print("-----\nSetting Name: "..setting_name.."\nSetting Type: "..type(setting_value), false, 0, user_peer_id)
 							end
 						elseif g_savedata.settings[arg[1]] ~= nil then -- makes sure the setting they selected exists
 							if not arg[2] then
 								-- print the current value of the setting they selected
-								wpDLCDebug(arg[1].."'s current value: "..tostring(g_savedata.settings[arg[1]]))
+								d.print(arg[1].."'s current value: "..tostring(g_savedata.settings[arg[1]]), false, 0, user_peer_id)
 							else
 								-- change the value of the setting they selected
 								if type(g_savedata.settings[arg[1]]) == "number" then
 									if tonumber(arg[2]) then
-										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, false, -1)
+										d.print(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, 0, -1)
 										g_savedata.settings[arg[1]] = tonumber(arg[2])
 									else
-										wpDLCDebug(arg[2].." is not a valid value! it must be a number!", false, true, user_peer_id)
+										d.print(arg[2].." is not a valid value! it must be a number!", false, 1, user_peer_id)
 									end
 								elseif g_savedata.settings[arg[1]] == true or g_savedata.settings[arg[1]] == false then
 									if arg[2] == "true" then
-										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, false, -1)
+										d.print(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, 0, -1)
 										g_savedata.settings[arg[1]] = true
 									elseif arg[2] == "false" then
-										wpDLCDebug(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, false, -1)
+										d.print(s.getPlayerName(user_peer_id).." has changed the setting "..arg[1].." from "..tostring(g_savedata.settings[arg[1]]).." to "..arg[2], false, 0, -1)
 										g_savedata.settings[arg[1]] = false
 									else
-										wpDLCDebug(arg[2].." is not a valid value! it must be either \"true\" or \"false\"!", false, true, user_peer_id)
+										d.print(arg[2].." is not a valid value! it must be either \"true\" or \"false\"!", false, 1, user_peer_id)
 									end
 								else
-									wpDLCDebug("g_savedata.settings."..arg[1].." is not a number or a boolean! please report this as a bug! Value of g_savedata.settings."..arg[1]..":"..g_savedata.settings[arg[1]], false, true, user_peer_id)
+									d.print("g_savedata.settings."..arg[1].." is not a number or a boolean! please report this as a bug! Value of g_savedata.settings."..arg[1]..":"..g_savedata.settings[arg[1]], false, 1, user_peer_id)
 								end
 							end
 						else 
 							-- the setting they selected does not exist
-							wpDLCDebug(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, true, user_peer_id)
+							d.print(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, 1, user_peer_id)
 						end
 					elseif command == "debug_cache" then
-						wpDLCDebug("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, false, user_peer_id)
+						d.print("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, 0, user_peer_id)
 					elseif command == "debug_cargo1" then
-						wpDLCDebug("asking cargo to do things...(get island distance)", false, false, user_peer_id)
+						d.print("asking cargo to do things...(get island distance)", false, 0, user_peer_id)
 						for island_index, island in pairs(g_savedata.controllable_islands) do
 							if island.faction == FACTION_AI then
 								cargo.getIslandDistance(g_savedata.ai_base_island, island)
 							end
 						end
 					elseif command == "debug_cargo2" then
-						wpDLCDebug("asking cargo to do things...(get best route)", false, false, user_peer_id)
+						d.print("asking cargo to do things...(get best route)", false, 0, user_peer_id)
 						island_selected = g_savedata.controllable_islands[tonumber(arg[1])]
 						if island_selected then
-							wpDLCDebug("selected island index: "..island_selected.index, false, false)
+							d.print("selected island index: "..island_selected.index, false, 0, user_peer_id)
 							local best_route = cargo.getBestRoute(g_savedata.ai_base_island, island_selected)
 							if best_route[1] then
-								wpDLCDebug("first transportation method: "..best_route[1].transport_method, false, false, user_peer_id)
+								d.print("first transportation method: "..best_route[1].transport_method, false, 0, user_peer_id)
 							else
-								wpDLCDebug("unable to find cargo route!", false, false, user_peer_id)
+								d.print("unable to find cargo route!", false, 0, user_peer_id)
 							end
 							if best_route[2] then
-								wpDLCDebug("second transportation method: "..best_route[2].transport_method, false, false, user_peer_id)
+								d.print("second transportation method: "..best_route[2].transport_method, false, 0, user_peer_id)
 							end
 							if best_route[3] then
-								wpDLCDebug("third transportation method: "..best_route[3].transport_method, false, false, user_peer_id)
+								d.print("third transportation method: "..best_route[3].transport_method, false, 0, user_peer_id)
 							end
 						else
-							wpDLCDebug("incorrect island id: "..arg[1], false, false, user_peer_id)
+							d.print("incorrect island id: "..arg[1], false, 0, user_peer_id)
 						end
 					elseif command == "clear_cache" then
-						wpDLCDebug("clearing cache", false, false, user_peer_id)
+						d.print("clearing cache", false, 0, user_peer_id)
 						cache.reset()
-						wpDLCDebug("cache reset", false, false, user_peer_id)
+						d.print("cache reset", false, 0, user_peer_id)
 					end
 				else
 					for command_name, command_info in pairs(player_commands.admin) do
 						if command == command_name then
-							wpDLCDebug("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, true, user_peer_id)
+							d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, user_peer_id)
 						end
 					end
 				end
@@ -1696,23 +1673,24 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				--
 				if user_peer_id == 0 and is_admin then
 					if command == "full_reload" and user_peer_id == 0 then
-						if arg[1] == "confirm" and g_savedata.playerData.isDoAsISay[user_peer_id] then
-							wpDLCDebug(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, false)
+						local steam_id = getSteamID(user_peer_id)
+						if arg[1] == "confirm" and g_savedata.player_data[steam_id].fully_reloading then
+							d.print(s.getPlayerName(user_peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, 0)
 							onCreate(true, true, user_peer_id)
-						elseif arg[1] == "cancel" and g_savedata.playerData.isDoAsISay[user_peer_id] == true then
-							wpDLCDebug("Action has been reverted, no longer will be fully reloading addon", false, false, user_peer_id)
-							g_savedata.playerData.isDoAsISay[user_peer_id] = nil
+						elseif arg[1] == "cancel" and g_savedata.player_data[steam_id].fully_reloading == true then
+							d.print("Action has been reverted, no longer will be fully reloading addon", false, 0, user_peer_id)
+							g_savedata.player_data[steam_id].fully_reloading = nil
 						end
 						if not arg[1] then
-							wpDLCDebug("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do\n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, false, user_peer_id)
-							g_savedata.playerData.isDoAsISay[user_peer_id] = true
-							g_savedata.playerData.timers.isDoAsISay = g_savedata.tick_counter
+							d.print("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do\n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, 0, user_peer_id)
+							g_savedata.player_data[steam_id].fully_reloading = true
+							g_savedata.player_data[steam_id].timers.do_as_i_say = g_savedata.tick_counter
 						end
 					end
 				else
 					for command_name, command_info in pairs(player_commands.host) do
 						if command == command_name then
-							wpDLCDebug("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, true, user_peer_id)
+							d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, user_peer_id)
 						end
 					end
 				end
@@ -1724,39 +1702,39 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					if not arg[1] then -- print a list of all commands
 						
 						-- player commands
-						wpDLCDebug("All Improved Conquest Mode Commands (PLAYERS)", false, false, user_peer_id)
+						d.print("All Improved Conquest Mode Commands (PLAYERS)", false, 0, user_peer_id)
 						for command_name, command_info in pairs(player_commands.normal) do 
 							if command_info.args ~= "none" then
-								wpDLCDebug("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, false, user_peer_id)
+								d.print("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, 0, user_peer_id)
 							else
-								wpDLCDebug("-----\nCommand\n?impwep "..command_name, false, false, user_peer_id)
+								d.print("-----\nCommand\n?impwep "..command_name, false, 0, user_peer_id)
 							end
-							wpDLCDebug("Short Description\n"..command_info.short_desc, false, false, user_peer_id)
+							d.print("Short Description\n"..command_info.short_desc, false, 0, user_peer_id)
 						end
 
 						-- admin commands
 						if is_admin then 
-							wpDLCDebug("\nAll Improved Conquest Mode Commands (ADMIN)", false, false, user_peer_id)
+							d.print("\nAll Improved Conquest Mode Commands (ADMIN)", false, 0, user_peer_id)
 							for command_name, command_info in pairs(player_commands.admin) do
 								if command_info.args ~= "none" then
-									wpDLCDebug("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, false, user_peer_id)
+									d.print("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, 0, user_peer_id)
 								else
-									wpDLCDebug("-----\nCommand\n?impwep "..command_name, false, false, user_peer_id)
+									d.print("-----\nCommand\n?impwep "..command_name, false, 0, user_peer_id)
 								end
-								wpDLCDebug("Short Description\n"..command_info.short_desc, false, false, user_peer_id)
+								d.print("Short Description\n"..command_info.short_desc, false, 0, user_peer_id)
 							end
 						end
 
 						-- host only commands
 						if user_peer_id == 0 and is_admin then
-							wpDLCDebug("\nAll Improved Conquest Mode Commands (HOST)", false, false, user_peer_id)
+							d.print("\nAll Improved Conquest Mode Commands (HOST)", false, 0, user_peer_id)
 							for command_name, command_info in pairs(player_commands.host) do
 								if command_info.args ~= "none" then
-									wpDLCDebug("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, false, user_peer_id)
+									d.print("-----\nCommand\n?impwep "..command_name.." "..command_info.args, false, 0, user_peer_id)
 								else
-									wpDLCDebug("-----\nCommand\n?impwep "..command_name, false, false, user_peer_id)
+									d.print("-----\nCommand\n?impwep "..command_name, false, 0, user_peer_id)
 								end
-								wpDLCDebug("Short Description\n"..command_info.short_desc.."\n", false, false, user_peer_id)
+								d.print("Short Description\n"..command_info.short_desc.."\n", false, 0, user_peer_id)
 							end
 						end
 
@@ -1784,17 +1762,17 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 						if command_exists then -- if the command exists
 							if has_permission then -- if they can execute it
 								if command_data.args ~= "none" then
-									wpDLCDebug("\nCommand\n?impwep "..arg[1].." "..command_data.args, false, false, user_peer_id)
+									d.print("\nCommand\n?impwep "..arg[1].." "..command_data.args, false, 0, user_peer_id)
 								else
-									wpDLCDebug("\nCommand\n?impwep "..arg[1], false, false, user_peer_id)
+									d.print("\nCommand\n?impwep "..arg[1], false, 0, user_peer_id)
 								end
-								wpDLCDebug("Description\n"..command_data.desc, false, false, user_peer_id)
-								wpDLCDebug("Example Usage\n"..command_data.example, false, false, user_peer_id)
+								d.print("Description\n"..command_data.desc, false, 0, user_peer_id)
+								d.print("Example Usage\n"..command_data.example, false, 0, user_peer_id)
 							else
-								wpDLCDebug("You do not have permission to use \""..arg[1].."\", contact a server admin if you believe this is incorrect.", false, true, user_peer_id)
+								d.print("You do not have permission to use \""..arg[1].."\", contact a server admin if you believe this is incorrect.", false, 1, user_peer_id)
 							end
 						else
-							wpDLCDebug("unknown command! \""..arg[1].."\" do \"?impwep help\" to get a list of all valid commands!", false, true, user_peer_id)
+							d.print("unknown command! \""..arg[1].."\" do \"?impwep help\" to get a list of all valid commands!", false, 1, user_peer_id)
 						end
 					end
 				end
@@ -1810,11 +1788,11 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				end
 
 				if not is_command then -- if the command they specified does not exist
-					wpDLCDebug("unknown command! \""..command.."\" do \"?impwep help\" to get a list of all valid commands!", false, true, user_peer_id)
+					d.print("unknown command! \""..command.."\" do \"?impwep help\" to get a list of all valid commands!", false, 1, user_peer_id)
 				end
 
 			else
-				wpDLCDebug("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, true, user_peer_id)
+				d.print("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, 1, user_peer_id)
 			end
 		end
 	end
@@ -1915,9 +1893,10 @@ function captureIsland(island, override, peer_id)
 		island.capture_timer = 0
 	end
 
-	if render_debug then
-		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-			if is_debugging then
+	if d.getDebug(3) then
+		local player_list = s.getPlayers()
+		for peer_index, peer in pairs(player_list) do
+			if d.getDebug(3, peer.id) then
 				updatePeerIslandMapData(player_id, island)
 			end
 		end
@@ -1925,6 +1904,27 @@ function captureIsland(island, override, peer_id)
 end
 
 function onPlayerJoin(steam_id, name, peer_id)
+
+	-- create playerdata if it does not already exist
+	if not g_savedata.player_data[tostring(steam_id)] then
+		g_savedata.player_data[tostring(steam_id)] = {
+			peer_id = peer_id,
+			fully_reloading = false,
+			do_as_i_say = false,
+			debug = {
+				chat = false,
+				profiler = false,
+				map = false
+			},
+			timers = {
+				do_as_i_say = 0
+			}
+		}
+	end
+
+	-- update the player's peer_id
+	g_savedata.player_data[tostring(steam_id)].peer_id = peer_id
+
 	warningChecks(-1)
 	if is_dlc_weapons then
 		for island_index, island in pairs(g_savedata.controllable_islands) do
@@ -2046,15 +2046,18 @@ function cleanVehicle(squad_index, vehicle_id)
 
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
-	wpDLCDebug("cleaned vehicle: "..vehicle_id, true, false)
-	for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-		if is_debugging then
-
-			s.removeMapObject(player_id ,vehicle_object.map_id)
-			s.removeMapLine(player_id ,vehicle_object.map_id)
-			for i = 1, #vehicle_object.path - 1 do
-				local waypoint = vehicle_object.path[i]
-				s.removeMapLine(player_id, waypoint.ui_id)
+	d.print("cleaned vehicle: "..vehicle_id, true, 0)
+	if g_savedata.debug.map then
+		local player_list = s.getPlayers()
+		for peer_index, peer in pairs(player_list) do
+			local steam_id = getSteamID(peer.id)
+			if g_savedata.player_data[steam_id].debug.map then
+				s.removeMapObject(player_id ,vehicle_object.map_id)
+				s.removeMapLine(player_id ,vehicle_object.map_id)
+				for i = 1, #vehicle_object.path - 1 do
+					local waypoint = vehicle_object.path[i]
+					s.removeMapLine(player_id, waypoint.ui_id)
+				end
 			end
 		end
 	end
@@ -2093,7 +2096,6 @@ end
 
 function onVehicleUnload(vehicle_id)
 	if is_dlc_weapons then
-		wpDLCDebug("onVehicleUnload: "..vehicle_id, true, false)
 
 		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
@@ -2101,9 +2103,9 @@ function onVehicleUnload(vehicle_id)
 			if vehicle_object.is_killed == true then
 				cleanVehicle(squad_index, vehicle_id)
 			else
-				wpDLCDebug("onVehicleUnload: set vehicle pseudo: "..vehicle_id, true, false)
+				d.print("onVehicleUnload: set vehicle pseudo: "..vehicle_id, true, 0)
 				if not vehicle_object.name then vehicle_object.name = "nil" end
-				wpDLCDebug("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, false)
+				d.print("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, 0)
 				vehicle_object.state.is_simulating = false
 			end
 		end
@@ -2153,7 +2155,6 @@ end
 
 function onVehicleLoad(vehicle_id)
 	if is_dlc_weapons then
-		wpDLCDebug("(onVehicleLoad) vehicle loading! id: "..vehicle_id, true, false)
 
 		if g_savedata.player_vehicles[vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(vehicle_id)
@@ -2166,9 +2167,9 @@ function onVehicleLoad(vehicle_id)
 		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
 		if squad_index then
-			wpDLCDebug("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, false)
+			d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
 			if not vehicle_object.name then vehicle_object.name = "nil" end
-			wpDLCDebug("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, false)
+			d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 			vehicle_object.state.is_simulating = true
 			vehicle_object.transform = s.getVehiclePos(vehicle_id)
 			-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -2176,7 +2177,7 @@ function onVehicleLoad(vehicle_id)
 				for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
 					if checking_vehicle_object.id ~= vehicle_id then
 						if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
-							wpDLCDebug("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, true)
+							d.print("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
 							killVehicle(squad_index, vehicle_id, true, true)
 							return
 						end
@@ -2223,7 +2224,7 @@ function onVehicleLoad(vehicle_id)
 					if success then
 						g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 					else
-						wpDLCDebug("Unable to spawn terrain height checker!", true, true)
+						d.print("Unable to spawn terrain height checker!", true, 1)
 					end
 				elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
 					g_savedata.terrain_scanner_links[vehicle_id] = nil
@@ -2241,7 +2242,7 @@ function onVehicleLoad(vehicle_id)
 						end
 					end
 					if not is_player_close then
-						wpDLCDebug("a vehicle was removed as it tried to spawn in the air!", true, false)
+						d.print("a vehicle was removed as it tried to spawn in the air!", true, 0)
 						killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
 					end
 				end
@@ -2297,9 +2298,6 @@ function addPath(vehicle_object, target_dest)
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
 			distance = m.distance(vehicle_object.transform, m.translation(path.x, veh_y, path.z))
-			if path_index == 1 then
-				wpDLCDebugVehicle(vehicle_object.id, "vehicle id: "..vehicle_object.id.." | distance from destination: "..m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)).." distance from path 1 to dest: "..m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, veh_y, path.z)), true, false)
-			end
 			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)) > m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, veh_y, path.z)) and distance >= 7 then
 				table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = s.getMapID() })
 			end
@@ -2421,7 +2419,7 @@ function tickGamemode()
 			end
 		end
 
-		if render_debug then
+		if d.getDebug(3) then
 			if isTickID(60, 60) then
 			
 				local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
@@ -2477,8 +2475,9 @@ function tickGamemode()
 				if a then
 					debug_data = debug_data .. " Attacking From: " .. a.name
 				end
-				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-					if is_debugging then
+				local player_list = s.getPlayers()
+				for peer_index, peer in pairs(player_list) do
+					if d.getDebug(3, peer.id) then
 						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
 						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
@@ -2519,7 +2518,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				g = 255
 				b = 0
 			end
-			if not g_savedata.playerData.isDebugging[peer_id] then -- checks to see if the player has debug mode disabled
+			if not d.getDebug(3, peer_id) then -- checks to see if the player has debug mode disabled
 				s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
@@ -2548,7 +2547,7 @@ function getSquadLeader(squad)
 	for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 		return vehicle_id, vehicle_object
 	end
-	wpDLCDebug("warning: empty squad "..squad.ai_type.." detected", true, true)
+	d.print("warning: empty squad "..squad.ai_type.." detected", true, 1)
 	return nil
 end
 
@@ -2777,13 +2776,13 @@ function tickAI()
 								if not scout_exists then -- if a scout vehicle does not exist
 									-- then we want to spawn one, unless its been less than 30 minutes since it was killed
 									if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death <= time.hour / 2 then
-										wpDLCDebug("attempting to spawn scout vehicle...", true, false)
+										d.print("attempting to spawn scout vehicle...", true, 0)
 										local spawned = spawnAIVehicle("scout")
 										if spawned then
 											if g_savedata.ai_history.scout_death == -1 then
 												g_savedata.ai_history.scout_death = 0
 											end
-											wpDLCDebug("scout vehicle spawned!", true, false)
+											d.print("scout vehicle spawned!", true, 0)
 											objective_island.is_scouting = true
 											for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 												if squad.command == COMMAND_SCOUT then
@@ -2791,7 +2790,7 @@ function tickAI()
 												end
 											end
 										else
-											wpDLCDebug("Failed to spawn scout vehicle!", true, true)
+											d.print("Failed to spawn scout vehicle!", true, 1)
 										end
 									end
 								elseif not_scouting and squad_to_set then -- if the scout was just set to a different command
@@ -2997,7 +2996,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	if vehicle_object.is_killed ~= true or instant then
-		wpDLCDebug(vehicle_id.." from squad "..squad_index.." is out of action", true, false)
+		d.print(vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
 		vehicle_object.is_killed = true
 		vehicle_object.death_timer = 0
 
@@ -3011,7 +3010,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 
 			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
 
-			wpDLCDebug("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, false)
+			d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
 			if vehicle_object.role ~= "scout" and vehicle_object.role ~= "cargo" then -- makes sure the vehicle isnt a scout vehicle or a cargo vehicle
 				if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
 					local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
@@ -3045,7 +3044,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 		if not instant and delete ~= true then
 			local fire_id = vehicle_object.fire_id
 			if fire_id ~= nil then
-				wpDLCDebug("explosion fire enabled", true, false)
+				d.print("explosion fire enabled", true, 0)
 				s.setFireData(fire_id, true, true)
 			end
 		end
@@ -3068,7 +3067,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 				explosion_size = 1
 			end
 
-			wpDLCDebug("explosion spawned", true, false)
+			d.print("explosion spawned", true, 0)
 
 			s.spawnExplosion(vehicle_object.transform, explosion_size)
 		end
@@ -3108,7 +3107,7 @@ function tickSquadrons()
 							g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] = nil
 							g_savedata.ai_army.squad_vehicles[vehicle_id] = nil
 
-							wpDLCDebug(vehicle_id.." leaving squad "..squad_index.." to resupply", true, false)
+							d.print(vehicle_id.." leaving squad "..squad_index.." to resupply", true, 0)
 
 							if tableLength(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
@@ -3157,7 +3156,7 @@ function tickSquadrons()
 						g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = nil
 						addToSquadron(vehicle_object)
 
-						wpDLCDebug(vehicle_id.." resupplied. joining squad", true, false)
+						d.print(vehicle_id.." resupplied. joining squad", true, 0)
 					end
 				end
 			end
@@ -3170,7 +3169,7 @@ function tickSquadrons()
 						setSquadCommand(squad, COMMAND_NONE)
 					end
 				else
-					wpDLCDebug("patrol squad missing leader", true, false)
+					d.print("patrol squad missing leader", true, 0)
 					setSquadCommand(squad, COMMAND_NONE)
 				end
 			elseif squad.command == COMMAND_STAGE then
@@ -3202,10 +3201,9 @@ function tickSquadrons()
 				g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].target_island = nil
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if #vehicle_object.path == 0 then
-						wpDLCDebug("resupply mission recalculating target island for: "..vehicle_id, true, false)
+						d.print("resupply mission recalculating target island for: "..vehicle_id, true, 0)
 						local ally_island = getResupplyIsland(vehicle_object.transform)
 						resetPath(vehicle_object)
-						wpDLCDebugVehicle(vehicle_id, "(vehicle resupplying) Vehicle: "..vehicle_id.." is resupplying! path reset!", true, false)
 						addPath(vehicle_object, m.multiply(ally_island.transform, m.translation(math.random(-250, 250), CRUISE_HEIGHT + (vehicle_object.id % 10 * 20), math.random(-250, 250))))
 					end
 					
@@ -3502,23 +3500,6 @@ function tickVision()
 					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
 				end
 			end
-
-			if render_debug then
-				local debug_data = ""
-
-				debug_data = debug_data .. "\ndamage: " .. player_vehicle.current_damage
-				debug_data = debug_data .. "\nthreshold: " .. player_vehicle.damage_threshold
-
-				if recent_spotter ~= nil then debug_data = debug_data .. "\nspotter: " .. player_vehicle.recent_spotter end
-				if last_known_pos ~= nil then debug_data = debug_data .. "last_known_pos: " end
-				if death_pos ~= nil then debug_data = debug_data .. "death_pos: " end
-				for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-					if is_debugging then
-						s.removeMapObject(player_id, player_vehicle.map_id)
-						s.addMapObject(player_id, player_vehicle.map_id, 1, 4, 0, 150, 0, 150, player_vehicle_id, 0, "Tracked Vehicle: " .. player_vehicle_id, 1, debug_data, 0, 0, 255, 255)
-					end
-				end
-			end
 		end
 	end
 
@@ -3678,7 +3659,7 @@ function tickVehicles()
 									end
 								elseif vehicle_object.ai_type ~= AI_TYPE_LAND then
 									-- if we have reached last waypoint start holding there
-									wpDLCDebug("set plane "..vehicle_id.." to holding", true, false)
+									d.print("set plane "..vehicle_id.." to holding", true, 0)
 									vehicle_object.state.s = VEHICLE_STATE_HOLDING
 								end
 							elseif vehicle_object.ai_type == AI_TYPE_BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
@@ -3687,7 +3668,7 @@ function tickVehicles()
 									table.remove(vehicle_object.path, 1)
 								else
 									-- if we have reached last waypoint start holding there
-									wpDLCDebug("set boat "..vehicle_id.." to holding", true, false)
+									d.print("set boat "..vehicle_id.." to holding", true, 0)
 									vehicle_object.state.s = VEHICLE_STATE_HOLDING
 								end
 							end
@@ -3734,7 +3715,6 @@ function tickVehicles()
 							end
 						else
 							if #vehicle_object.path == 0 then
-								wpDLCDebugVehicle(vehicle_id, "Vehicle: "..vehicle_id.." has 0 paths, adding more", true, false)
 								addPath(vehicle_object, vehicle_object.transform)
 							end
 
@@ -3790,7 +3770,7 @@ function tickVehicles()
 						end
 					end
 				end
-				if render_debug then
+				if d.getDebug(3) then
 					local vehicle_pos = vehicle_object.transform
 					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_pos)
 					local debug_data = ""
@@ -3900,8 +3880,9 @@ function tickVehicles()
 						b = 57
 						vehicle_icon = debug_mode_blinker and 14 or state_icons[squad.command]
 					end
-					for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
-						if is_debugging then
+					local player_list = s.getPlayers()
+					for peer_index, peer in pairs(player_list) do
+						if d.getDebug(3, peer.id) then
 							s.removeMapObject(player_id, vehicle_object.map_id)
 							s.addMapObject(player_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
@@ -3955,9 +3936,9 @@ function tickTerrainScanners()
 		
 		if vehicle_object then
 			if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
-				wpDLCDebug("terrain scanner loading!", true, false)
-				wpDLCDebug("ter id: "..terrain_scanner, true, false)
-				wpDLCDebug("veh id: "..vehicle_id, true, false)
+				d.print("terrain scanner loading!", true, 0)
+				d.print("ter id: "..terrain_scanner, true, 0)
+				d.print("veh id: "..vehicle_id, true, 0)
 				dial_read_attempts = 0
 				repeat
 					dial_read_attempts = dial_read_attempts + 1
@@ -3968,14 +3949,14 @@ function tickTerrainScanners()
 						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
 						local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
 						s.setVehiclePos(vehicle_id, new_vehicle_matrix)
-						wpDLCDebug("set land vehicle to new y level!", true, false)
+						d.print("set land vehicle to new y level!", true, 0)
 						g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
 						s.despawnVehicle(terrain_scanner, true)
 					else
 						if success then
-							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+							d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, 1)
 						else
-							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+							d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, 1)
 						end
 						
 					end
@@ -3993,19 +3974,19 @@ function tickModifiers()
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 and g_savedata.ai_history.has_defended ~= 0 then -- if the last time the player attacked was equal or less than 30 minutes ago
 			sm.train(REWARD, "defend", 4)
 			sm.train(PUNISH, "attack", 3)
-			wpDLCDebug("players have attacked within the last 30 minutes! increasing defence, decreasing attack!", true, false)
+			d.print("players have attacked within the last 30 minutes! increasing defence, decreasing attack!", true, 0)
 		end
 	end
 	if isTickID(g_savedata.tick_counter, time.hour) then -- attack, if the player has not attacked in the last one hour, raise attack
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour then -- if the last time the player attacked was more than an hour ago
 			sm.train(REWARD, "attack", 3)
-			wpDLCDebug("players have not attacked in the past hour! increasing attack!", true, false)
+			d.print("players have not attacked in the past hour! increasing attack!", true, 0)
 		end
 	end
 	if isTickID(g_savedata.tick_counter, time.hour * 2) then -- defence, if the player has not attacked in the last two hours, then lower defence
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended > time.hour * 2 then -- if the last time the player attacked was more than two hours ago
 			sm.train(PUNISH, "defend", 3)
-			wpDLCDebug("players have not attacked in the last two hours! lowering defence!", true, false)
+			d.print("players have not attacked in the last two hours! lowering defence!", true, 0)
 		end
 	end
 
@@ -4029,7 +4010,7 @@ function tickModifiers()
 					if g_savedata.ai_history.defended_charge >= 6 then
 						g_savedata.ai_history.defended_charge = 0
 						g_savedata.ai_history.has_defended = g_savedata.tick_counter
-						wpDLCDebug(player.name.." has been detected to be attacking "..island.name..", the ai will be raising their defences!", true, false)
+						d.print(player.name.." has been detected to be attacking "..island.name..", the ai will be raising their defences!", true, 0)
 					end
 				end
 			end
@@ -4038,22 +4019,28 @@ function tickModifiers()
 end
 
 function tickOther()
-	if g_savedata.playerData.isDoAsISay[0] then
-		-- if its been 15 or more seconds since player did the ?impwep full_reload
-		-- then cancel the command
-		if (g_savedata.tick_counter - g_savedata.playerData.timers.isDoAsISay) >= time.second*15 then
-			wpDLCDebug("Automatically cancelled full reload!", false, false, 0)
-			g_savedata.playerData.isDoAsISay[0] = nil
-			g_savedata.playerData.timers.isDoAsISay = 0
+	local steam_id = getSteamID(0)
+	if steam_id then
+		if g_savedata.player_data[steam_id] and g_savedata.player_data[steam_id].do_as_i_say then
+			-- if its been 15 or more seconds since player did the ?impwep full_reload
+			-- then cancel the command
+			if (g_savedata.tick_counter - g_savedata.player_data[steam_id].timers.do_as_i_say) >= time.second*15 then
+				d.print("Automatically cancelled full reload!", false, 0, 0)
+				g_savedata.player_data[steam_id].fully_reloading[0] = nil
+				g_savedata.player_data[steam_id].timers.do_as_i_say = 0
+			end
 		end
 	end
 end
 
 function onTick(tick_time)
-	g_tick_counter = g_tick_counter + 1
-	g_savedata.tick_counter = g_savedata.tick_counter + 1
-
 	if is_dlc_weapons then
+
+		--d.startProfiler("onTick", true)
+
+
+		g_tick_counter = g_tick_counter + 1
+		g_savedata.tick_counter = g_savedata.tick_counter + 1
 		tickUpdateVehicleData()
 		tickVision()
 		tickGamemode()
@@ -4065,6 +4052,9 @@ function onTick(tick_time)
 			tickTerrainScanners()
 		end
 		tickOther() -- not as important stuff
+
+
+		--d.stopProfiler("onTick", true)
 	end
 end
 
@@ -4211,7 +4201,7 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 			l_ai_type = "flag"
 		end
 		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
-			wpDLCDebug("terrain scanner!", true, false)
+			d.print("terrain scanner!", true, 0)
 			l_ai_type = "terrain_scanner"
 		end
 
@@ -4245,10 +4235,10 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		wpDLCDebug("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, true)
-		wpDLCDebug("component index: "..component, false, true)
-		wpDLCDebug("playlist_index: "..playlist_index, false, true)
-		wpDLCDebug("location_index: "..location_index, false, true)
+		d.print("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, 1)
+		d.print("component index: "..component, false, 1)
+		d.print("playlist_index: "..playlist_index, false, 1)
+		d.print("location_index: "..location_index, false, 1)
 		return nil
 	end
 end
@@ -4354,8 +4344,6 @@ function squadInitVehicleCommand(squad, vehicle_object)
 	vehicle_object.target_vehicle_id = -1
 	vehicle_object.target_player_id = -1
 
-	wpDLCDebugVehicle(vehicle_object.id, "(squadInitVehicleCommand) Vehicle "..vehicle_object.id.." command: "..squad.command, true, false)
-
 	if squad.command == COMMAND_PATROL then
 		resetPath(vehicle_object)
 
@@ -4386,14 +4374,14 @@ function squadInitVehicleCommand(squad, vehicle_object)
 		resetPath(vehicle_object)
 		target_island, origin_island = getObjectiveIsland()
 		if target_island then
-			wpDLCDebug("Scout found a target island!", true, false)
+			d.print("Scout found a target island!", true, 0)
 			local holding_route = g_holding_pattern
 			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[1].x, CRUISE_HEIGHT * 2, holding_route[1].z)))
 			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[2].x, CRUISE_HEIGHT * 2, holding_route[2].z)))
 			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[3].x, CRUISE_HEIGHT * 2, holding_route[3].z)))
 			addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[4].x, CRUISE_HEIGHT * 2, holding_route[4].z)))
 		else
-			wpDLCDebug("Scout was unable to find a island to target!", true, true)
+			d.print("Scout was unable to find a island to target!", true, 1)
 		end
 	elseif squad.command == COMMAND_RETREAT then
 	elseif squad.command == COMMAND_NONE then
@@ -4567,7 +4555,7 @@ function hasTag(tags, tag)
 			end
 		end
 	else
-		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		d.print("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, 1)
 	end
 	return false
 end
@@ -4585,7 +4573,7 @@ function getTagValue(tags, tag, as_string)
 			end
 		end
 	else
-		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		d.print("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, 1)
 	end
 	return nil
 end
@@ -4594,10 +4582,10 @@ end
 function printTable(T, requiresDebugging, isError, toPlayer)
 	for k, v in pairs(T) do
 		if type(v) == "table" then
-			wpDLCDebug("Table: "..tostring(k), requiresDebugging, isError, toPlayer)
+			d.print("Table: "..tostring(k), requiresDebugging, isError, toPlayer)
 			printTable(v, requiresDebugging, isError, toPlayer)
 		else
-			wpDLCDebug("k: "..tostring(k).." v: "..tostring(v), requiresDebugging, isError, toPlayer)
+			d.print("k: "..tostring(k).." v: "..tostring(v), requiresDebugging, isError, toPlayer)
 		end
 	end
 end
@@ -4623,7 +4611,7 @@ function randChance(t)
 	local win_val = 0
 	for k, v in pairs(t) do
 		local chance = rand(0, v / total_mod)
-		wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
+		d.print("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, 0)
 		if chance > win_val then
 			win_val = chance
 			win_name = k
@@ -4662,7 +4650,7 @@ end
 function squads.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
 
 	if not vehicle_id then -- makes sure vehicle id was provided
-		wpDLCDebug("(squads.getVehicle) vehicle_id is nil!", true, true)
+		d.print("(squads.getVehicle) vehicle_id is nil!", true, 1)
 		return nil
 	else
 		squad_index, squad = squads.getSquad(vehicle_id)
@@ -4714,17 +4702,17 @@ end
 function cache.write(location, data)
 
 	if type(g_savedata.cache[location]) ~= "table" then
-		wpDLCDebug("Data currently at the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+		d.print("Data currently at the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, 0)
 	else
-		wpDLCDebug("Data currently at the cache of "..tostring(location)..": (table)", true, false)
+		d.print("Data currently at the cache of "..tostring(location)..": (table)", true, 0)
 	end
 
 	g_savedata.cache[location] = data
 
 	if type(g_savedata.cache[location]) ~= "table" then
-		wpDLCDebug("Data written to the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, false)
+		d.print("Data written to the cache of "..tostring(location)..": "..tostring(g_savedata.cache[location]), true, 0)
 	else
-		wpDLCDebug("Data written to the cache of "..tostring(location)..": (table)", true, false)
+		d.print("Data written to the cache of "..tostring(location)..": (table)", true, 0)
 	end
 
 	if g_savedata.cache[location] == data then
@@ -4741,9 +4729,9 @@ end
 function cache.read(location)
 	g_savedata.cache_stats.reads = g_savedata.cache_stats.reads + 1
 	if type(g_savedata.cache[location]) ~= "table" then
-		wpDLCDebug("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: "..g_savedata.cache[location], true, false)
+		d.print("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: "..g_savedata.cache[location], true, 0)
 	else
-		wpDLCDebug("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: (table)", true, false)
+		d.print("reading cache data at\ng_savedata.cache."..tostring(location).."\n\nData: (table)", true, 0)
 	end
 	return g_savedata.cache[location]
 end
@@ -4752,10 +4740,10 @@ end
 ---@return boolean exists if the data exists at the location
 function cache.exists(location)
 	if g_savedata.cache[location] or g_savedata.cache[location] == false then
-		wpDLCDebug("g_savedata.cache."..location.." exists", true, false)
+		d.print("g_savedata.cache."..location.." exists", true, 0)
 		return true
 	end
-	wpDLCDebug("g_savedata.cache."..location.." doesn't exist", true, false)
+	d.print("g_savedata.cache."..location.." doesn't exist", true, 0)
 	return false
 end
 
@@ -5139,8 +5127,8 @@ end
 function cargo.getIslandDistance(island1, island2)
 
 
-	wpDLCDebug("(cargo.getIslandDistance)\nisland1: "..island1.name, true, false)
-	wpDLCDebug("island2: "..island2.name, true, false)
+	d.print("(cargo.getIslandDistance)\nisland1: "..island1.name, true, 0)
+	d.print("island2: "..island2.name, true, 0)
 	local first_cache_index = island2.index
 	local second_cache_index = island1.index
 
@@ -5308,7 +5296,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		else
 			sel_role = vehicle_list_id
 		end
-		wpDLCDebug("selected role: "..sel_role, true, false)
+		d.print("selected role: "..sel_role, true, 0)
 		if not vehicle_type then
 			if g_savedata.constructable_vehicles[sel_role] then
 				for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
@@ -5318,18 +5306,18 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 				end
 				sel_veh_type = randChance(veh_type_chances)
 			else
-				wpDLCDebug("There are no vehicles with the role \""..sel_role.."\"", true, true)
+				d.print("There are no vehicles with the role \""..sel_role.."\"", true, 1)
 				return false
 			end
 		else -- then use the vehicle type which was selected
 			if g_savedata.constructable_vehicles[sel_role] and g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
 				sel_veh_type = vehicle_type
 			else
-				wpDLCDebug("There are no vehicles with the role \""..sel_role.."\" and with the type \""..vehicle_type.."\"", true, true)
+				d.print("There are no vehicles with the role \""..sel_role.."\" and with the type \""..vehicle_type.."\"", true, 1)
 				return false
 			end
 		end
-		wpDLCDebug("selected vehicle type: "..sel_veh_type, true, false)
+		d.print("selected vehicle type: "..sel_veh_type, true, 0)
 
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
@@ -5337,7 +5325,7 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 		end
 		sel_strat = randChance(strat_chances)
-		wpDLCDebug("selected strategy: "..sel_strat, true, false)
+		d.print("selected strategy: "..sel_strat, true, 0)
 		
 		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 			if type(v) == "table" then
@@ -5345,12 +5333,12 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 		end
 		sel_vehicle = randChance(vehicle_chances)
-		wpDLCDebug("selected vehicle: "..sel_vehicle, true, false)
+		d.print("selected vehicle: "..sel_vehicle, true, 0)
 	else
 		if g_savedata.constructable_vehicles then
-			wpDLCDebug("unknown arguments for choosing which ai vehicle to spawn!", true, true)
+			d.print("unknown arguments for choosing which ai vehicle to spawn!", true, 1)
 		else
-			wpDLCDebug("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, true)
+			d.print("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, 1)
 		end
 		return false
 	end
@@ -5398,16 +5386,16 @@ end
 function spawnModifiers.train(reinforcement_type, role, role_reinforcement, type, type_reinforcement, strategy, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
 	if reinforcement_type == PUNISH then
 		if role and role_reinforcement then
-			wpDLCDebug("punished role:"..role.." | amount punished: "..ai_training.punishments[role_reinforcement], true, false)
+			d.print("punished role:"..role.." | amount punished: "..ai_training.punishments[role_reinforcement], true, 0)
 			g_savedata.constructable_vehicles[role].mod = math.max(g_savedata.constructable_vehicles[role].mod + ai_training.punishments[role_reinforcement], 0)
 			if type and type_reinforcement then 
-				wpDLCDebug("punished type:"..type.." | amount punished: "..ai_training.punishments[type_reinforcement], true, false)
+				d.print("punished type:"..type.." | amount punished: "..ai_training.punishments[type_reinforcement], true, 0)
 				g_savedata.constructable_vehicles[role][type].mod = math.max(g_savedata.constructable_vehicles[role][type].mod + ai_training.punishments[type_reinforcement], 0.05)
 				if strategy and strategy_reinforcement then 
-					wpDLCDebug("punished strategy:"..strategy.." | amount punished: "..ai_training.punishments[strategy_reinforcement], true, false)
+					d.print("punished strategy:"..strategy.." | amount punished: "..ai_training.punishments[strategy_reinforcement], true, 0)
 					g_savedata.constructable_vehicles[role][type][strategy].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.punishments[strategy_reinforcement], 0.05)
 					if constructable_vehicle_id and vehicle_reinforcement then 
-						wpDLCDebug("punished vehicle:"..constructable_vehicle_id.." | amount punished: "..ai_training.punishments[vehicle_reinforcement], true, false)
+						d.print("punished vehicle:"..constructable_vehicle_id.." | amount punished: "..ai_training.punishments[vehicle_reinforcement], true, 0)
 						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.punishments[vehicle_reinforcement], 0.05)
 					end
 				end
@@ -5415,16 +5403,16 @@ function spawnModifiers.train(reinforcement_type, role, role_reinforcement, type
 		end
 	elseif reinforcement_type == REWARD then
 		if role and role_reinforcement then
-			wpDLCDebug("rewarded role:"..role.." | amount rewarded: "..ai_training.rewards[role_reinforcement], true, false)
+			d.print("rewarded role:"..role.." | amount rewarded: "..ai_training.rewards[role_reinforcement], true, 0)
 			g_savedata.constructable_vehicles[role].mod = math.min(g_savedata.constructable_vehicles[role].mod + ai_training.rewards[role_reinforcement], 1.5)
 			if type and type_reinforcement then 
-				wpDLCDebug("rewarded type:"..type.." | amount rewarded: "..ai_training.rewards[type_reinforcement], true, false)
+				d.print("rewarded type:"..type.." | amount rewarded: "..ai_training.rewards[type_reinforcement], true, 0)
 				g_savedata.constructable_vehicles[role][type].mod = math.min(g_savedata.constructable_vehicles[role][type].mod + ai_training.rewards[type_reinforcement], 1.5)
 				if strategy and strategy_reinforcement then 
-					wpDLCDebug("rewarded strategy:"..strategy.." | amount rewarded: "..ai_training.rewards[strategy_reinforcement], true, false)
+					d.print("rewarded strategy:"..strategy.." | amount rewarded: "..ai_training.rewards[strategy_reinforcement], true, 0)
 					g_savedata.constructable_vehicles[role][type][strategy].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.rewards[strategy_reinforcement], 1.5)
 					if constructable_vehicle_id and vehicle_reinforcement then 
-						wpDLCDebug("rewarded vehicle:"..constructable_vehicle_id.." | amount rewarded: "..ai_training.rewards[vehicle_reinforcement], true, false)
+						d.print("rewarded vehicle:"..constructable_vehicle_id.." | amount rewarded: "..ai_training.rewards[vehicle_reinforcement], true, 0)
 						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.rewards[vehicle_reinforcement], 1.5)
 					end
 				end
@@ -5442,40 +5430,281 @@ function spawnModifiers.debug(user_peer_id, role, type, strategy, constructable_
 	if not constructable_vehicle_id then
 		if not strategy then
 			if not type then
-				wpDLCDebug("modifier of vehicles with role "..role..": "..g_savedata.constructable_vehicles[role].mod, false, false, user_peer_id)
+				d.print("modifier of vehicles with role "..role..": "..g_savedata.constructable_vehicles[role].mod, false, 0, user_peer_id)
 			else
-				wpDLCDebug("modifier of vehicles with role "..role..", with type "..type..": "..g_savedata.constructable_vehicles[role][type].mod, false, false, user_peer_id)
+				d.print("modifier of vehicles with role "..role..", with type "..type..": "..g_savedata.constructable_vehicles[role][type].mod, false, 0, user_peer_id)
 			end
 		else
-			wpDLCDebug("modifier of vehicles with role "..role..", with type "..type..", with strategy "..strategy..": "..g_savedata.constructable_vehicles[role][type][strategy].mod, false, false, user_peer_id)
+			d.print("modifier of vehicles with role "..role..", with type "..type..", with strategy "..strategy..": "..g_savedata.constructable_vehicles[role][type][strategy].mod, false, 0, user_peer_id)
 		end
 	else
-		wpDLCDebug("modifier of role "..role..", type "..type..", strategy "..strategy..", with the id of "..constructable_vehicle_id..": "..g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod, false, false, user_peer_id)
+		d.print("modifier of role "..role..", type "..type..", strategy "..strategy..", with the id of "..constructable_vehicle_id..": "..g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod, false, 0, user_peer_id)
 	end
 end
 
 --------------------------------------------------------------------------------
 --
--- Profiler
+-- Debugging Functions
 --
 --------------------------------------------------------------------------------
 
----@param unique_name string a unique name for the profiler  
-function profiler.start(unique_name, requires_debug)
-	if not requires_debug or requires_debug and g_savedata.debug.profiler then
-		if unique_name then	
-			if not g_savedata.profiler[unique_name]
-				g_savedata.profiler[unique_name] = s.getTimeMillisec()
+---@param message string the message you want to print
+---@param requires_debug boolean if it requires <debug_type> debug to be enabled
+---@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler) 
+---@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
+function debugging.print(message, requires_debug, debug_type, peer_id) -- glorious debug function
+
+	if not requires_debug or requires_debug and d.getDebug(debug_type) then
+		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
+		local prefix = s.getAddonData((s.getAddonIndex())).name..suffix
+
+		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
+			if message then
+				debug.log("SW IMPWEP "..suffix.." | "..string.gsub(message, "\n", " \\n "))
 			else
-				wpDLCDebug("A profiler named "..unique_name.." already exists!", true, true)
+				debug.log("SW IMPWEP "..suffix.." | (d.print) message is nil!")
+			end
+		end
+		
+		if type(message) == "table" then
+			printTable(message, requires_debug, debug_type, peer_id)
+
+		elseif requires_debug == true then
+			if toPlayer ~= -1 and toPlayer ~= nil then
+				if g_savedata.player_data.is_debugging.toPlayer then
+					s.announce(prefix, message, toPlayer)
+				end
+			else
+				local player_list = s.getPlayers()
+				for peer_index, player in pairs(player_list) do
+					if d.getDebug(debug_type, player.id) then
+						s.announce(prefix, message, player_id)
+					end
+				end
+			end
 		else
-			wpDLCDebug("A profiler was attempted to be started without a name!", true, true)
+			s.announce(prefix, message, toPlayer or "-1")
 		end
 	end
 end
 
-function profiler.stop(unique_name, requires_debug)
+function debugging.getDebug(debug_type, peer_id)
+	if not peer_id or peer_id == -1 then -- if any player has it enabled
+		if debug_type == -1 then -- any debug
+			if g_savedata.debug.chat or g_savedata.debug.profiler or g_savedata.debug.map then
+				return true
+			end
+		elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
+			if g_savedata.debug.chat then
+				return true
+			end
+		elseif debug_type == 2 then -- profiler debug
+			if g_savedata.debug.profiler then
+				return true
+			end
+		elseif debug_type == 3 then -- map debug
+			if g_savedata.debug.map then
+				return true
+			end
+		else
+			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type!", true, 1)
+		end
+	else -- if a specific player has it enabled
+		local steam_id = getSteamID(peer_id)
+		if debug_type == -1 then -- any debug
+			if g_savedata.player_data[steam_id].debug.chat or g_savedata.player_data[steam_id].debug.profiler or g_savedata.player_data[steam_id].debug.map then
+				return true
+			end
+		elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
+			if g_savedata.player_data[steam_id].debug.chat then
+				return true
+			end
+		elseif debug_type == 2 then -- profiler debug
+			if g_savedata.player_data[steam_id].debug.profiler then
+				return true
+			end
+		elseif debug_type == 3 then -- map debug
+			if g_savedata.player_data[steam_id].debug.map then
+				return true
+			end
+		else
+			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
+		end
+	end
+	return false
+end
+
+function debugging.setDebug(requested_debug_type, peer_id)
+	if requested_debug_type then
+		if peer_id then
+			local steam_id = getSteamID(peer_id)
+			if requested_debug_type == -1 then -- all debug
+				local none_true = true
+				for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do -- disable all debug
+					if g_savedata.player_data[steam_id].debug[debug_type] then
+						none_true = false
+						g_savedata.player_data[steam_id].debug[debug_type] = false
+					end
+				end
+
+				if none_true then -- if none was enabled, then enable all
+					for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do
+						g_savedata.player_data[steam_id].debug[debug_type] = true
+					end
+					g_savedata.debug.chat = true
+					g_savedata.debug.profiler = true
+					g_savedata.debug.map = true
+					return "Enabled All Debug"
+				else
+					d.checkDebug()
+
+
+					-- remove map debug
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							s.removeMapObject(peer_id, vehicle_object.map_id)
+							s.removeMapLine(peer_id, vehicle_object.map_id)
+							for i = 1, #vehicle_object.path - 1 do
+								local waypoint = vehicle_object.path[i]
+								s.removeMapLine(peer_id, waypoint.ui_id)
+							end
+						end
+					end
+
+					for island_index, island in pairs(g_savedata.controllable_islands) do
+						updatePeerIslandMapData(peer_id, island)
+					end
+
+					updatePeerIslandMapData(peer_id, g_savedata.player_base_island)
+					updatePeerIslandMapData(peer_id, g_savedata.ai_base_island)
+
+
+					return "Disabled All Debug"
+				end
+				
+			elseif requested_debug_type == 0 or requested_debug_type == 1 then -- chat debug
+				g_savedata.player_data[steam_id].debug.chat = not g_savedata.player_data[steam_id].debug.chat
+				if g_savedata.player_data[steam_id].debug.chat then
+					g_savedata.debug.chat = true
+					return "Enabled Chat Debug"
+				else
+					d.checkDebug()
+					return "Disabled Chat Debug"
+				end
+			elseif requested_debug_type == 2 then -- profiler debug
+				g_savedata.player_data[steam_id].debug.profiler = not g_savedata.player_data[steam_id].debug.profiler
+				if g_savedata.player_data[steam_id].debug.profiler then
+					g_savedata.debug.profiler = true
+					return "Enabled Profiler Debug"
+				else
+					d.checkDebug()
+					return "Disabled Profiler Debug"
+				end
+			elseif requested_debug_type == 3 then -- map debug
+				g_savedata.player_data[steam_id].debug.map = not g_savedata.player_data[steam_id].debug.map
+				if g_savedata.player_data[steam_id].debug.map then
+					g_savedata.debug.map = true
+					return "Enabled Map Debug"
+				else
+					d.checkDebug()
+
+					-- remove map debug
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+							s.removeMapObject(peer_id, vehicle_object.map_id)
+							s.removeMapLine(peer_id, vehicle_object.map_id)
+							for i = 1, #vehicle_object.path - 1 do
+								local waypoint = vehicle_object.path[i]
+								s.removeMapLine(peer_id, waypoint.ui_id)
+							end
+						end
+					end
+
+					for island_index, island in pairs(g_savedata.controllable_islands) do
+						updatePeerIslandMapData(peer_id, island)
+					end
+					
+					updatePeerIslandMapData(peer_id, g_savedata.player_base_island)
+					updatePeerIslandMapData(peer_id, g_savedata.ai_base_island)
+
+
+					return "Disabled Map Debug"
+				end
+			end
+		else
+			d.print("(d.setDebug) a peer_id was not specified! debug type: "..tostring(debug_type), true, 1)
+		end
+	else
+		d.print("(d.setDebug) the debug type was not specified!", true, 1)
+	end
+end
+
+function debugging.checkDebug() -- checks all debugging types to see if anybody has it enabled, if not, disable them to save on performance
+	local keep_enabled = {}
+
+	-- check all debug types for all players to see if they have it enabled or disabled
+	local player_list = s.getPlayers()
+	for peer_index, peer in pairs(player_list) do
+		local steam_id = getSteamID(peer.id)
+		for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do
+			-- if nobody's known to have it enabled
+			if not keep_enabled[debug_type] then
+				-- then set it to whatever this player's value was
+				keep_enabled[debug_type] = debug_type_enabled
+			end
+		end
+	end
+
+	-- any debug types that are disabled for all players, we want to disable globally to save on performance
+	for debug_type, should_keep_enabled in pairs(keep_enabled) do
+		-- if its not enabled for anybody
+		if not should_keep_enabled then
+			-- disable the debug globally
+			g_savedata.debug[debug_type] = should_keep_enabled
+		end
+	end
+end
+
+
+-----
+-- Profilers
+-----
+
+---@param unique_name string a unique name for the profiler  
+function debugging.startProfiler(unique_name, requires_debug)
+	-- if it doesnt require debug or
+	-- if it requires debug and debug for the profiler is enabled or
+	-- if this is a development version
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+		if unique_name then
+			if not g_savedata.profiler[unique_name] then
+				g_savedata.profiler[unique_name] = s.getTimeMillisec()
+			else
+				d.print("A profiler named "..unique_name.." already exists", true, 1)
+			end
+		else
+			d.print("A profiler was attempted to be started without a name!", true, 1)
+		end
+	end
+end
+
+function debugging.stopProfiler(unique_name, requires_debug)
+	-- if it doesnt require debug or
+	-- if it requires debug and debug for the profiler is enabled or
+	-- if this is a development version
+	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+		if unique_name then
+			if g_savedata.profiler[unique_name] then
+				d.print(unique_name.."'s runtime: "..((s.getTimeMillisec()-g_savedata.profiler[unique_name])/1000).."s", true, 2)
+				g_savedata.profiler[unique_name] = nil
+			else
+				d.print("A profiler named "..unique_name.." doesn't exist", true, 1)
+			end
+		else
+			d.print("A profiler was attempted to be started without a name!", true, 1)
+		end
+	end
+end
 
 
 --------------------------------------------------------------------------------
@@ -5495,7 +5724,7 @@ function noneNil(print_error, ...) -- check for if none of the inputted variable
 			if not none_nil then
 				none_nil = false
 				if print_error then
-					wpDLCDebug("(noneNil) a variable was nil! index: "..variable_index.." | from: ".._[1], true, true)
+					d.print("(noneNil) a variable was nil! index: "..variable_index.." | from: ".._[1], true, 1)
 				end
 			end
 		end
@@ -5526,6 +5755,19 @@ function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
 		end
 	end
 	return players_clear
+end
+
+---@param peer_id integer the peer_id of the player you want to get the steam id of
+---@return string steam_id the steam of the player, nil if not found
+function getSteamID(peer_id)
+	local player_list = s.getPlayers()
+	for peer_index, peer in pairs(player_list) do
+		if peer.id == peer_id then
+			return tostring(peer.steam_id)
+		end
+	end
+	d.print("(getSteamID) unable to get steam_id for peer_id: "..peer_id, true, 1)
+	return nil
 end
 
 ---@param T table table to get the size of
