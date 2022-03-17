@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.9)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.10)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -204,7 +204,12 @@ g_savedata = {
 		failed_writes = 0,
 		resets = 0
 	},
-	profiler = {},
+	profiler = {
+		working = {},
+		total = {},
+		display = {},
+		ui_id = nil
+	},
 	debug = {
 		chat = false,
 		profiler = false,
@@ -2312,6 +2317,7 @@ function addPath(vehicle_object, target_dest)
 end
 
 function tickGamemode()
+	d.startProfiler("tickGamemode()", true)
 	if is_dlc_weapons then
 		-- tick enemy base spawning
 		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + 1
@@ -2488,6 +2494,7 @@ function tickGamemode()
 			end
 		end
 	end
+	d.stopProfiler("tickGamemode()", true, "onTick()")
 end
 
 
@@ -2578,274 +2585,273 @@ function getNearbySquad(transform, override_command)
 end
 
 function tickAI()
-	if is_dlc_weapons then
+	d.startProfiler("tickAI()", true)
+	-- allocate squads to islands
+	for island_index, island in pairs(g_savedata.controllable_islands) do
+		if isTickID(island_index, 60) then
+			if island.faction == FACTION_AI then
+				if island.assigned_squad_index == -1 then
+					local squad, squad_index = getNearbySquad(island.transform)
 
-		-- allocate squads to islands
-		for island_index, island in pairs(g_savedata.controllable_islands) do
-			if isTickID(island_index, 60) then
-				if island.faction == FACTION_AI then
-					if island.assigned_squad_index == -1 then
-						local squad, squad_index = getNearbySquad(island.transform)
-
-						if squad ~= nil then
-							setSquadCommandDefend(squad, island)
-							island.assigned_squad_index = squad_index
-						end
-					end
-				end
-			end
-			if isTickID(island_index*15, time.minute/4) then -- every 15 seconds, update the amount of vehicles that are defending the base
-				island.defenders = 0
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					if squad.command == COMMAND_DEFEND or squad.command == COMMAND_TURRET then
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if island.faction == FACTION_AI then
-								if xzDistance(island.transform, vehicle_object.transform) < 1500 then
-									island.defenders = island.defenders + 1
-								end
-							end
-						end
-					end
-				end
-			end 
-		end
-
-		-- allocate squads to engage or investigate based on vision
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			if isTickID(squad_index, 60) then			
-				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					local squad_vision = squadGetVisionData(squad)
-					if squad.command ~= COMMAND_SCOUT then
-						if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
-							setSquadCommandEngage(squad)
-						elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
-							if #squad_vision.investigate_players > 0 then
-								local investigate_player = squad_vision:getBestInvestigatePlayer()
-								setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
-							elseif #squad_vision.investigate_vehicles > 0 then
-								local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
-								setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
-							end
-						end
+					if squad ~= nil then
+						setSquadCommandDefend(squad, island)
+						island.assigned_squad_index = squad_index
 					end
 				end
 			end
 		end
-
-		if isTickID(60, 60) then
-			g_count_squads = 0
-			g_count_attack = 0
-			g_count_patrol = 0
-
+		if isTickID(island_index*15, time.minute/4) then -- every 15 seconds, update the amount of vehicles that are defending the base
+			island.defenders = 0
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET then
-						g_count_squads = g_count_squads + 1
-					end
-		
-					if squad.command == COMMAND_STAGE or squad.command == COMMAND_ATTACK then
-						g_count_attack = g_count_attack + 1
-					elseif squad.command == COMMAND_PATROL then
-						g_count_patrol = g_count_patrol + 1
-					end
-				end
-			end
-
-			local objective_island, ally_island = getObjectiveIsland()
-
-			if objective_island == nil then
-				g_savedata.is_attack = false
-			else
-				if g_savedata.is_attack == false then
-					if g_savedata.constructable_vehicles.attack.mod >= 0.1 then -- if its above the threshold in order to attack
-						if g_savedata.ai_knowledge.scout[objective_island.name].scouted >= scout_requirement then
-							local boats_ready = 0
-							local boats_total = 0
-							local air_ready = 0
-							local air_total = 0
-							local land_ready = 0
-							local land_total = 0
-							objective_island.is_scouting = false
-
-							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == COMMAND_STAGE then
-									local _, squad_leader = getSquadLeader(squad)
-									local squad_leader_transform = squad_leader.transform
-
-									if squad.ai_type == AI_TYPE_BOAT then
-										boats_total = boats_total + 1
-
-										local air_dist = m.distance(objective_island.transform, ally_island.transform)
-										local dist = m.distance(squad_leader_transform, objective_island.transform)
-										local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
-
-										if dist < air_dist * air_sea_speed_factor then
-											boats_ready = boats_ready + 1
-										end
-									elseif squad.ai_type == AI_TYPE_LAND then
-										land_total = land_total + 1
-
-										local air_dist = m.distance(objective_island.transform, ally_island.transform)
-										local dist = m.distance(squad_leader_transform, objective_island.transform)
-										local air_sea_speed_factor = AI_SPEED_PSEUDO_LAND/AI_SPEED_PSEUDO_PLANE
-
-										if dist < air_dist * air_sea_speed_factor then
-											land_ready = land_ready + 1
-										end
-									else
-										air_total = air_total + 1
-
-										local dist = m.distance(squad_leader_transform, ally_island.transform)
-										if dist < 2000 then
-											air_ready = air_ready + 1
-										end
-									end
-								end
-							end
-							
-							-- add more vehicles if we didn't hit the limit
-							if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET and squad.role ~= "defend" then
-										if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-											if squad.ai_type == AI_TYPE_BOAT then
-												if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
-													boats_total = boats_total + 1
-													setSquadCommandStage(squad, objective_island)
-												end
-											else
-												air_total = air_total + 1
-												setSquadCommandStage(squad, ally_island)
-											end
-										end
-									end
-								end
-							end
-							
-				
-							g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
-							g_is_boats_ready = hasTag(ally_island.tags, "no-access=boat") or hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
-							local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
-							
-							if is_attack then
-								g_savedata.is_attack = is_attack
-				
-								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									if squad.command == COMMAND_STAGE then
-										if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT or squad.ai_type ~= AI_TYPE_BOAT then -- makes sure boats can attack that island
-											setSquadCommandAttack(squad, objective_island)
-										end
-									elseif squad.command == COMMAND_ATTACK then
-										if squad.target_island.faction == FACTION_AI then
-											-- if they are targeting their own island
-											squad.target_island = objective_island
-										end
-									end
-								end
-							else
-								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									if squad.command == COMMAND_NONE and squad.ai_type ~= AI_TYPE_TURRET and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-										if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
-											if not hasTag(objective_island.tags, "no-access=boat") then -- if boats can attack that island
-												setSquadCommandStage(squad, objective_island)
-												boats_total = boats_total + 1
-											end
-										else
-											setSquadCommandStage(squad, ally_island)
-											air_total = air_total + 1
-										end
-									elseif squad.command == COMMAND_STAGE and squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-										setSquadCommandStage(squad, objective_island)
-										squad.target_island = objective_island
-									end
-								end
-							end
-						else -- if they've yet to fully scout the base
-							local scout_exists = false
-							local not_scouting = false
-							local squad_to_set = nil
-							if not objective_island.is_scouting then
-								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-									for vehicle_index, vehicle in pairs(squad.vehicles) do
-										if vehicle.role == "scout" then
-											scout_exists = true
-											if squad.command ~= COMMAND_SCOUT then not_scouting = true; squad_to_set = squad_index end
-										end
-									end
-								end
-								if not scout_exists then -- if a scout vehicle does not exist
-									-- then we want to spawn one, unless its been less than 30 minutes since it was killed
-									if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death <= time.hour / 2 then
-										d.print("attempting to spawn scout vehicle...", true, 0)
-										local spawned = spawnAIVehicle("scout")
-										if spawned then
-											if g_savedata.ai_history.scout_death == -1 then
-												g_savedata.ai_history.scout_death = 0
-											end
-											d.print("scout vehicle spawned!", true, 0)
-											objective_island.is_scouting = true
-											for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-												if squad.command == COMMAND_SCOUT then
-													setSquadCommandScout(squad)
-												end
-											end
-										else
-											d.print("Failed to spawn scout vehicle!", true, 1)
-										end
-									end
-								elseif not_scouting and squad_to_set then -- if the scout was just set to a different command
-									-- then we want to set it back to scouting
-									setSquadCommandScout(g_savedata.ai_army.squadrons[squad_to_set])
-								end
-							end
-						end
-					else -- if they've not hit the threshold to attack
-						if objective_island.is_scouting then -- if theres still a scout plane scouting the island
-							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == COMMAND_SCOUT then
-									squad.target_island = ally_island
-									setSquadCommand(squad, COMMAND_DEFEND)
-									objective_island.is_scouting = false
-								end
-							end
-						end
-					end
-				else
-					local is_disengage = (g_count_attack / g_count_squads) < 0.25
-		
-					if is_disengage then
-						g_savedata.is_attack = false
-		
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							if squad.command == COMMAND_ATTACK then
-								if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") or squad.ai_type ~= AI_TYPE_BOAT then
-									setSquadCommandStage(squad, ally_island)
-								end
+				if squad.command == COMMAND_DEFEND or squad.command == COMMAND_TURRET then
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						if island.faction == FACTION_AI then
+							if xzDistance(island.transform, vehicle_object.transform) < 1500 then
+								island.defenders = island.defenders + 1
 							end
 						end
 					end
 				end
 			end
+		end 
+	end
 
-			-- assign squads to patrol
-			local allied_islands = getAlliedIslands()
-
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				if squad.command == COMMAND_NONE then
-					if #allied_islands > 0 then
-						if (g_count_patrol / g_count_squads) < 0.5 then
-							g_count_patrol = g_count_patrol + 1
-							setSquadCommandPatrol(squad, allied_islands[math.random(1, #allied_islands)])
-						else
-							setSquadCommandDefend(squad, allied_islands[math.random(1, #allied_islands)])
+	-- allocate squads to engage or investigate based on vision
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		if isTickID(squad_index, 60) then			
+			if squad_index ~= RESUPPLY_SQUAD_INDEX then
+				local squad_vision = squadGetVisionData(squad)
+				if squad.command ~= COMMAND_SCOUT then
+					if squad.command ~= COMMAND_ENGAGE and squad_vision:is_engage() then
+						setSquadCommandEngage(squad)
+					elseif squad.command ~= COMMAND_INVESTIGATE and squad_vision:is_investigate() then
+						if #squad_vision.investigate_players > 0 then
+							local investigate_player = squad_vision:getBestInvestigatePlayer()
+							setSquadCommandInvestigate(squad, investigate_player.obj.last_known_pos)
+						elseif #squad_vision.investigate_vehicles > 0 then
+							local investigate_vehicle = squad_vision:getBestInvestigateVehicle()
+							setSquadCommandInvestigate(squad, investigate_vehicle.obj.last_known_pos)
 						end
-					else
-						setSquadCommandPatrol(squad, g_savedata.ai_base_island)
 					end
 				end
 			end
 		end
 	end
+
+	if isTickID(60, 60) then
+		g_count_squads = 0
+		g_count_attack = 0
+		g_count_patrol = 0
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad_index ~= RESUPPLY_SQUAD_INDEX then
+				if squad.command ~= COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET then
+					g_count_squads = g_count_squads + 1
+				end
+	
+				if squad.command == COMMAND_STAGE or squad.command == COMMAND_ATTACK then
+					g_count_attack = g_count_attack + 1
+				elseif squad.command == COMMAND_PATROL then
+					g_count_patrol = g_count_patrol + 1
+				end
+			end
+		end
+
+		local objective_island, ally_island = getObjectiveIsland()
+
+		if objective_island == nil then
+			g_savedata.is_attack = false
+		else
+			if g_savedata.is_attack == false then
+				if g_savedata.constructable_vehicles.attack.mod >= 0.1 then -- if its above the threshold in order to attack
+					if g_savedata.ai_knowledge.scout[objective_island.name].scouted >= scout_requirement then
+						local boats_ready = 0
+						local boats_total = 0
+						local air_ready = 0
+						local air_total = 0
+						local land_ready = 0
+						local land_total = 0
+						objective_island.is_scouting = false
+
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad.command == COMMAND_STAGE then
+								local _, squad_leader = getSquadLeader(squad)
+								local squad_leader_transform = squad_leader.transform
+
+								if squad.ai_type == AI_TYPE_BOAT then
+									boats_total = boats_total + 1
+
+									local air_dist = m.distance(objective_island.transform, ally_island.transform)
+									local dist = m.distance(squad_leader_transform, objective_island.transform)
+									local air_sea_speed_factor = AI_SPEED_PSEUDO_BOAT/AI_SPEED_PSEUDO_PLANE
+
+									if dist < air_dist * air_sea_speed_factor then
+										boats_ready = boats_ready + 1
+									end
+								elseif squad.ai_type == AI_TYPE_LAND then
+									land_total = land_total + 1
+
+									local air_dist = m.distance(objective_island.transform, ally_island.transform)
+									local dist = m.distance(squad_leader_transform, objective_island.transform)
+									local air_sea_speed_factor = AI_SPEED_PSEUDO_LAND/AI_SPEED_PSEUDO_PLANE
+
+									if dist < air_dist * air_sea_speed_factor then
+										land_ready = land_ready + 1
+									end
+								else
+									air_total = air_total + 1
+
+									local dist = m.distance(squad_leader_transform, ally_island.transform)
+									if dist < 2000 then
+										air_ready = air_ready + 1
+									end
+								end
+							end
+						end
+						
+						-- add more vehicles if we didn't hit the limit
+						if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								if squad.command == COMMAND_PATROL or squad.command == COMMAND_DEFEND and squad.ai_type ~= AI_TYPE_TURRET and squad.role ~= "defend" then
+									if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+										if squad.ai_type == AI_TYPE_BOAT then
+											if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
+												boats_total = boats_total + 1
+												setSquadCommandStage(squad, objective_island)
+											end
+										else
+											air_total = air_total + 1
+											setSquadCommandStage(squad, ally_island)
+										end
+									end
+								end
+							end
+						end
+						
+			
+						g_is_air_ready = air_total == 0 or air_ready / air_total >= 0.5
+						g_is_boats_ready = hasTag(ally_island.tags, "no-access=boat") or hasTag(objective_island.tags, "no-access=boat") or boats_total == 0 or boats_ready / boats_total >= 0.25
+						local is_attack = (g_count_attack / g_count_squads) >= 0.25 and g_count_attack >= MIN_ATTACKING_SQUADS and g_is_boats_ready and g_is_air_ready
+						
+						if is_attack then
+							g_savedata.is_attack = is_attack
+			
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								if squad.command == COMMAND_STAGE then
+									if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == AI_TYPE_BOAT or squad.ai_type ~= AI_TYPE_BOAT then -- makes sure boats can attack that island
+										setSquadCommandAttack(squad, objective_island)
+									end
+								elseif squad.command == COMMAND_ATTACK then
+									if squad.target_island.faction == FACTION_AI then
+										-- if they are targeting their own island
+										squad.target_island = objective_island
+									end
+								end
+							end
+						else
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								if squad.command == COMMAND_NONE and squad.ai_type ~= AI_TYPE_TURRET and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+									if squad.ai_type == AI_TYPE_BOAT then -- send boats ahead since they are slow
+										if not hasTag(objective_island.tags, "no-access=boat") then -- if boats can attack that island
+											setSquadCommandStage(squad, objective_island)
+											boats_total = boats_total + 1
+										end
+									else
+										setSquadCommandStage(squad, ally_island)
+										air_total = air_total + 1
+									end
+								elseif squad.command == COMMAND_STAGE and squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+									setSquadCommandStage(squad, objective_island)
+									squad.target_island = objective_island
+								end
+							end
+						end
+					else -- if they've yet to fully scout the base
+						local scout_exists = false
+						local not_scouting = false
+						local squad_to_set = nil
+						if not objective_island.is_scouting then
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								for vehicle_index, vehicle in pairs(squad.vehicles) do
+									if vehicle.role == "scout" then
+										scout_exists = true
+										if squad.command ~= COMMAND_SCOUT then not_scouting = true; squad_to_set = squad_index end
+									end
+								end
+							end
+							if not scout_exists then -- if a scout vehicle does not exist
+								-- then we want to spawn one, unless its been less than 30 minutes since it was killed
+								if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death <= time.hour / 2 then
+									d.print("attempting to spawn scout vehicle...", true, 0)
+									local spawned = spawnAIVehicle("scout")
+									if spawned then
+										if g_savedata.ai_history.scout_death == -1 then
+											g_savedata.ai_history.scout_death = 0
+										end
+										d.print("scout vehicle spawned!", true, 0)
+										objective_island.is_scouting = true
+										for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+											if squad.command == COMMAND_SCOUT then
+												setSquadCommandScout(squad)
+											end
+										end
+									else
+										d.print("Failed to spawn scout vehicle!", true, 1)
+									end
+								end
+							elseif not_scouting and squad_to_set then -- if the scout was just set to a different command
+								-- then we want to set it back to scouting
+								setSquadCommandScout(g_savedata.ai_army.squadrons[squad_to_set])
+							end
+						end
+					end
+				else -- if they've not hit the threshold to attack
+					if objective_island.is_scouting then -- if theres still a scout plane scouting the island
+						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+							if squad.command == COMMAND_SCOUT then
+								squad.target_island = ally_island
+								setSquadCommand(squad, COMMAND_DEFEND)
+								objective_island.is_scouting = false
+							end
+						end
+					end
+				end
+			else
+				local is_disengage = (g_count_attack / g_count_squads) < 0.25
+	
+				if is_disengage then
+					g_savedata.is_attack = false
+	
+					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+						if squad.command == COMMAND_ATTACK then
+							if squad.ai_type == AI_TYPE_BOAT and not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") or squad.ai_type ~= AI_TYPE_BOAT then
+								setSquadCommandStage(squad, ally_island)
+							end
+						end
+					end
+				end
+			end
+		end
+
+		-- assign squads to patrol
+		local allied_islands = getAlliedIslands()
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad.command == COMMAND_NONE then
+				if #allied_islands > 0 then
+					if (g_count_patrol / g_count_squads) < 0.5 then
+						g_count_patrol = g_count_patrol + 1
+						setSquadCommandPatrol(squad, allied_islands[math.random(1, #allied_islands)])
+					else
+						setSquadCommandDefend(squad, allied_islands[math.random(1, #allied_islands)])
+					end
+				else
+					setSquadCommandPatrol(squad, g_savedata.ai_base_island)
+				end
+			end
+		end
+	end
+	d.stopProfiler("tickAI()", true, "onTick()")
 end
 
 function getAlliedIslands()
@@ -3075,6 +3081,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 end
 
 function tickSquadrons()
+	d.startProfiler("tickSquadrons()", true)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		if isTickID(squad_index, 60) then
 			-- clean out-of-action vehicles
@@ -3423,10 +3430,11 @@ function tickSquadrons()
 			end
 		end
 	end
+	d.stopProfiler("tickSquadrons()", true, "onTick()")
 end
 
 function tickVision()
-
+	d.startProfiler("tickVision()", true)
 	-- get the ai's vision radius
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -3547,9 +3555,11 @@ function tickVision()
 			end
 		end
 	end
+	d.stopProfiler("tickVision()", true, "onTick()")
 end
 
 function tickVehicles()
+	d.startProfiler("tickVehicles()", true)
 	local vehicle_update_tickrate = 30
 	if isTickID(60, 60) then
 		debug_mode_blinker = not debug_mode_blinker
@@ -3910,9 +3920,11 @@ function tickVehicles()
 			end
 		end
 	end
+	d.stopProfiler("tickVehicles()", true, "onTick()")
 end
 
 function tickUpdateVehicleData()
+	d.startProfiler("tickUpdateVehicleData()", true)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, 30) then
@@ -3926,52 +3938,58 @@ function tickUpdateVehicleData()
 			player_vehicle.transform = s.getVehiclePos(player_vehicle_id)
 		end
 	end
+	d.stopProfiler("tickUpdateVehicleData()", true, "onTick()")
 end
 
 function tickTerrainScanners()
-	printTable(g_savedata.terrain_scanner_links, true, false)
+	d.startProfiler("tickTerrainScanners()", true)
 	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
+		if g_savedata.terrain_scanner_links[vehicle_id] ~= "Just Teleported" then
 	
-		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+			local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
-		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
-		
-		if vehicle_object then
-			if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
-				d.print("terrain scanner loading!", true, 0)
-				d.print("ter id: "..terrain_scanner, true, 0)
-				d.print("veh id: "..vehicle_id, true, 0)
-				dial_read_attempts = 0
-				repeat
-					dial_read_attempts = dial_read_attempts + 1
-					local terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
-					if success and terrain_height.value ~= 0 then
-						printTable(terrain_height, true, false)
-						local new_terrain_height = (1000 - terrain_height.value) + 5
-						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-						local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
-						s.setVehiclePos(vehicle_id, new_vehicle_matrix)
-						d.print("set land vehicle to new y level!", true, 0)
-						g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
-						s.despawnVehicle(terrain_scanner, true)
-					else
-						if success then
-							d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, 1)
+			local terrain_scanner_data, is_success = s.getVehicleData(terrain_scanner)
+			
+			if vehicle_object and is_success then
+				if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
+					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+					s.setVehiclePos(vehicle_id, m.translation(vehicle_x, 2000, vehicle_z))
+					d.print("terrain scanner loading!", true, 0)
+					d.print("ter id: "..terrain_scanner, true, 0)
+					d.print("veh id: "..vehicle_id, true, 0)
+					dial_read_attempts = 0
+					repeat
+						dial_read_attempts = dial_read_attempts + 1
+						local terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
+						if success and terrain_height.value ~= 0 then
+							printTable(terrain_height, true, false)
+							local new_terrain_height = (1000 - terrain_height.value) + 5
+							local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
+							s.setVehiclePos(vehicle_id, new_vehicle_matrix)
+							d.print("set land vehicle's y to: "..new_terrain_height, true, 0)
+							g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
+							s.despawnVehicle(terrain_scanner, true)
 						else
-							d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, 1)
+							if success then
+								d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, 1)
+							else
+								d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, 1)
+							end
+							
 						end
-						
-					end
-					if dial_read_attempts >= 2 then return end
-				until(success and terrain_height.value ~= 0)
+						if dial_read_attempts >= 2 then return end
+					until(success and terrain_height.value ~= 0)
+				end
+			else -- the vehicle seems to have been destroyed in some way
+				g_savedata.terrain_scanner_links[vehicle_id] = nil
 			end
-		else -- the vehicle seems to have been destroyed in some way
-			g_savedata.terrain_scanner_links[vehicle_id] = nil
 		end
 	end
+	d.stopProfiler("tickTerrainScanners()", true, "onTick()")
 end
 
 function tickModifiers()
+	d.startProfiler("tickModifiers()", true)
 	if isTickID(g_savedata.tick_counter, time.hour / 2) then -- defence, if the player has attacked within the last 30 minutes, increase defence
 		if g_savedata.tick_counter - g_savedata.ai_history.has_defended <= time.hour / 2 and g_savedata.ai_history.has_defended ~= 0 then -- if the last time the player attacked was equal or less than 30 minutes ago
 			sm.train(REWARD, "defend", 4)
@@ -4018,9 +4036,11 @@ function tickModifiers()
 			end
 		end
 	end
+	d.stopProfiler("tickModifiers()", true, "onTick()")
 end
 
 function tickOther()
+	d.startProfiler("tickOther()", true)
 	local steam_id = getSteamID(0)
 	if steam_id then
 		if g_savedata.player_data[steam_id] and g_savedata.player_data[steam_id].do_as_i_say then
@@ -4033,12 +4053,13 @@ function tickOther()
 			end
 		end
 	end
+	d.stopProfiler("tickOther()", true, "onTick()")
 end
 
 function onTick(tick_time)
 	if is_dlc_weapons then
 
-		--d.startProfiler("onTick", true)
+		d.startProfiler("onTick()", true)
 
 
 		g_tick_counter = g_tick_counter + 1
@@ -4056,7 +4077,8 @@ function onTick(tick_time)
 		tickOther() -- not as important stuff
 
 
-		--d.stopProfiler("onTick", true)
+		d.stopProfiler("onTick()", true, "onTick()")
+		d.showProfilers()
 	end
 end
 
@@ -4557,7 +4579,7 @@ function hasTag(tags, tag)
 			end
 		end
 	else
-		d.print("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, 1)
+		d.print("hasTag() was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag, true, 1)
 	end
 	return false
 end
@@ -5573,6 +5595,9 @@ function debugging.setDebug(requested_debug_type, peer_id)
 						end
 					end
 
+					-- remove profiler debug
+					s.removePopup(peer_id, g_savedata.profiler.ui_id)
+
 					for island_index, island in pairs(g_savedata.controllable_islands) do
 						updatePeerIslandMapData(peer_id, island)
 					end
@@ -5600,6 +5625,10 @@ function debugging.setDebug(requested_debug_type, peer_id)
 					return "Enabled Profiler Debug"
 				else
 					d.checkDebug()
+
+					-- remove profiler debug
+					s.removePopup(peer_id, g_savedata.profiler.ui_id)
+
 					return "Disabled Profiler Debug"
 				end
 			elseif requested_debug_type == 3 then -- map debug
@@ -5679,8 +5708,8 @@ function debugging.startProfiler(unique_name, requires_debug)
 	-- if this is a development version
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
 		if unique_name then
-			if not g_savedata.profiler[unique_name] then
-				g_savedata.profiler[unique_name] = s.getTimeMillisec()
+			if not g_savedata.profiler.working[unique_name] then
+				g_savedata.profiler.working[unique_name] = s.getTimeMillisec()
 			else
 				d.print("A profiler named "..unique_name.." already exists", true, 1)
 			end
@@ -5690,20 +5719,86 @@ function debugging.startProfiler(unique_name, requires_debug)
 	end
 end
 
-function debugging.stopProfiler(unique_name, requires_debug)
+function debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 	-- if it doesnt require debug or
 	-- if it requires debug and debug for the profiler is enabled or
 	-- if this is a development version
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
 		if unique_name then
-			if g_savedata.profiler[unique_name] then
-				d.print(unique_name.."'s runtime: "..((s.getTimeMillisec()-g_savedata.profiler[unique_name])/1000).."s", true, 2)
-				g_savedata.profiler[unique_name] = nil
+			if g_savedata.profiler.working[unique_name] then
+				tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
+				g_savedata.profiler.total[profiler_group][unique_name]["timer"][g_savedata.tick_counter] = s.getTimeMillisec()-g_savedata.profiler.working[unique_name]
+				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-60)] = nil
+				g_savedata.profiler.working[unique_name] = nil
 			else
 				d.print("A profiler named "..unique_name.." doesn't exist", true, 1)
 			end
 		else
 			d.print("A profiler was attempted to be started without a name!", true, 1)
+		end
+	end
+end
+
+function debugging.showProfilers(requires_debug)
+	if g_savedata.debug.profiler then
+		if g_savedata.profiler.total then
+			if not g_savedata.profiler.ui_id then
+				g_savedata.profiler.ui_id = s.getMapID()
+			end
+			d.averageProfilers()
+
+			local debug_message = "Profilers\n\n"
+			debug_message = d.getProfilers(debug_message)
+
+			local player_list = s.getPlayers()
+			for peer_index, peer in pairs(player_list) do
+				if d.getDebug(2, peer.id) then
+					s.setPopupScreen(peer.id, g_savedata.profiler.ui_id, "Profilers", true, debug_message, -0.92, 0.2)
+				end
+			end
+		end
+	end
+end
+
+function debugging.getProfilers(debug_message)
+	for debug_name, debug_data in pairs(g_savedata.profiler.display) do
+		debug_message = debug_message..debug_name..": "..string.format("%.2f", tostring(debug_data)).."ms\n--\n"
+	end
+	return debug_message
+end
+
+function debugging.averageProfilers(t, old_node_name)
+	if not t then
+		for node_name, node_data in pairs(g_savedata.profiler.total) do
+			if type(node_data) == "table" then
+				d.averageProfilers(node_data, node_name)
+			elseif type(node_data) == "number" then
+				-- average the data over the past 60 ticks and save the result
+				local data_total = 0
+				local valid_ticks = 0
+				for i = 0, 60 do
+					valid_ticks = valid_ticks + 1
+					data_total = data_total + g_savedata.profiler.total[node_name][(g_savedata.tick_counter-i)]
+				end
+				g_savedata.profiler.display[node_name] = data_total/valid_ticks
+			end
+		end
+	else
+		for node_name, node_data in pairs(t) do
+			if type(node_data) == "table" and node_name ~= "timer" then
+				d.averageProfilers(node_data, node_name)
+			elseif node_name == "timer" then
+				-- average the data over the past 60 ticks and save the result
+				local data_total = 0
+				local valid_ticks = 0
+				for i = 0, 60 do
+					if t[node_name] and t[node_name][(g_savedata.tick_counter-i)] then
+						valid_ticks = valid_ticks + 1
+						data_total = data_total + t[node_name][(g_savedata.tick_counter-i)]
+					end
+				end
+				g_savedata.profiler.display[old_node_name] = data_total/valid_ticks
+			end
 		end
 	end
 end
