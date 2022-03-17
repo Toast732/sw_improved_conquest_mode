@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.8)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.9)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -3495,9 +3495,11 @@ function tickVision()
 
 			if player_vehicle.death_pos ~= nil then
 				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
-					local player_vehicle_data is_= s.getVehicleData(player_vehicle_id)
+					local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
 					player_vehicle.death_pos = nil
-					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					if is_success then
+						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					end
 				end
 			end
 		end
