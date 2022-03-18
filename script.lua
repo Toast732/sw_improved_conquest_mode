@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.11)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.12)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1555,7 +1555,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 									end
 								end
 							else
-								local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+								local vehicle_object, squad_index, squad = squads.getVehicle(tonumber(arg[1]))
 
 								if vehicle_object and squad_index and squad then
 									killVehicle(squad_index, vehicle_id, true, true)
