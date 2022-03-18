@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.10)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.11)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -487,11 +487,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					flag_vehicle = flag,
 					transform = flagZone.transform,
 					tags = flagZone.tags,
-					faction = FACTION_NEUTRAL, 
+					faction = FACTION_NEUTRAL,
 					is_contested = false,
 					capture_timer = g_savedata.settings.CAPTURE_TIME / 2,
-					map_id = s.getMapID(), 
-					assigned_squad_index = -1, 
+					map_id = s.getMapID(),
+					assigned_squad_index = -1,
 					zones = {
 						turrets = {},
 						land = {}
@@ -901,8 +901,12 @@ function spawnAIVehicle(requested_prefab)
 	end
 
 	if not g_savedata.controllable_islands[selected_spawn] then
-		d.print("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
-		return false
+		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
+			selected_spawn_transform = g_savedata.ai_base_island.transform
+		else
+			d.print("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
+			return false
+		end
 	end
 
 	local spawn_transform = selected_spawn_transform
