@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.13)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.14)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -853,7 +853,7 @@ function spawnAIVehicle(requested_prefab)
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
 							if playersNotNearby(player_list, island_transform, 3000, true) then
 								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-									closest_player_pos = player_transform
+									closest_player_pos = player_to_island_dist
 									selected_spawn_transform = island_transform
 									selected_spawn = island_index
 								end
@@ -5863,7 +5863,7 @@ function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
 end
 
 ---@param peer_id integer the peer_id of the player you want to get the steam id of
----@return string steam_id the steam of the player, nil if not found
+---@return string steam_id the steam id of the player, nil if not found
 function getSteamID(peer_id)
 	local player_list = s.getPlayers()
 	for peer_index, peer in pairs(player_list) do
