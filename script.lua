@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.12)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.13)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1558,8 +1558,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								local vehicle_object, squad_index, squad = squads.getVehicle(tonumber(arg[1]))
 
 								if vehicle_object and squad_index and squad then
-									killVehicle(squad_index, vehicle_id, true, true)
-									d.print("Sucessfully deleted vehicle "..vehicle_id.." name: "..vehicle_object.name, false, 0, user_peer_id)
+									killVehicle(squad_index, tonumber(arg[1]), true, true)
+									d.print("Sucessfully deleted vehicle "..arg[1].." name: "..vehicle_object.name, false, 0, user_peer_id)
 								else
 									d.print("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, 1, user_peer_id)
 								end
@@ -3005,82 +3005,86 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
-	if vehicle_object.is_killed ~= true or instant then
-		d.print(vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
-		vehicle_object.is_killed = true
-		vehicle_object.death_timer = 0
+	if vehicle_object then
+		if vehicle_object.is_killed ~= true or instant then
+			d.print(vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
+			vehicle_object.is_killed = true
+			vehicle_object.death_timer = 0
 
-		-- change ai spawning modifiers
-		if not delete then -- if the vehicle was not forcefully despawned
-			local ai_damaged = vehicle_object.current_damage or 0
-			local ai_damage_dealt = 1
-			for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
-				ai_damage_dealt = ai_damage_dealt + damage
-			end
-
-			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
-
-			d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
-			if vehicle_object.role ~= "scout" and vehicle_object.role ~= "cargo" then -- makes sure the vehicle isnt a scout vehicle or a cargo vehicle
-				if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
-					local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
-					sm.train(
-						REWARD, 
-						vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
-						vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
-						vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
-						constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
-					)
-				else -- if the ai did less damage than the damage it took / 3
-					local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
-					sm.train(
-						PUNISH, 
-						vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
-						vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
-						vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
-						constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
-					)
+			-- change ai spawning modifiers
+			if not delete then -- if the vehicle was not forcefully despawned
+				local ai_damaged = vehicle_object.current_damage or 0
+				local ai_damage_dealt = 1
+				for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
+					ai_damage_dealt = ai_damage_dealt + damage
 				end
-			else -- if it is a scout vehicle, we instead want to reset its progress on whatever island it was on
-				target_island, origin_island = getObjectiveIsland(true)
-				if target_island then
-					g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
-					target_island.is_scouting = false
-					g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+
+				local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+
+				d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
+				if vehicle_object.role ~= "scout" and vehicle_object.role ~= "cargo" then -- makes sure the vehicle isnt a scout vehicle or a cargo vehicle
+					if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
+						local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
+						sm.train(
+							REWARD, 
+							vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
+							vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
+							vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
+							constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
+						)
+					else -- if the ai did less damage than the damage it took / 3
+						local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
+						sm.train(
+							PUNISH, 
+							vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
+							vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
+							vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
+							constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
+						)
+					end
+				else -- if it is a scout vehicle, we instead want to reset its progress on whatever island it was on
+					target_island, origin_island = getObjectiveIsland(true)
+					if target_island then
+						g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
+						target_island.is_scouting = false
+						g_savedata.ai_history.scout_death = g_savedata.tick_counter -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+					end
 				end
 			end
-		end
 
-		if not instant and delete ~= true then
-			local fire_id = vehicle_object.fire_id
-			if fire_id ~= nil then
-				d.print("explosion fire enabled", true, 0)
-				s.setFireData(fire_id, true, true)
-			end
-		end
-
-		s.despawnVehicle(vehicle_id, instant)
-
-		for _, survivor in pairs(vehicle_object.survivors) do
-			s.despawnObject(survivor.id, instant)
-		end
-
-		if vehicle_object.fire_id ~= nil then
-			s.despawnObject(vehicle_object.fire_id, instant)
-		end
-
-		if instant == true and delete ~= true then
-			local explosion_size = 2
-			if vehicle_object.size == "small" then
-				explosion_size = 0.5
-			elseif vehicle_object.size == "medium" then
-				explosion_size = 1
+			if not instant and delete ~= true then
+				local fire_id = vehicle_object.fire_id
+				if fire_id ~= nil then
+					d.print("explosion fire enabled", true, 0)
+					s.setFireData(fire_id, true, true)
+				end
 			end
 
-			d.print("explosion spawned", true, 0)
+			s.despawnVehicle(vehicle_id, instant)
 
-			s.spawnExplosion(vehicle_object.transform, explosion_size)
+			for _, survivor in pairs(vehicle_object.survivors) do
+				s.despawnObject(survivor.id, instant)
+			end
+
+			if vehicle_object.fire_id ~= nil then
+				s.despawnObject(vehicle_object.fire_id, instant)
+			end
+
+			if instant == true and delete ~= true then
+				local explosion_size = 2
+				if vehicle_object.size == "small" then
+					explosion_size = 0.5
+				elseif vehicle_object.size == "medium" then
+					explosion_size = 1
+				end
+
+				d.print("explosion spawned", true, 0)
+
+				s.spawnExplosion(vehicle_object.transform, explosion_size)
+			end
 		end
+	else
+		d.print("(killVehicle) vehicle_object is nil!", true, 1)
 	end
 end
 
