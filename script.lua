@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.14)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.15)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -207,7 +207,11 @@ g_savedata = {
 	profiler = {
 		working = {},
 		total = {},
-		display = {},
+		display = {
+			average = {},
+			max = {},
+			current = {}
+		},
 		ui_id = nil
 	},
 	debug = {
@@ -5486,7 +5490,7 @@ end
 ---@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
 function debugging.print(message, requires_debug, debug_type, peer_id) -- glorious debug function
 
-	if not requires_debug or requires_debug and d.getDebug(debug_type) then
+	if not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
 		local prefix = s.getAddonData((s.getAddonIndex())).name..suffix
 
@@ -5509,7 +5513,7 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 			else
 				local player_list = s.getPlayers()
 				for peer_index, player in pairs(player_list) do
-					if d.getDebug(debug_type, player.id) then
+					if d.getDebug(debug_type, player.id) or debug_type == 2 and d.getDebug(0, player.id) then
 						s.announce(prefix, message, player_id)
 					end
 				end
@@ -5637,6 +5641,9 @@ function debugging.setDebug(requested_debug_type, peer_id)
 					-- remove profiler debug
 					s.removePopup(peer_id, g_savedata.profiler.ui_id)
 
+					-- clean all the profiler debug, if its disabled globally
+					d.cleanProfilers()
+
 					return "Disabled Profiler Debug"
 				end
 			elseif requested_debug_type == 3 then -- map debug
@@ -5685,7 +5692,7 @@ function debugging.checkDebug() -- checks all debugging types to see if anybody 
 	local player_list = s.getPlayers()
 	for peer_index, peer in pairs(player_list) do
 		local steam_id = getSteamID(peer.id)
-		for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do
+		for debug_type, debug_type_enabled in pairs(g_savedata.player_data[steam_id].debug) do
 			-- if nobody's known to have it enabled
 			if not keep_enabled[debug_type] then
 				-- then set it to whatever this player's value was
@@ -5753,10 +5760,10 @@ function debugging.showProfilers(requires_debug)
 			if not g_savedata.profiler.ui_id then
 				g_savedata.profiler.ui_id = s.getMapID()
 			end
-			d.averageProfilers()
+			d.generateProfilerDisplayData()
 
-			local debug_message = "Profilers\n\n"
-			debug_message = d.getProfilers(debug_message)
+			local debug_message = "Profilers\navg|max|cur (ms)"
+			debug_message = d.getProfilerData(debug_message)
 
 			local player_list = s.getPlayers()
 			for peer_index, peer in pairs(player_list) do
@@ -5768,18 +5775,18 @@ function debugging.showProfilers(requires_debug)
 	end
 end
 
-function debugging.getProfilers(debug_message)
-	for debug_name, debug_data in pairs(g_savedata.profiler.display) do
-		debug_message = debug_message..debug_name..": "..string.format("%.2f", tostring(debug_data)).."ms\n--\n"
+function debugging.getProfilerData(debug_message)
+	for debug_name, debug_data in pairs(g_savedata.profiler.display.average) do
+		debug_message = ("%s\n--\n%s: %.2f|%.2f|%.2f"):format(debug_message, debug_name, debug_data, g_savedata.profiler.display.max[debug_name], g_savedata.profiler.display.current[debug_name])
 	end
 	return debug_message
 end
 
-function debugging.averageProfilers(t, old_node_name)
+function debugging.generateProfilerDisplayData(t, old_node_name)
 	if not t then
 		for node_name, node_data in pairs(g_savedata.profiler.total) do
 			if type(node_data) == "table" then
-				d.averageProfilers(node_data, node_name)
+				d.generateProfilerDisplayData(node_data, node_name)
 			elseif type(node_data) == "number" then
 				-- average the data over the past 60 ticks and save the result
 				local data_total = 0
@@ -5788,26 +5795,49 @@ function debugging.averageProfilers(t, old_node_name)
 					valid_ticks = valid_ticks + 1
 					data_total = data_total + g_savedata.profiler.total[node_name][(g_savedata.tick_counter-i)]
 				end
-				g_savedata.profiler.display[node_name] = data_total/valid_ticks
+				g_savedata.profiler.display.average[node_name] = data_total/valid_ticks -- average usage over the past 60 ticks
+				g_savedata.profiler.display.max[node_name] = max_node -- max usage over the past 60 ticks
+				g_savedata.profiler.display.current[node_name] = g_savedata.profiler.total[node_name][(g_savedata.tick_counter)] -- usage in the current tick
 			end
 		end
 	else
 		for node_name, node_data in pairs(t) do
 			if type(node_data) == "table" and node_name ~= "timer" then
-				d.averageProfilers(node_data, node_name)
+				d.generateProfilerDisplayData(node_data, node_name)
 			elseif node_name == "timer" then
 				-- average the data over the past 60 ticks and save the result
 				local data_total = 0
 				local valid_ticks = 0
+				local max_node = 0
 				for i = 0, 60 do
 					if t[node_name] and t[node_name][(g_savedata.tick_counter-i)] then
 						valid_ticks = valid_ticks + 1
+						-- set max tick time
+						if max_node < t[node_name][(g_savedata.tick_counter-i)] then
+							max_node = t[node_name][(g_savedata.tick_counter-i)]
+						end
+						-- set average tick time
 						data_total = data_total + t[node_name][(g_savedata.tick_counter-i)]
 					end
 				end
-				g_savedata.profiler.display[old_node_name] = data_total/valid_ticks
+				g_savedata.profiler.display.average[old_node_name] = data_total/valid_ticks -- average usage over the past 60 ticks
+				g_savedata.profiler.display.max[old_node_name] = max_node -- max usage over the past 60 ticks
+				g_savedata.profiler.display.current[old_node_name] = t[node_name][(g_savedata.tick_counter)] -- usage in the current tick
 			end
 		end
+	end
+end
+
+function debugging.cleanProfilers() -- resets all profiler data in g_savedata
+	if not d.getDebug(2) then
+		g_savedata.profiler.working = {}
+		g_savedata.profiler.total = {}
+		g_savedata.profiler.display = {
+			average = {},
+			max = {},
+			current = {}
+		}
+		d.print("cleaned all profiler data", true, 2)
 	end
 end
 
