@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.15)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.16)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -178,6 +178,13 @@ g_savedata = {
 		awaiting_reload = false,
 	},
 	tick_counter = 0,
+	sweep_and_prune = { -- used for sweep and prune, capture detection
+		flags = { -- only updates order in oncreate and is_world_create
+			x = {},
+			z = {}
+		},
+		ai_pairs = {}
+	},
 	ai_history = {
 		has_defended = 0, -- logs the time in ticks the player attacked at
 		defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
@@ -287,7 +294,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
+			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60 * 60,
 			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
 			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
 			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
@@ -524,6 +531,16 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					break
 				end
 			end
+
+			-- sets up their positions for sweep and prune
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				table.insert(g_savedata.sweep_and_prune.flags.x, { island_index = island_index, x = island.transform[13]})
+				table.insert(g_savedata.sweep_and_prune.flags.z, { island_index = island_index, z = island.transform[15]})
+			end
+			-- sort the islands from least to most by their x coordinate
+			table.sort(g_savedata.sweep_and_prune.flags.x, function(a, b) return a.x < b.x end)
+			-- sort the islands from least to most by their z coordinate
+			table.sort(g_savedata.sweep_and_prune.flags.z, function(a, b) return a.z < b.z end)
 
 			-- sets up scouting data
 			for island_index, island in pairs(g_savedata.controllable_islands) do
@@ -2326,178 +2343,260 @@ end
 
 function tickGamemode()
 	d.startProfiler("tickGamemode()", true)
-	if is_dlc_weapons then
-		-- tick enemy base spawning
-		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + 1
+
+	-- check squad vehicle positions, every 10 seconds
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do -- go through every squad vehicle
+		for vehicle_index, vehicle_object in pairs(squad.vehicles) do -- go through every vehicle in that squad
+			if isTickID(vehicle_index, time.second*10) then -- every 10 seconds
+				local has_island = false
+				-- checks to make sure the target vehicle is valid
+				if not vehicle_object.is_killed -- makes sure the vehicle isnt dead
+					and vehicle_object.role ~= "scout" -- makes sure the vehicle isn't a scout vehicle
+					and vehicle_object.role ~= "cargo" -- makes sure the vehicle isn't a cargo vehicle
+					and squad.command ~= COMMAND_RESUPPLY -- makes sure the squad isnt resupplying
+					then
+					
+					if vehicle_object.target_island then -- makes sure it has a target island
+						has_island = true
+						g_savedata.sweep_and_prune.ai_pairs[vehicle_object.id] = vehicle_object.target_island -- sets to check this vehicle with its target island in sweep and prune
+					end
+				end
+
+				if not has_island then -- if it doesnt have a matching island
+					if g_savedata.sweep_and_prune.ai_pairs[vehicle_object.id] then -- checks if it is in the pre_pairs table
+						g_savedata.sweep_and_prune.ai_pairs[vehicle_object.id] = nil -- removes it from the pre_pairs table
+					end
+				end
+			end
+		end
+	end
+
+	-- tick capture rates
+	local capture_tick_rate = g_savedata.settings.CAPTURE_TIME/400 -- time it takes for it to move 0.25%
+	if isTickID(0, capture_tick_rate) then -- ticks the time it should take to move 0.25%
+		-- check all ai that are within the capture radius
+		for vehicle_id, island in pairs(g_savedata.sweep_and_prune.ai_pairs) do
+			local vehicle_object, squad, squad_index = squads.getVehicle(vehicle_id)
+
+			local capture_radius = island.faction == FACTION_AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
+
+			-- if the ai vehicle is within the capture radius
+			if m.distance(vehicle_object.transform, island.transform) <= capture_radius then
+				island.ai_capturing = island.ai_capturing + 1
+			end
+		end
+
+		-- check all players that are within the capture radius
+		for player_index, player in pairs(s.getPlayers()) do -- go through all players
+			local player_transform = s.getPlayerPos(player.id)
+
+			local player_x = player_transform[14]
+			local player_z = player_transform[16]
+
+			local player_pairs = {
+				x = {},
+				xz = {},
+				data = {
+					islands = {},
+					players = {}
+				}
+			}
+
+			-- x axis
+			for i = 1, #g_savedata.sweep_and_prune.flags.x do -- for all the flags/capture zones
+				local distance = math.abs(player_x-g_savedata.sweep_and_prune.flags.x[i].x) -- gets the x distance between the player and the capture point
+				d.print("island_index: "..g_savedata.sweep_and_prune.flags.x[i].island_index, true, 0)
+				d.print("i: "..i, true, 0)
+				local capture_radius = g_savedata.controllable_islands[g_savedata.sweep_and_prune.flags.x[i].island_index].faction == FACTION_PLAYER and CAPTURE_RADIUS / 5 or CAPTURE_RADIUS / 100 -- capture radius / 5 if the player owns the island, otherwise its / 100
+				if distance <= capture_radius then -- if they are within the capture radius
+					table.insert(player_pairs.x, { -- add them to the pairs in the x table
+						peer_id = player.id, 
+						island_index = g_savedata.sweep_and_prune.flags.x[i].island_index, 
+						z = g_savedata.sweep_and_prune.flags.z[i].z, 
+						distance = distance
+					})
+				end
+			end
+
+			-- z axis
+			for i = 1, #player_pairs.x do
+				local distance = math.abs(player_z - player_pairs.x[i].z) -- gets the z distance between the player and the capture point
+				local capture_radius = g_savedata.controllable_islands[g_savedata.sweep_and_prune.flags.z[i].island_index].faction == FACTION_PLAYER and CAPTURE_RADIUS / 5 or CAPTURE_RADIUS / 100 -- capture radius / 5 if the player owns the island, otherwise its / 100
+				if distance <= capture_radius then -- if they are within the capture radius
+					table.insert(player_pairs.xz, {
+						peer_id = player_pairs.x[i].peer_id,
+						island_index = player_pairs.x[i].island_index,
+						distance = player_pairs.x[i].distance + distance
+					})
+				end
+			end
+
+			-- clean up, if the player is capturing multiple islands, make them only capture the closest one to them
+			-- if the island has multiple people capturing it, add them together into one
+			for i = 1, #player_pairs.xz do
+				local peer_id = player_pairs.xz[i].peer_id
+				if not player_pairs.data.players[peer_id] then -- if this is the only island we know the player is capturing so far
+					local island_index = player_pairs.xz[i].island_index
+					-- player data
+					player_pairs.data.players[peer_id] = {
+						island_index = island_index,
+						distance = player_pairs.xz[i].distance
+					}
+					-- island data
+					player_pairs.data.islands[island_index].number_capturing = (player_pairs.data.islands[island_index].number_capturing or 0) + 1
+				else -- if the player has been detected to be capturing multiple islands
+					local distance = player_pairs.xz[i].distance
+					-- if the distance from this island is less than the island that we checked before
+					if player_pairs.data.players[peer_id].distance > distance then
+						-- changes old island data
+						player_pairs.data.islands[player_pairs.data.players[peer_id].island_index].number_capturing = player_pairs.data.islands[island_index].number_capturing - 1 -- remove 1 from the number capturing that island
+						-- updates player data
+						player_pairs.data.players[peer_id] = {
+							island_index = player_pairs.xz[i].island_index,
+							distance = distance
+						}
+						-- updates new island data
+						player_pairs.data.islands[island_index].number_capturing = (player_pairs.data.islands[island_index].number_capturing or 0) + 1
+					end
+				end
+			end
+
+			for island_index, island in pairs(player_pairs.data.islands) do
+				g_savedata.controllable_islands[island_index].players_capturing = island.number_capturing
+			end
+		end
+
+		-- tick spawning for ai vehicles (to remove as will be replaced to be dependant on logistics system)
+		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + capture_tick_rate
 		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
 			g_savedata.ai_base_island.production_timer = 0
 
 			spawnTurret(g_savedata.ai_base_island)
 			spawnAIVehicle()
 		end
+
+		-- update islands
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 
-			if island.ai_capturing == nil then
-				island.ai_capturing = 0
-				island.players_capturing = 0
-			end
-
-			-- spawn turrets at owned islands
+			-- spawn turrets at owned islands (to remove as will be replaced to be dependant on logistics system)
 			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 1 then
 				spawnTurret(island)
 			end
-			
-			-- tick capture timers
-			local tick_rate = 60
-			if island.capture_timer >= 0 and island.capture_timer <= g_savedata.settings.CAPTURE_TIME then -- if the capture timers are within range of the min and max
-				local playerList = s.getPlayers()
-				-- does a check for how many enemy ai are capturing the island
-				if island.capture_timer > 0 then
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name or squad.command ~= COMMAND_ATTACK and squad.command ~= COMMAND_SCOUT and squad.command ~= COMMAND_RESUPPLY then
-							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-								if isTickID(vehicle_id, tick_rate) then
-									if vehicle_object.role ~= "scout" then
-										if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
-											island.ai_capturing = island.ai_capturing + 1
-										elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
-											island.ai_capturing = island.ai_capturing + 1
-										end
-									end
-								end
-							end
-						end
-					end
+
+
+			-- display new capture data
+			if island.players_capturing > 0 and island.ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
+				if island.is_contested == false then -- notifies that an island is being contested
+					s.notify(-1, "ISLAND CONTESTED", "An island is being contested!", 1)
+					island.is_contested = true
 				end
+			else
+				island.is_contested = false
+				if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
 
-				-- does a check for how many players are capturing the island
-				if g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- if the % captured is not 100% or more
-					for _, player in pairs(playerList) do
-						if isTickID(player.id, tick_rate) then
-							local player_transform = s.getPlayerPos(player.id)
-							local flag_vehicle_transform = s.getVehiclePos(island.flag_vehicle.id)
-							if m.distance(flag_vehicle_transform, player_transform) < 15 then -- if they are within 15 metres of the capture point
-								island.players_capturing = island.players_capturing + 1
-							elseif m.distance(flag_vehicle_transform, player_transform) < CAPTURE_RADIUS / 5 and island.faction == FACTION_PLAYER then -- if they are within CAPTURE_RADIUS / 5 metres of the capture point and if they own the point, this is their defending radius
-								island.players_capturing = island.players_capturing + 1
-							end
-						end
-					end
-				end
-
-				if isTickID(60, tick_rate) then
-					if island.players_capturing > 0 and island.ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
-						if island.is_contested == false then -- notifies that an island is being contested
-							s.notify(-1, "ISLAND CONTESTED", "An island is being contested!", 1)
-							island.is_contested = true
-						end
-					else
-						island.is_contested = false
-						if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
-
-							island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)])
-						elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
-							island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)])
-						end
-					end
-					
-					-- displays tooltip on vehicle
-					local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
-					if island.is_contested then -- if the point is contested (both teams trying to cap)
-						s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
-					elseif island.faction ~= FACTION_PLAYER then -- if the player doesn't own the point
-						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
-						elseif island.ai_capturing == 0 then -- if players are capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
-						else -- if ai is capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-						end
-					else -- if the player does own the point
-						if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
-						elseif island.ai_capturing == 0 then -- if players are capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
-						else -- if ai is capping the point
-							s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
-						end
-					end
-
-					updatePeerIslandMapData(-1, island)
-
-					-- resets amount capping
-					island.ai_capturing = 0
-					island.players_capturing = 0
-					captureIsland(island)
+					island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)])
+				elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
+					island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)])
 				end
 			end
+			
+			-- displays tooltip on vehicle
+			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+			if island.is_contested then -- if the point is contested (both teams trying to cap)
+				s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+			elseif island.faction ~= FACTION_PLAYER then -- if the player doesn't own the point
+				if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+				elseif island.ai_capturing == 0 then -- if players are capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+				else -- if ai is capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+				end
+			else -- if the player does own the point
+				if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+				elseif island.ai_capturing == 0 then -- if players are capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+				else -- if ai is capping the point
+					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+				end
+			end
+
+			updatePeerIslandMapData(-1, island)
+
+			-- resets amount capping
+			island.ai_capturing = 0
+			island.players_capturing = 0
+			captureIsland(island)
 		end
+	end
 
-		if d.getDebug(3) then
-			if isTickID(60, 60) then
-			
-				local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
-				s.removeMapObject(player_debugging_id, g_savedata.ai_base_island.map_id)
 
-				local plane_count = 0
-				local heli_count = 0
-				local army_count = 0
-				local land_count = 0
-				local boat_count = 0
-				local turret_count = 0
-			
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
-						if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
-						if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
-						if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
-						if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
-						if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
-					end
+	-- update ai's main base island debug
+	if d.getDebug(3) then
+		if isTickID(60, 60) then
+		
+			local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
+			s.removeMapObject(player_debugging_id, g_savedata.ai_base_island.map_id)
+
+			local plane_count = 0
+			local heli_count = 0
+			local army_count = 0
+			local land_count = 0
+			local boat_count = 0
+			local turret_count = 0
+		
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					if vehicle_object.ai_type ~= AI_TYPE_TURRET then army_count = army_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_TURRET then turret_count = turret_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_PLANE then plane_count = plane_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_HELI then heli_count = heli_count + 1 end
+					if vehicle_object.ai_type == AI_TYPE_LAND then land_count = land_count + 1 end
 				end
+			end
 
-				local ai_islands = 1
-				for island_index, island in pairs(g_savedata.controllable_islands) do
-					if island.faction == FACTION_AI then
-						ai_islands = ai_islands + 1
-					end
+			local ai_islands = 1
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				if island.faction == FACTION_AI then
+					ai_islands = ai_islands + 1
 				end
+			end
 
-				local t, a = getObjectiveIsland()
+			local t, a = getObjectiveIsland()
 
-				local ai_base_island_turret_count = 0
-				for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
-					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
-				end
+			local ai_base_island_turret_count = 0
+			for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
+				if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+			end
 
-				local debug_data = ""
-				debug_data = debug_data.."--- This Island's Statistics ---\n\n"
-				debug_data = debug_data.."Number of Turrets: "..ai_base_island_turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
-				debug_data = debug_data.."\n--- Global Statistics ---\n\n"
-				debug_data = debug_data .. "Total AI Vehicles: "..army_count.."/"..(g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT).."\n"
-				debug_data = debug_data .. "Total Sea Vehicles: "..boat_count.."/"..g_savedata.settings.MAX_BOAT_AMOUNT.."\n"
-				debug_data = debug_data .. "Total Helicopters: "..heli_count.."/"..g_savedata.settings.MAX_HELI_AMOUNT.."\n"
-				debug_data = debug_data .. "Total Planes: "..plane_count.."/"..g_savedata.settings.MAX_PLANE_AMOUNT.."\n"
-				debug_data = debug_data .. "Total Land Vehicles: "..land_count.."/"..g_savedata.settings.MAX_LAND_AMOUNT.."\n"
-				debug_data = debug_data .. "Total Turrets: "..turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT*ai_islands.."\n"
-				debug_data = debug_data .. "\nNumber of Squads: "..g_count_squads.."\n"
+			local debug_data = ""
+			debug_data = debug_data.."--- This Island's Statistics ---\n\n"
+			debug_data = debug_data.."Number of Turrets: "..ai_base_island_turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+			debug_data = debug_data.."\n--- Global Statistics ---\n\n"
+			debug_data = debug_data .. "Total AI Vehicles: "..army_count.."/"..(g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT).."\n"
+			debug_data = debug_data .. "Total Sea Vehicles: "..boat_count.."/"..g_savedata.settings.MAX_BOAT_AMOUNT.."\n"
+			debug_data = debug_data .. "Total Helicopters: "..heli_count.."/"..g_savedata.settings.MAX_HELI_AMOUNT.."\n"
+			debug_data = debug_data .. "Total Planes: "..plane_count.."/"..g_savedata.settings.MAX_PLANE_AMOUNT.."\n"
+			debug_data = debug_data .. "Total Land Vehicles: "..land_count.."/"..g_savedata.settings.MAX_LAND_AMOUNT.."\n"
+			debug_data = debug_data .. "Total Turrets: "..turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT*ai_islands.."\n"
+			debug_data = debug_data .. "\nNumber of Squads: "..g_count_squads.."\n"
 
-				if t then
-					debug_data = debug_data .. "Attacking: " .. t.name .. "\n"
-				end
-				if a then
-					debug_data = debug_data .. " Attacking From: " .. a.name
-				end
-				local player_list = s.getPlayers()
-				for peer_index, peer in pairs(player_list) do
-					if d.getDebug(3, peer.id) then
-						s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
+			if t then
+				debug_data = debug_data .. "Attacking: " .. t.name .. "\n"
+			end
+			if a then
+				debug_data = debug_data .. " Attacking From: " .. a.name
+			end
+			local player_list = s.getPlayers()
+			for peer_index, peer in pairs(player_list) do
+				if d.getDebug(3, peer.id) then
+					s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
-						local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
-						s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
-						s.addMapObject(player_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
-					end
+					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
+					s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
+					s.addMapObject(player_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
 				end
 			end
 		end
@@ -5840,7 +5939,6 @@ function debugging.cleanProfilers() -- resets all profiler data in g_savedata
 		d.print("cleaned all profiler data", true, 2)
 	end
 end
-
 
 --------------------------------------------------------------------------------
 --
