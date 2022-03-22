@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.16)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.17)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -698,6 +698,7 @@ function spawnTurret(island)
 			role = getTagValue(selected_prefab.vehicle.tags, "role") or "turret",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
+			main_body = getTagValue(selected_prefab.vehicle.tags, "main_body") or 0, -- used for saying an alternate main body, such as the large turret on the sam turret
 			vision = {
 				radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
@@ -2011,7 +2012,7 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
 		if squad_index then
-			if vehicle_id == incoming_vehicle_id and body_id == 0 then
+			if body_id == 0 or body_id == vehicle_object.main_body then -- makes sure the damage was on the ai's main body
 				if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
 				local damage_prev = vehicle_object.current_damage
 				vehicle_object.current_damage = vehicle_object.current_damage + amount
