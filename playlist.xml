@@ -2616,7 +2616,7 @@
 			</l>
 			<l id="21" name="BOAT - DESTROYER" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,pseudo_speed=16,health=1800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
+					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,GPS_TARGET_POSITION,pseudo_speed=16,health=1800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
