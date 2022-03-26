@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.20)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.21)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -400,9 +400,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				end
 			end
 
+			d.print("setting up world...", true, 0)
+
+			d.print("setting up spawn zones...", true, 0)
+
 			turret_zones = s.getZones("turret")
 
 			land_zones = s.getZones("land_spawn")
+
+			d.print("building locations and prefabs...", true, 0)
 
             for i in iterPlaylists() do
                 for j in iterLocations(i) do
@@ -414,9 +420,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				buildPrefabs(i)
             end
 
+			d.print("populating constructable vehicles with spawning modifiers...", true, 0)
+
 			sm.create()
 
 			local start_island = s.getStartIsland()
+
+			d.print("creating player's main base...", true, 0)
 
 			-- init player base
 			local flag_zones = s.getZones("capture")
@@ -442,6 +452,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					flag_zones[flagZone_index] = nil
 				end
 			end
+
+			d.print("creating ai's main base...", true, 0)
 
 			-- calculate furthest flag from player
 			local furthest_flagZone_index = nil
@@ -489,6 +501,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			end
 			flag_zones[furthest_flagZone_index] = nil
 
+			d.print("setting up remaining neutral islands...", true, 0)
+
 			-- set up remaining neutral islands
 			for flagZone_index, flagZone in pairs(flag_zones) do
 				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
@@ -525,17 +539,19 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					end
 				end
 
-				table.insert(g_savedata.controllable_islands, new_island)
+				g_savedata.controllable_islands[new_island.index] = new_island
 
 				if(#g_savedata.controllable_islands >= g_savedata.settings.ISLAND_COUNT) then
 					break
 				end
 			end
 
+			d.print("setting up additional data...")
+
 			-- sets up their positions for sweep and prune
 			for island_index, island in pairs(g_savedata.controllable_islands) do
-				table.insert(g_savedata.sweep_and_prune.flags.x, { island_index = island_index, x = island.transform[13]})
-				table.insert(g_savedata.sweep_and_prune.flags.z, { island_index = island_index, z = island.transform[15]})
+				table.insert(g_savedata.sweep_and_prune.flags.x, { island_index = island.index, x = island.transform[13]})
+				table.insert(g_savedata.sweep_and_prune.flags.z, { island_index = island.index, z = island.transform[15]})
 			end
 			-- sort the islands from least to most by their x coordinate
 			table.sort(g_savedata.sweep_and_prune.flags.x, function(a, b) return a.x < b.x end)
@@ -556,6 +572,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					t.faction = FACTION_AI
 				end
 			end
+
+			d.print("completed setting up world!", true, 0)
 
 			if not do_as_i_say then
 				-- if the world was just created like normal
@@ -2401,8 +2419,8 @@ function tickGamemode()
 		for player_index, player in pairs(s.getPlayers()) do -- go through all players
 			local player_transform = s.getPlayerPos(player.id)
 
-			local player_x = player_transform[14]
-			local player_z = player_transform[16]
+			local player_x = player_transform[13]
+			local player_z = player_transform[15]
 
 			local player_pairs = {
 				x = {},
@@ -2418,12 +2436,21 @@ function tickGamemode()
 				local distance = math.abs(player_x-g_savedata.sweep_and_prune.flags.x[i].x) -- gets the x distance between the player and the capture point
 				local capture_radius = g_savedata.controllable_islands[g_savedata.sweep_and_prune.flags.x[i].island_index].faction == FACTION_PLAYER and CAPTURE_RADIUS / 5 or CAPTURE_RADIUS / 100 -- capture radius / 5 if the player owns the island, otherwise its / 100
 				if distance <= capture_radius then -- if they are within the capture radius
+					-- get the z coord of the selected island
+					local z_coord = nil
+					for ii = 1, #g_savedata.sweep_and_prune.flags.z do
+						if g_savedata.sweep_and_prune.flags.z[ii].island_index == g_savedata.sweep_and_prune.flags.x[i].island_index then
+							z_coord = g_savedata.sweep_and_prune.flags.z[ii].z
+							break
+						end
+					end
 					table.insert(player_pairs.x, { -- add them to the pairs in the x table
 						peer_id = player.id, 
 						island_index = g_savedata.sweep_and_prune.flags.x[i].island_index, 
-						z = g_savedata.sweep_and_prune.flags.z[i].z, 
+						z = z_coord, 
 						distance = distance
 					})
+					d.print(s.getPlayerName(player.id).." is within the x capture radius of "..g_savedata.sweep_and_prune.flags.x[i].island_index.."\nPlayer x: "..player_x.."\nIsland x: "..g_savedata.sweep_and_prune.flags.x[i].x, true, 0)
 				end
 			end
 
@@ -2437,6 +2464,7 @@ function tickGamemode()
 						island_index = player_pairs.x[i].island_index,
 						distance = player_pairs.x[i].distance + distance
 					})
+					d.print(s.getPlayerName(player.id).." is within the x and z capture radius of "..player_pairs.x[i].island_index, true, 0)
 				end
 			end
 
@@ -2452,6 +2480,7 @@ function tickGamemode()
 						distance = player_pairs.xz[i].distance
 					}
 					-- island data
+					player_pairs.data.islands[island_index] = {}
 					player_pairs.data.islands[island_index].number_capturing = (player_pairs.data.islands[island_index].number_capturing or 0) + 1
 				else -- if the player has been detected to be capturing multiple islands
 					local distance = player_pairs.xz[i].distance
@@ -2503,9 +2532,9 @@ function tickGamemode()
 				island.is_contested = false
 				if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
 
-					island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)])
+					island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)]) * capture_tick_rate
 				elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
-					island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)])
+					island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)]) * capture_tick_rate
 				end
 			end
 			
@@ -5598,7 +5627,7 @@ end
 ---@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
 function debugging.print(message, requires_debug, debug_type, peer_id) -- glorious debug function
 
-	if not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
+	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
 		local prefix = s.getAddonData((s.getAddonIndex())).name..suffix
 
@@ -5655,24 +5684,26 @@ function debugging.getDebug(debug_type, peer_id)
 		end
 	else -- if a specific player has it enabled
 		local steam_id = getSteamID(peer_id)
-		if debug_type == -1 then -- any debug
-			if g_savedata.player_data[steam_id].debug.chat or g_savedata.player_data[steam_id].debug.profiler or g_savedata.player_data[steam_id].debug.map then
-				return true
+		if steam_id and g_savedata.player_data[steam_id] then -- makes sure the steam id and player data exists
+			if debug_type == -1 then -- any debug
+				if g_savedata.player_data[steam_id].debug.chat or g_savedata.player_data[steam_id].debug.profiler or g_savedata.player_data[steam_id].debug.map then
+					return true
+				end
+			elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
+				if g_savedata.player_data[steam_id].debug.chat then
+					return true
+				end
+			elseif debug_type == 2 then -- profiler debug
+				if g_savedata.player_data[steam_id].debug.profiler then
+					return true
+				end
+			elseif debug_type == 3 then -- map debug
+				if g_savedata.player_data[steam_id].debug.map then
+					return true
+				end
+			else
+				d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
 			end
-		elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
-			if g_savedata.player_data[steam_id].debug.chat then
-				return true
-			end
-		elseif debug_type == 2 then -- profiler debug
-			if g_savedata.player_data[steam_id].debug.profiler then
-				return true
-			end
-		elseif debug_type == 3 then -- map debug
-			if g_savedata.player_data[steam_id].debug.map then
-				return true
-			end
-		else
-			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
 		end
 	end
 	return false
