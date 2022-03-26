@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.19)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.20)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1141,8 +1141,8 @@ local player_commands = {
 		},
 		dv = { -- delete vehicle
 			short_desc = "lets you delete an ai vehicle",
-			desc = "lets you delete an ai vehicle by vehicle id, or all by specifying \"all\"",
-			args = "(vehicle_id|\"all\")",
+			desc = "lets you delete an ai vehicle by vehicle id, or all by specifying \"all\", or all vehicles that have been damaged by specifying \"damaged\"",
+			args = "(vehicle_id|\"all\"|\"damaged\")",
 			example = "?impwep dv all",
 		},
 		si = { -- set scout intel
@@ -1531,7 +1531,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 					elseif command == "setmod" then
 						if arg[1] then
-							if arg[1] == "punish" or arg[2] == "reward" then
+							if arg[1] == "punish" or arg[1] == "reward" then
 								if arg[2] then
 									if g_savedata.constructable_vehicles[arg[1]].mod then
 										if tonumber(arg[3]) then
@@ -1569,12 +1569,22 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 					-- arg 1 = id
 					elseif command == "dv" then -- delete vehicle
 						if arg[1] then
-							if arg[1] == "all" then
+							if arg[1] == "all" or arg[1] == "damaged" then
+								local vehicle_counter = 0
 								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 									for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-										killVehicle(squad_index, vehicle_id, true, true)
-										d.print("Sucessfully deleted vehicle "..vehicle_id, false, 0, user_peer_id)
+										if arg[1] ~= "damaged" or arg[1] == "damaged" and vehicle_object.health > 0 then
+											killVehicle(squad_index, vehicle_id, true, true)
+											vehicle_counter = vehicle_counter + 1
+										end
 									end
+								end
+								if vehicle_counter == 0 then
+									d.print("There were no enemy AI vehicles to remove", false, 0, user_peer_id)
+								elseif vehicle_counter == 1 then
+									d.print("Removed "..vehicle_counter.." enemy AI vehicle", false, 0, user_peer_id)
+								elseif vehicle_counter > 1 then
+									d.print("Removed "..vehicle_counter.." enemy AI vehicles", false, 0, user_peer_id)
 								end
 							else
 								local vehicle_object, squad_index, squad = squads.getVehicle(tonumber(arg[1]))
@@ -2152,7 +2162,7 @@ function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 	end
 	if target then
-		tx, ty, tz = matrix.position(target.last_known_pos)
+		tx, ty, tz = m.position(target.last_known_pos)
 		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", tx)
 		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", ty)
 		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", tz)
@@ -2406,8 +2416,6 @@ function tickGamemode()
 			-- x axis
 			for i = 1, #g_savedata.sweep_and_prune.flags.x do -- for all the flags/capture zones
 				local distance = math.abs(player_x-g_savedata.sweep_and_prune.flags.x[i].x) -- gets the x distance between the player and the capture point
-				d.print("island_index: "..g_savedata.sweep_and_prune.flags.x[i].island_index, true, 0)
-				d.print("i: "..i, true, 0)
 				local capture_radius = g_savedata.controllable_islands[g_savedata.sweep_and_prune.flags.x[i].island_index].faction == FACTION_PLAYER and CAPTURE_RADIUS / 5 or CAPTURE_RADIUS / 100 -- capture radius / 5 if the player owns the island, otherwise its / 100
 				if distance <= capture_radius then -- if they are within the capture radius
 					table.insert(player_pairs.x, { -- add them to the pairs in the x table
@@ -3824,7 +3832,7 @@ function tickVehicles()
 									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
 									local is_better_pos = false
 									for path_index, path in pairs(possiblePaths) do
-										if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
+										if m.distance(m.translation(path.x, path.y, path.z), ai_target) < distance then
 											is_better_pos = true
 										end
 									end
@@ -4130,8 +4138,8 @@ function tickModifiers()
 			if island.faction == FACTION_AI then
 				local player_list = s.getPlayers()
 				for player_index, player in pairs(player_list) do
-					player_pos = s.getPlayerPos(player)
-					player_island_dist = xzDistance(player_pos, island.transform)
+					local player_pos = s.getPlayerPos(player)
+					local player_island_dist = xzDistance(player_pos, island.transform)
 					if player_island_dist < 1000 then
 						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
 					elseif player_island_dist < 2000 then
