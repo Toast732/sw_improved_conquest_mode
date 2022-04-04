@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.22)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.23)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1754,7 +1754,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 						-- addon index
 						local true_addon_index, true_is_success = s.getAddonIndex(addon_name)
 						local addon_index, is_success = s.getAddonIndex()
-						d.print("addon_index: "..addon_index.." | "..true_addon_index.."\nsuccessfully found addon_index: "..tostring(is_success).." | "..tostring(true_is_success), false, 0, user_peer_id)
+						d.print("addon_index: "..tostring(addon_index).." | "..tostring(true_addon_index).."\nsuccessfully found addon_index: "..tostring(is_success).." | "..tostring(true_is_success), false, 0, user_peer_id)
 
 						-- addon data
 						local true_addon_data = s.getAddonData(true_addon_index)
