@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.21)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.22)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -102,6 +102,9 @@ local default_mods = {
 	stealth = 0.05
 }
 
+-- please note: this is not machine learning, this works by making a
+-- vehicle spawn less or more often, depending on the damage it did
+-- compared to the damage it has taken
 local ai_training = {
 	punishments = {
 		-0.02,
@@ -147,7 +150,6 @@ local g_is_boats_ready = false
 local g_count_squads = 0
 local g_count_attack = 0
 local g_count_patrol = 0
-local g_tick_counter = 0
 
 g_savedata = {
 	ai_base_island = nil,
@@ -447,7 +449,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						ai_capturing = 0,
 						players_capturing = 0,
 						defenders = 0,
-						is_scouting = false
+						is_scouting = false,
+						cargo = {
+							oil = 0,
+							jet_fuel = 0,
+							diesel = 0
+						}
 					}
 					flag_zones[flagZone_index] = nil
 				end
@@ -486,7 +493,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				ai_capturing = 0,
 				players_capturing = 0,
 				defenders = 0,
-				is_scouting = false
+				is_scouting = false,
+				cargo = {
+					oil = 0,
+					jet_fuel = 1500,
+					diesel = 1500
+				}
 			}
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
@@ -524,7 +536,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					ai_capturing = 0,
 					players_capturing = 0,
 					defenders = 0,
-					is_scouting = false
+					is_scouting = false,
+					cargo = {
+						oil = 0,
+						jet_fuel = 0,
+						diesel = 0
+					}
 				}
 
 				for _, turretZone in pairs(turret_zones) do
@@ -1198,6 +1215,12 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		addon_info = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
@@ -1264,7 +1287,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								end
 							end
 						end
-
+						
 					elseif command == "sv" then --spawn vehicle
 						if arg[1] then
 							vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
@@ -1280,7 +1303,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 													if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
 														if vehicle_data.ai_type == AI_TYPE_BOAT then
 															local player_pos = s.getPlayerPos(user_peer_id)
-															local new_location found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+															local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 															if found_new_location then
 																-- teleport vehicle to new position
 																local veh_x, veh_y, veh_z = m.position(new_location)
@@ -1715,9 +1738,29 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							d.print("incorrect island id: "..arg[1], false, 0, user_peer_id)
 						end
 					elseif command == "clear_cache" then
+
 						d.print("clearing cache", false, 0, user_peer_id)
 						cache.reset()
 						d.print("cache reset", false, 0, user_peer_id)
+
+					elseif command == "addon_info" then -- command for debugging things such as why the addon name is broken
+
+						d.print("---- addon info ----", false, 0, user_peer_id)
+
+						-- gets true data
+						-- get the addon name
+						local addon_name = "Improved Conquest Mode (".. string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d)")..(IS_DEVELOPMENT_VERSION and ".dev)" or ")")
+
+						-- addon index
+						local true_addon_index, true_is_success = s.getAddonIndex(addon_name)
+						local addon_index, is_success = s.getAddonIndex()
+						d.print("addon_index: "..addon_index.." | "..true_addon_index.."\nsuccessfully found addon_index: "..tostring(is_success).." | "..tostring(true_is_success), false, 0, user_peer_id)
+
+						-- addon data
+						local true_addon_data = s.getAddonData(true_addon_index)
+						local addon_data = s.getAddonData(addon_index)
+						d.print("file_store: "..tostring(addon_data.file_store).." | "..tostring(true_addon_data.file_store).."\nlocation_count: "..tostring(addon_data.location_count).." | "..tostring(true_addon_data.location_count).."\naddon_name: "..tostring(addon_data.name).." | "..tostring(true_addon_data.name).."\npath_id: "..tostring(addon_data.path_id).." | "..tostring(true_addon_data.path_id), false, 0, user_peer_id)
+
 					end
 				else
 					for command_name, command_info in pairs(player_commands.admin) do
@@ -2450,7 +2493,6 @@ function tickGamemode()
 						z = z_coord, 
 						distance = distance
 					})
-					d.print(s.getPlayerName(player.id).." is within the x capture radius of "..g_savedata.sweep_and_prune.flags.x[i].island_index.."\nPlayer x: "..player_x.."\nIsland x: "..g_savedata.sweep_and_prune.flags.x[i].x, true, 0)
 				end
 			end
 
@@ -2464,7 +2506,6 @@ function tickGamemode()
 						island_index = player_pairs.x[i].island_index,
 						distance = player_pairs.x[i].distance + distance
 					})
-					d.print(s.getPlayerName(player.id).." is within the x and z capture radius of "..player_pairs.x[i].island_index, true, 0)
 				end
 			end
 
@@ -2531,10 +2572,11 @@ function tickGamemode()
 			else
 				island.is_contested = false
 				if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
-
 					island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)]) * capture_tick_rate
+
 				elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
 					island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)]) * capture_tick_rate
+					
 				end
 			end
 			
@@ -4205,13 +4247,25 @@ function tickOther()
 	d.stopProfiler("tickOther()", true, "onTick()")
 end
 
+function tickCargo()
+	-- every 2 hours go through all islands and check if 
+	-- they are low on cargo, the two that are the lowest 
+	-- we will try to send cargo to
+	for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
+		if isTickID(0, time.minute*120) then -- every 2 hours
+			if island.faction == FACTION_AI then -- if the enemy ai owns the island
+
+			end
+		end
+	end
+
+end
+
 function onTick(tick_time)
 	if is_dlc_weapons then
 
 		d.startProfiler("onTick()", true)
 
-
-		g_tick_counter = g_tick_counter + 1
 		g_savedata.tick_counter = g_savedata.tick_counter + 1
 		tickUpdateVehicleData()
 		tickVision()
@@ -4220,6 +4274,7 @@ function onTick(tick_time)
 		tickSquadrons()
 		tickVehicles()
 		tickModifiers()
+		tickCargo()
 		if tableLength(g_savedata.terrain_scanner_links) > 0 then
 			tickTerrainScanners()
 		end
@@ -4643,7 +4698,7 @@ end
 ---@param rate integer the total amount of ticks, for example, a rate of 60 means it returns true once every second* (if the tps is not low)
 ---@return boolean isTick if its the current tick that you requested
 function isTickID(id, rate)
-	return (g_tick_counter + id) % rate == 0
+	return (g_savedata.tick_counter + id) % rate == 0
 end
 
 -- iterator function for iterating over all playlists, skipping any that return nil data
