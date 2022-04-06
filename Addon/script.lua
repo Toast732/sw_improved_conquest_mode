@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.25)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.26)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -594,10 +594,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			if not do_as_i_say then
 				-- if the world was just created like normal
+
+				d.print("spawning initial ai vehicles...", true, 0)
 				
-				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)--]] do
-					spawnAIVehicle() -- spawn initial ai
+				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1) do
+					local spawned, vehicle_data = spawnAIVehicleRetry(nil, true, 5) -- spawn initial ai
 				end
+				d.print("all initial ai vehicles spawned!")
 			else -- say we're ready to reload scripts
 				g_savedata.info.awaiting_reload = true
 				d.print("to complete this process, do ?reload_scripts", false, 0, peer_id)
@@ -797,6 +800,25 @@ end
 
 ---@param requested_prefab any vehicle name or vehicle type, such as scout, will try to spawn that vehicle or type
 ---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
+---@param retry_count integer how many times to retry spawning the vehicle if it fails
+---@return boolean spawned_vehicle if the vehicle successfully spawned or not
+---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
+function spawnAIVehicleRetry(requested_prefab, force_spawn, retry_count) -- spawns a ai vehicle, if it fails then it tries again, the amount of times it retrys is how ever many was given)
+	local spawned = nil
+	local vehicle_data = nil
+	for i = 1, retry_count do
+		spawned, vehicle_data = spawnAIVehicle(requested_prefab, force_spawn)
+		if spawned then
+			return spawned, vehicle_data
+		else
+			d.print("(spawnAIVehicleRetry) Spawning failed, retrying ("..retry_count-i.." attempts remaining)\nError: "..vehicle_data, true, 1)
+		end
+	end
+	return spawned, vehicle_data
+end
+
+---@param requested_prefab any vehicle name or vehicle type, such as scout, will try to spawn that vehicle or type
+---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
 function spawnAIVehicle(requested_prefab, force_spawn)
@@ -960,10 +982,12 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 
 	-- try spawning at the ai's main base if it was unable to find a valid spawn
 	if not g_savedata.controllable_islands[selected_spawn] then
-		-- if it can spawn at the ai's main base, or the vehicle is being forcibly spawned
-		if hasTag(g_savedata.ai_base_island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or force_spawn then
-			selected_spawn_transform = g_savedata.ai_base_island.transform
-			selected_spawn = g_savedata.ai_base_island.index
+		if playersNotNearby(player_list, g_savedata.ai_base_island.transform, 3000, true) then
+			-- if it can spawn at the ai's main base, or the vehicle is being forcibly spawned and its not a land vehicle
+			if hasTag(g_savedata.ai_base_island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or force_spawn and getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true) ~= "wep_land" then
+				selected_spawn_transform = g_savedata.ai_base_island.transform
+				selected_spawn = g_savedata.ai_base_island.index
+			end
 		end
 	end
 
@@ -973,7 +997,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then -- make the scout spawn at the ai's main base
 			selected_spawn_transform = g_savedata.ai_base_island.transform
 		else
-			d.print("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
+			d.print("(spawnAIVehicle) was unable to find island to spawn at!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
 			return false, "was unable to find island to spawn at"
 		end
 	end
@@ -4856,7 +4880,7 @@ function randChance(t)
 	local win_val = 0
 	for k, v in pairs(t) do
 		local chance = rand(0, v / total_mod)
-		d.print("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, 0)
+		-- d.print("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, 0)
 		if chance > win_val then
 			win_val = chance
 			win_name = k
@@ -4890,8 +4914,8 @@ end
 
 ---@param vehicle_id integer the vehicle's id
 ---@return vehicle_object[] vehicle_object the vehicle object, nil if not found
----@return squad[] squad the info of the squad, if not found, then returns nil
 ---@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return squad[] squad the info of the squad, if not found, then returns nil
 function squads.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
 
 	if not vehicle_id then -- makes sure vehicle id was provided
