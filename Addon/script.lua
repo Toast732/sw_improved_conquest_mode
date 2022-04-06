@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.28)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.29)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -171,7 +171,7 @@ g_savedata = {
 	constructable_vehicles = {},
 	vehicle_list = {},
 	terrain_scanner_prefab = {},
-	terrain_scanner_links = {},
+	terrain_scanners = {},
 	is_attack = false,
 	info = {
 		creation_version = nil,
@@ -788,6 +788,7 @@ function spawnTurret(island)
 			damage_dealt = {},
 			fire_id = nil,
 			spawnbox_index = spawnbox_index,
+			just_teleported = false
 		}
 
 		if #spawned_objects.fires > 0 then
@@ -1124,6 +1125,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
 			damage_dealt = {},
 			fire_id = nil,
+			just_teleported = false
 		}
 
 		if #spawned_objects.fires > 0 then
@@ -2218,7 +2220,7 @@ function cleanVehicle(squad_index, vehicle_id)
 
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
-	d.print("cleaned vehicle: "..vehicle_id, true, 0)
+	d.print("cleaning vehicle: "..vehicle_id, true, 0)
 	if g_savedata.debug.map then
 		local player_list = s.getPlayers()
 		for peer_index, peer in pairs(player_list) do
@@ -2268,6 +2270,13 @@ function cleanVehicle(squad_index, vehicle_id)
 			end
 		end
 	end
+
+	-- removes it from the terrain scanner data
+	for scanner_index, scanner in pairs(g_savedata.terrain_scanners) do
+		if scanner.vehicle.id == vehicle_id then
+			g_savedata.terrain_scanners[scanner_index] = nil
+		end
+	end
 end
 
 function onVehicleUnload(vehicle_id)
@@ -2279,7 +2288,7 @@ function onVehicleUnload(vehicle_id)
 			if vehicle_object.is_killed == true then
 				cleanVehicle(squad_index, vehicle_id)
 			else
-				d.print("onVehicleUnload: set vehicle pseudo: "..vehicle_id, true, 0)
+				d.print("(onVehicleUnload): set vehicle pseudo: "..vehicle_id, true, 0)
 				if not vehicle_object.name then vehicle_object.name = "nil" end
 				d.print("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, 0)
 				vehicle_object.state.is_simulating = false
@@ -2371,7 +2380,9 @@ function onVehicleLoad(vehicle_id)
 					--Gunners
 					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
 					local c = s.getCharacterData(char.id)
-					s.setCharacterData(char.id, c.hp, true, true)
+					if c then
+						s.setCharacterData(char.id, c.hp, true, true)
+					end
 				else
 					if i == 1 then
 						if vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_object.ai_type == AI_TYPE_LAND then
@@ -2380,12 +2391,16 @@ function onVehicleLoad(vehicle_id)
 							s.setCharacterSeated(char.id, vehicle_id, "Pilot")
 						end
 						local c = s.getCharacterData(char.id)
-						s.setCharacterData(char.id, c.hp, true, true)
+						if c then
+							s.setCharacterData(char.id, c.hp, true, true)
+						end
 					else
 						--Gunners
 						s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
 						local c = s.getCharacterData(char.id)
-						s.setCharacterData(char.id, c.hp, true, true)
+						if c then
+							s.setCharacterData(char.id, c.hp, true, true)
+						end
 					end
 				end
 			end
@@ -2393,34 +2408,31 @@ function onVehicleLoad(vehicle_id)
 				if(#vehicle_object.path >= 1) then
 					setLandTarget(vehicle_id, vehicle_object)
 				end
-				if g_savedata.terrain_scanner_links[vehicle_id] == nil then
-					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-					local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
-					local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
-					if success then
-						g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
-					else
-						d.print("Unable to spawn terrain height checker!", true, 1)
-					end
-				elseif g_savedata.terrain_scanner_links[vehicle_id] == "Just Teleported" then
-					g_savedata.terrain_scanner_links[vehicle_id] = nil
+
+				-- add it to the terrain scanner table to spawn it at the correct height
+				if vehicle_object.transform[14] < 1000 and not vehicle_object.just_teleported then -- makes sure its not already having its terrain height scanned
+					table.insert(g_savedata.terrain_scanners, {
+						vehicle = vehicle_object,
+						transform = vehicle_object.transform,
+						data = {},
+						result = {}
+					})
+				elseif vehicle_object.just_teleported then
+					vehicle_object.just_teleported = false
 				end
 			elseif vehicle_object.ai_type == AI_TYPE_BOAT then
 				local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-				if vehicle_y > 10 then -- if its above y 10
-					local playerList = s.getPlayers()
-					local is_player_close = false
-					-- checks if any players are within 750m of the vehicle
-					for _, player in pairs(playerList) do
-						local player_transform = s.getPlayerPos(player.id)
-						if m.distance(player_transform, vehicle_object.transform) < 250 then
-							is_player_close = true
-						end
-					end
-					if not is_player_close then
-						d.print("a vehicle was removed as it tried to spawn in the air!", true, 0)
-						killVehicle(squad_index, vehicle_id, true, true) -- delete vehicle
-					end
+
+				-- add it to the terrain scanner table to make sure its not spawning in the air or is spawning in terrain
+				if vehicle_object.transform[14] < 1000 and not vehicle_object.just_teleported then -- makes sure its not already having its terrain height scanned
+					table.insert(g_savedata.terrain_scanners, {
+						vehicle = vehicle_object,
+						transform = vehicle_object.transform,
+						data = {},
+						result = {}
+					})
+				elseif vehicle_object.just_teleported then
+					vehicle_object.just_teleported = false
 				end
 			end
 			refuel(vehicle_id)
@@ -4230,45 +4242,103 @@ end
 
 function tickTerrainScanners()
 	d.startProfiler("tickTerrainScanners()", true)
-	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
-		if g_savedata.terrain_scanner_links[vehicle_id] ~= "Just Teleported" then
-	
-			local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+	for scanner_index, scanner in pairs(g_savedata.terrain_scanners) do
 
-			local terrain_scanner_data, is_success = s.getVehicleData(terrain_scanner)
-			
-			if vehicle_object and is_success then
-				if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
-					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-					s.setVehiclePos(vehicle_id, m.translation(vehicle_x, 2000, vehicle_z))
-					d.print("terrain scanner loading!", true, 0)
-					d.print("ter id: "..terrain_scanner, true, 0)
-					d.print("veh id: "..vehicle_id, true, 0)
-					dial_read_attempts = 0
-					repeat
-						dial_read_attempts = dial_read_attempts + 1
-						local terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
-						if success and terrain_height.value ~= 0 then
-							printTable(terrain_height, true, false)
-							local new_terrain_height = (1000 - terrain_height.value) + 5
-							local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
-							s.setVehiclePos(vehicle_id, new_vehicle_matrix)
-							d.print("set land vehicle's y to: "..new_terrain_height, true, 0)
-							g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
-							s.despawnVehicle(terrain_scanner, true)
-						else
-							if success then
-								d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, 1)
-							else
-								d.print("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, 1)
-							end
-							
-						end
-						if dial_read_attempts >= 2 then return end
-					until(success and terrain_height.value ~= 0)
+		-- makes sure the scanner has not been read yet
+		if not scanner.result.time then 
+			if scanner.vehicle.id then -- if theres going to be a vehicle in the way
+				local vehicle_x, vehicle_y, vehicle_z = m.position(scanner.vehicle.transform)
+				local real_vehicle_pos = s.getVehiclePos(scanner.vehicle.id)
+				local real_vehicle_x, real_vehicle_y, real_vehicle_z = m.position(real_vehicle_pos)
+
+				-- check if the vehicle is too low
+				if real_vehicle_y < 1030 then
+					-- move it to y 1050 so it wont interfere with the result
+					s.setVehiclePos(scanner.vehicle.id, m.translation(vehicle_x, 1050, vehicle_z))
+					d.print("(Terrain Scanner) teleported vehicle", true, 0)
 				end
-			else -- the vehicle seems to have been destroyed in some way
-				g_savedata.terrain_scanner_links[vehicle_id] = nil
+			end
+
+			
+			if not scanner.data.id then -- if its not been spawned yet
+				-- spawn the terrain scanner
+				local scan_position_x, scan_position_y, scan_position_z = m.position(scanner.transform)
+				local scan_position = m.translation(scan_position_x, 1000, scan_position_z)
+				local terrain_scanner, spawned = s.spawnAddonComponent(scan_position, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
+				if spawned then -- if it was spawned
+
+					d.print("(Terrain Scanner) spawned terrain scanner", true, 0)
+					scanner.data = terrain_scanner
+				else -- it failed to spawn
+
+					d.print("(Terrain Scanner) Failed to spawn terrain scanner!", true, 1)
+				end
+			else -- if it has already been spawned
+				local _, scanner_exists = s.getVehicleData(scanner.data.id)
+				if scanner_exists then -- makes sure the vehicle actually exists
+					local terrain_height_data, dial_read = s.getVehicleDial(scanner.data.id, "MEASURED_DISTANCE")
+					if dial_read and terrain_height_data.value ~= 0 then -- if the dial was read
+						scanner.result = {
+							height = 1000 - terrain_height_data.value,
+							time = g_savedata.tick_counter
+						}
+						s.despawnVehicle(scanner.data.id, true) -- despawn the scanner
+						d.print("(Terrain Scanner) data has been read and written, despawning terrain scanner", true, 0)
+					end
+				end
+			end
+		else
+			-- debug for if something goes wrong
+			local time_since = timeSince(scanner.result.time)
+			if time_since % time.minute == 0 and time_since ~= 0 then -- if its been longer than a minute since the data was written, every 1 minute
+				d.print("(Terrain Scanner) Its been "..time_since/time.minute.." minute"..(time_since/time.minute ~= 1 and "s " or " ").."since the scanner data was written for scanner "..scanner_index.." maybe the scanner was never deleted from the table?", true, 1)
+			end
+
+			-- do something with the result
+			if scanner.vehicle.ai_type then -- makes sure a vehicle exists
+				if scanner.vehicle.ai_type == AI_TYPE_BOAT then -- if we're scanning terrain for a boat
+					if scanner.result.height <= -2 then -- checks for if theres water there
+						-- set it to y 0
+						s.setVehiclePos(scanner.vehicle.id, m.translation(scanner.transform[13], 0.5, scanner.transform[15]))
+
+						local squad_index, squad = squads.getSquad(scanner.vehicle.id)
+						g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
+
+						-- delete the scanner data
+						g_savedata.terrain_scanners[scanner_index] = nil
+						d.print("(Terrain Scanner) "..scanner.vehicle.name.."( "..scanner.vehicle.id..") has been detected that it is in water", true, 0)
+					else -- if its not water
+						-- delete the vehicle
+						local squad_index, squad = squads.getSquad(scanner.vehicle.id)
+						killVehicle(squad_index, scanner.vehicle.id, true, true)
+						-- delete scanner data
+						g_savedata.terrain_scanners[scanner_index] = nil
+						d.print("(Terrain Scanner) Deleted vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") because it was not in water", true, 0)
+					end
+				elseif scanner.vehicle.ai_type == AI_TYPE_LAND then -- if we're scanning terrain for a land vehicle
+					if scanner.result.height >= 0 then -- makes sure theres land there
+						-- set it to the scanned height
+						s.setVehiclePos(scanner.vehicle.id, m.translation(scanner.transform[13], scanner.result.height + 1.5, scanner.transform[15]))
+
+						local squad_index, squad = squads.getSquad(scanner.vehicle.id)
+						g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
+
+						-- delete the scanner data
+						g_savedata.terrain_scanners[scanner_index] = nil
+						d.print("(Terrain Scanner) set vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") to "..scanner.result.height.."m", true, 0)
+					else -- if its not on land
+						-- delete the vehicle
+						local squad_index, squad = squads.getSquad(scanner.vehicle.id)
+						killVehicle(squad_index, scanner.vehicle.id, true, true)
+						-- delete scanner data
+						g_savedata.terrain_scanners[scanner_index] = nil
+						d.print("(Terrain Scanner) Deleted vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") because it was not on land", true, 0)
+					end
+				else
+					d.print("(Terrain Scanner) I'm told to scan terrain for a vehicle that I dont know how to handle! vehicle type: "..scanner.vehicle.ai_type, true, 1)
+				end
+			else
+				d.print("(Terrain Scanner) the scanner "..scanner_index.." has no vehicle!", true, 1)
 			end
 		end
 	end
@@ -4370,9 +4440,7 @@ function onTick(tick_time)
 		tickVehicles()
 		tickModifiers()
 		tickCargo()
-		if tableLength(g_savedata.terrain_scanner_links) > 0 then
-			tickTerrainScanners()
-		end
+		tickTerrainScanners()
 		tickOther() -- not as important stuff
 
 
@@ -4524,7 +4592,6 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 			l_ai_type = "flag"
 		end
 		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
-			d.print("terrain scanner!", true, 0)
 			l_ai_type = "terrain_scanner"
 		end
 
@@ -6131,6 +6198,12 @@ end
 -- Other
 --
 --------------------------------------------------------------------------------
+
+---@param time number the time you want to see how long its been since (in ticks)
+---@return number time_since how many ticks its been since <time>
+function timeSince(time)
+	return g_savedata.tick_counter - time
+end
 
 ---@param print_error boolean if you want it to print an error if any are nil (if true, the second argument must be a name for debugging puposes)
 ---@param ... any varibles to check
