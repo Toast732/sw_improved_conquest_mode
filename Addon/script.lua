@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.27)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.28)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -782,7 +782,7 @@ function spawnTurret(island)
 			transform = spawn_transform,
 			target_player_id = -1,
 			target_vehicle_id = -1,
-			home_island = island.name,
+			home_island = island,
 			current_damage = 0,
 			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
 			damage_dealt = {},
@@ -1066,6 +1066,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		local vehicle_data = { 
 			id = spawned_objects.spawned_vehicle.id,
 			name = selected_prefab.location.data.name,
+			home_island = g_savedata.controllable_islands[selected_spawn] or g_savedata.ai_base_island,
 			survivors = vehicle_survivors, 
 			path = { 
 				[1] = {
@@ -2235,12 +2236,12 @@ function cleanVehicle(squad_index, vehicle_id)
 
 	if vehicle_object.ai_type == AI_TYPE_TURRET and vehicle_object.spawnbox_index ~= nil then
 		for island_index, island in pairs(g_savedata.controllable_islands) do		
-			if island.name == vehicle_object.home_island then
+			if island.name == vehicle_object.home_island.name then
 				island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
 			end
 		end
 		-- its from the ai's main base
-		if g_savedata.ai_base_island.name == vehicle_object.home_island then
+		if g_savedata.ai_base_island.name == vehicle_object.home_island.name then
 			g_savedata.ai_base_island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
 		end
 	end
@@ -3230,7 +3231,7 @@ function addToSquadron(vehicle_object)
 		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
 			if squad.ai_type == vehicle_object.ai_type then
 				local _, squad_leader = getSquadLeader(squad)
-				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island == squad_leader.home_island then
+				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
 					if vehicle_object.role ~= "scout" and squad.ai_type ~= "scout" then
 						if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 							squad.vehicles[vehicle_object.id] = vehicle_object
@@ -4060,15 +4061,16 @@ function tickVehicles()
 					local vehicle_pos = vehicle_object.transform
 					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_pos)
 					local debug_data = ""
-					debug_data = debug_data.."Role: "..vehicle_object.role.."\n"
-					debug_data = debug_data.."Strategy: "..vehicle_object.strategy.."\n\n"
 					debug_data = debug_data.."Movement State: "..vehicle_object.state.s .. "\n"
-					debug_data = debug_data .. "Waypoints: " .. #vehicle_object.path .."\n\n"
+					debug_data = debug_data.."Waypoints: "..#vehicle_object.path .."\n\n"
 					
-					debug_data = debug_data .. "Squad: " .. squad_index .."\n"
-					debug_data = debug_data .. "Command: " .. squad.command .."\n"
-					debug_data = debug_data .. "AI State: ".. ai_state .. "\n"
-					if squad.target_island then debug_data = debug_data.."\nTarget Island: " .. squad.target_island.name .. "\n" end
+					debug_data = debug_data.."Squad: "..squad_index .."\n"
+					debug_data = debug_data.."Command: "..squad.command .."\n"
+					debug_data = debug_data.."AI State: "..ai_state .. "\n"
+					debug_data = debug_data.."\nHome Island: "..vehicle_object.home_island.name.."\n"
+					if squad.target_island then 
+						debug_data = debug_data.."Target Island: "..squad.target_island.name.."\n" 
+					end
 
 					debug_data = debug_data .. "Target Player: " .. vehicle_object.target_player_id .."\n"
 					debug_data = debug_data .. "Target Vehicle: " .. vehicle_object.target_vehicle_id .."\n\n"
@@ -4082,8 +4084,19 @@ function tickVehicles()
 					end
 
 					local hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
+
+					if g_savedata.settings.SINKING_MODE then
+						if vehicle_object.ai_type == AI_TYPE_TURRET or vehicle_object.ai_type == AI_TYPE_LAND then
+							hp = hp * 2.5
+						else
+							hp = hp * 8
+							if vehicle_object.ai_type == AI_TYPE_BOAT then
+								hp = hp * 10
+							end
+						end
+					end
 					
-					debug_data = debug_data .. "hp: " .. vehicle_object.current_damage .. " / " .. hp .. "\n"
+					debug_data = debug_data .. "hp: " .. (hp - vehicle_object.current_damage) .. " / " .. hp .. "\n"
 
 					local damage_dealt = 0
 					for victim_vehicle, damage in pairs(vehicle_object.damage_dealt) do
