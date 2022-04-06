@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.26)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.27)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -672,10 +672,15 @@ function buildPrefabs(location_index)
 	end
 end
 
+---@param island island[] the island to spawn the turret at
+---@return boolean spawned if the turret successfully spawned
+---@return vehicle_data[] vehicle_data the vehicle data of the turret, if it did not successfully spawn, then it returns the error code
 function spawnTurret(island)
 	local selected_prefab = sm.spawn(true, "turret")
 
-	if (#island.zones.turrets < 1) then return end
+	if (#island.zones.turrets < 1) then
+		return false, "theres no turret zones on this island!\nisland: "..island.name 
+	end
 
 	local turret_count = 0
 
@@ -683,15 +688,19 @@ function spawnTurret(island)
 		if turret_zone.is_spawned then turret_count = turret_count + 1 end
 	end
 
-	if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then return end
+	if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+		return false, "hit turret limit for this island" 
+	end
 
 	local spawnbox_index = math.random(1, #island.zones.turrets)
 	if island.zones.turrets[spawnbox_index].is_spawned == true then
-		return
+		return false, "the turret spawn point is already occupied!"
 	end
 	
 	local player_list = s.getPlayers()
-	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 3000, true) then return end -- makes sure players are not too close before spawning a turret
+	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 3000, true) then -- makes sure players are not too close before spawning a turret
+		return false, "players are too close to the turret spawn point!" 
+	end 
 
 	island.zones.turrets[spawnbox_index].is_spawned = true
 	local spawn_transform = island.zones.turrets[spawnbox_index].transform
@@ -788,7 +797,10 @@ function spawnTurret(island)
 		local squad = addToSquadron(vehicle_data)
 		setSquadCommand(squad, COMMAND_TURRET)
 
-		d.print("spawning island turret", true, 0)
+		d.print("spawned island turret", true, 0)
+		return true, vehicle_data
+	else
+		return false, "spawned_objects.spawned_vehicle is nil!"
 	end
 end
 
@@ -820,7 +832,7 @@ end
 ---@param requested_prefab any vehicle name or vehicle type, such as scout, will try to spawn that vehicle or type
 ---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
----@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
+---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its returns the error code
 function spawnAIVehicle(requested_prefab, force_spawn)
 	local plane_count = 0
 	local heli_count = 0
@@ -1565,15 +1577,26 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 
 					elseif command == "st" then --spawn turret
-						local turrets_spawned = 1
-						spawnTurret(g_savedata.ai_base_island)
+						local turrets_spawned = 0
+						-- spawn at ai's main base
+						local spawned, vehicle_data = spawnTurret(g_savedata.ai_base_island)
+						if spawned then
+							turrets_spawned = turrets_spawned + 1
+						else
+							d.print("Failed to spawn a turret on island "..g_savedata.ai_base_island.name.."\nError:\n"..vehicle_data, true, 1)
+						end
+						-- spawn at enemy ai islands
 						for island_index, island in pairs(g_savedata.controllable_islands) do
 							if island.faction == FACTION_AI then
-								spawnTurret(island)
-								turrets_spawned = turrets_spawned + 1
+								local spawned, vehicle_data = spawnTurret(island)
+								if spawned then
+									turrets_spawned = turrets_spawned + 1
+								else
+									d.print("Failed to spawn a turret on island "..island.name.."\nError:\n"..vehicle_data, true, 1)
+								end
 							end
 						end
-						d.print("attempted to spawn "..turrets_spawned.." turrets", false, 0, user_peer_id)
+						d.print("spawned "..turrets_spawned.." turret"..(turrets_spawned ~= 1 and "s" or ""), false, 0, user_peer_id)
 
 
 					elseif command == "cp" then --capture point
@@ -2216,6 +2239,10 @@ function cleanVehicle(squad_index, vehicle_id)
 				island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
 			end
 		end
+		-- its from the ai's main base
+		if g_savedata.ai_base_island.name == vehicle_object.home_island then
+			g_savedata.ai_base_island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
+		end
 	end
 
 	for _, survivor in pairs(vehicle_object.survivors) do
@@ -2596,8 +2623,15 @@ function tickGamemode()
 		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
 			g_savedata.ai_base_island.production_timer = 0
 
-			spawnTurret(g_savedata.ai_base_island)
-			spawnAIVehicle()
+			local spawned, vehicle_data = spawnTurret(g_savedata.ai_base_island)
+			if not spawned then
+				d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
+			end
+			
+			local spawned, vehicle_data = spawnAIVehicle()
+			if not spawned then
+				d.print("failed to spawn vehicle\nError:\n"..vehicle_data, true, 1)
+			end
 		end
 
 		-- update islands
@@ -2605,7 +2639,10 @@ function tickGamemode()
 
 			-- spawn turrets at owned islands (to remove as will be replaced to be dependant on logistics system)
 			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 0 then
-				spawnTurret(island)
+				local spawned, vehicle_data = spawnTurret(island)
+				if not spawned then
+					d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
+				end
 			end
 
 
