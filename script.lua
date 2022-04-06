@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.23)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.24)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -796,9 +796,10 @@ end
 --------------------------------------------------------------------------------
 
 ---@param requested_prefab any vehicle name or vehicle type, such as scout, will try to spawn that vehicle or type
+---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
-function spawnAIVehicle(requested_prefab)
+function spawnAIVehicle(requested_prefab, force_spawn)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
@@ -827,7 +828,7 @@ function spawnAIVehicle(requested_prefab)
 
 	if not selected_prefab then
 		d.print("Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
-		return false
+		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
 	if not requested_prefab then
@@ -957,12 +958,23 @@ function spawnAIVehicle(requested_prefab)
 		end
 	end
 
+	-- try spawning at the ai's main base if it was unable to find a valid spawn
 	if not g_savedata.controllable_islands[selected_spawn] then
-		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
+		-- if it can spawn at the ai's main base, or the vehicle is being forcibly spawned
+		if hasTag(g_savedata.ai_base_island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or force_spawn then
+			selected_spawn_transform = g_savedata.ai_base_island.transform
+			selected_spawn = g_savedata.ai_base_island.index
+		end
+	end
+
+
+	-- if it still was unable to find a island to spawn at
+	if not g_savedata.controllable_islands[selected_spawn] and selected_spawn ~= g_savedata.ai_base_island.index then
+		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then -- make the scout spawn at the ai's main base
 			selected_spawn_transform = g_savedata.ai_base_island.transform
 		else
 			d.print("(spawnAIVehicle) selected island is nil!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..getTagValue(selected_prefab.vehicle.tags, "role", true), true, 1)
-			return false
+			return false, "was unable to find island to spawn at"
 		end
 	end
 
@@ -982,7 +994,7 @@ function spawnAIVehicle(requested_prefab)
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if m.distance(spawn_transform, vehicle_object.transform) < (getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
 				d.print("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
-				return false
+				return false, "spawn location was too close to vehicle "..vehicle_id
 			end
 		end
 	end
@@ -1089,7 +1101,7 @@ function spawnAIVehicle(requested_prefab)
 		end
 		return true, vehicle_data
 	end
-	return false
+	return false, "spawned_objects.spawned_vehicle was nil"
 end
 
 local player_commands = {
@@ -1295,7 +1307,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								valid_vehicle = true
 								d.print("Spawning \""..arg[1].."\"", false, 0, user_peer_id)
 								if arg[1] ~= "scout" and arg[1] ~= "cargo" then
-									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id)
+									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id, true)
 									if successfully_spawned then
 										if arg[2] ~= nil then
 											if arg[2] == "near" then -- the player selected to spawn it in a range
@@ -1414,6 +1426,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 													end
 												end
 											end
+										end
+									else
+										if type(vehicle_data) == "string" then
+											d.print("Failed to spawn vehicle! Error:\n"..vehicle_data, false, 1, user_peer_id)
+										else
+											d.print("Failed to spawn vehicle!\n(no error code recieved)", false, 1, user_peer_id)
 										end
 									end
 								elseif arg[1] == "cargo" then
@@ -1747,7 +1765,6 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 						d.print("---- addon info ----", false, 0, user_peer_id)
 
-						-- gets true data
 						-- get the addon name
 						local addon_name = "Improved Conquest Mode (".. string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d)")..(IS_DEVELOPMENT_VERSION and ".dev)" or ")")
 
@@ -2095,12 +2112,17 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 						enemy_hp = enemy_hp * 2.5
 					else
 						enemy_hp = enemy_hp * 8
+						if vehicle_object.ai_type == AI_TYPE_BOAT then
+							enemy_hp = enemy_hp * 10
+						end
 					end
 				end
 
 				if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
+					d.print("Killing vehicle "..vehicle_id.." instantly, as the damage it took is over twice its max health", true, 0)
 					killVehicle(squad_index, vehicle_id, true)
 				elseif damage_prev <= enemy_hp and vehicle_object.current_damage > enemy_hp then
+					d.print("Killing vehicle "..vehicle_id.." as it took too much damage", true, 0)
 					killVehicle(squad_index, vehicle_id, false)
 				end
 			end
@@ -2558,7 +2580,7 @@ function tickGamemode()
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 
 			-- spawn turrets at owned islands (to remove as will be replaced to be dependant on logistics system)
-			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 1 then
+			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 0 then
 				spawnTurret(island)
 			end
 
@@ -4248,25 +4270,24 @@ function tickOther()
 end
 
 function tickCargo()
-	-- every 2 hours go through all islands and check if 
-	-- they are low on cargo, the two that are the lowest 
-	-- we will try to send cargo to
-	for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
-		if isTickID(0, time.minute*120) then -- every 2 hours
+	-- every 1 hour go through all islands and calculate weights for each island
+	-- the weight uses things such as if its a defensive position, if its being
+	-- used for attack, and if its low on cargo
+	if isTickID(0, time.hour) then -- every 1 hour
+		for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
 			if island.faction == FACTION_AI then -- if the enemy ai owns the island
 
 			end
 		end
 	end
-
 end
 
 function onTick(tick_time)
 	if is_dlc_weapons then
+		g_savedata.tick_counter = g_savedata.tick_counter + 1
 
 		d.startProfiler("onTick()", true)
 
-		g_savedata.tick_counter = g_savedata.tick_counter + 1
 		tickUpdateVehicleData()
 		tickVision()
 		tickGamemode()
@@ -4462,11 +4483,7 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
-		-- print info for use in debugging
-		d.print("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, 1)
-		d.print("component index: "..component, false, 1)
-		d.print("playlist_index: "..playlist_index, false, 1)
-		d.print("location_index: "..location_index, false, 1)
+		d.print("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, 1)
 		return nil
 	end
 end
@@ -6044,7 +6061,7 @@ end
 ---@param print_error boolean if you want it to print an error if any are nil (if true, the second argument must be a name for debugging puposes)
 ---@param ... any varibles to check
 ---@return boolean none_are_nil returns true of none of the variables are nil or false
-function noneNil(print_error, ...) -- check for if none of the inputted variables are nil
+function noneNil(print_error,...) -- check for if none of the inputted variables are nil
 	local _ = table.pack(...)
 	local none_nil = true
 	for variable_index, variable in pairs(_) do
