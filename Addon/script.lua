@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.29)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.30)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -3420,25 +3420,25 @@ function tickSquadrons()
 							killVehicle(squad_index, vehicle_id, false, false)
 						end
 					end
-					-- check if the vehicle simply needs to reload a machine gun
-					local mg_info = isVehicleNeedsReloadMG(vehicle_id)
-					if mg_info[1] and mg_info[2] ~= 0 then
+					-- check if the vehicle simply needs to a ammo belt, barrel or box
+					local gun_info = isVehicleNeedsReload(vehicle_id)
+					if gun_info[1] and gun_info[2] ~= 0 then
 						local i = 1
 						local successed = false
-						local ammoData = {}
+						local ammo_data = {}
 						repeat
-							local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..mg_info[2].." - "..i)
+							local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..i)
 							if success then
 								if ammo.ammo > 0 then
 									successed = success
-									ammoData[i] = ammo
+									ammo_data[i] = ammo
 								end
 							end
 							i = i + 1
 						until (not success)
 						if successed then
-							s.setVehicleWeapon(vehicle_id, "Ammo "..mg_info[2].." - "..#ammoData, 0)
-							s.setVehicleWeapon(vehicle_id, "Ammo "..mg_info[2], ammoData[#ammoData].capacity)
+							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
+							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
 					end
 				end
@@ -4640,21 +4640,22 @@ function isVehicleNeedsResupply(vehicle_id, button_name)
 	return success and button_data.on
 end
 
-function isVehicleNeedsReloadMG(vehicle_id)
+function isVehicleNeedsReload(vehicle_id)
 	local needing_reload = false
-	local mg_id = 0
+	local gun_id = 0
 	for i=1,6 do
-		local needs_reload, is_success_button = s.getVehicleButton(vehicle_id, "RELOAD_MG"..i)
+		local needs_reload, is_success_button = s.getVehicleButton(vehicle_id, "AI_RELOAD_AMMO_"..i)
 		if needs_reload ~= nil then
 			if needs_reload.on and is_success_button then
 				needing_reload = true
-				mg_id = i
+				gun_id = i
+				break
 			end
 		end
 	end
 	local returnings = {}
 	returnings[1] = needing_reload
-	returnings[2] = mg_id
+	returnings[2] = gun_id
 	return returnings
 end
 

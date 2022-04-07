@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="153" component_id_counter="2854">
+	<locations location_id_counter="153" component_id_counter="2856">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -24610,6 +24610,22 @@
 						<spawn_bounds>
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="2" id="2855" name="id_2855" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-7.224298" 31="0.8" 32="-1.661771"/>
+						<spawn_bounds>
+							<min x="-0.11" y="-0.8" z="-0.11"/>
+							<max x="0.11" y="0.8" z="0.11"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="2" id="2856" name="id_2856" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-7.260929" 31="0.8" 32="-2.546723"/>
+						<spawn_bounds>
+							<min x="-0.11" y="-0.8" z="-0.11"/>
+							<max x="0.11" y="0.8" z="0.11"/>
 						</spawn_bounds>
 						<graph_links/>
 					</c>
