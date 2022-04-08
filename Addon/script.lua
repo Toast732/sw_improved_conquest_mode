@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.31)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.32)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -794,7 +794,7 @@ function spawnTurret(island)
 	local selected_prefab = sm.spawn(true, getTagValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
 
 	if not selected_prefab then
-		return false, "was unable to get a turret prefab! turret_type of turret spawn zone: "..getTagValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true)
+		return false, "was unable to get a turret prefab! turret_type of turret spawn zone: "..tostring(getTagValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true))
 	end
 
 	island.zones.turrets[spawnbox_index].is_spawned = true
