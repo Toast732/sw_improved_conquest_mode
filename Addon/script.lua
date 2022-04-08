@@ -11,14 +11,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.30)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.31)"
+local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
-local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -152,6 +152,7 @@ local g_count_attack = 0
 local g_count_patrol = 0
 
 g_savedata = {
+	exists = true, -- means that the savedata does exist, used for checking if the savedata exists
 	ai_base_island = nil,
 	player_base_island = nil,
 	controllable_islands = {},
@@ -260,6 +261,92 @@ local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when dam
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
 
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
+
+	if not g_savedata.exists then -- creates savedata if it doesnt exist, can occur theres syntax errors in the script when the world is created
+		local g_settings = g_savedata.settings
+		g_savedata = {
+			settings = g_settings,
+			exists = true,
+			ai_base_island = nil,
+			player_base_island = nil,
+			controllable_islands = {},
+			ai_army = { 
+				squadrons = { 
+					[RESUPPLY_SQUAD_INDEX] = { 
+						command = COMMAND_RESUPPLY, 
+						ai_type = "", 
+						role = "", 
+						vehicles = {}, 
+						target_island = nil 
+					}
+				},
+				squad_vehicles = {} -- stores which squad the vehicles are assigned to, indexed via the vehicle's id, with this we can get the vehicle we want the data for without needing to check every single enemy ai vehicle
+			},
+			player_vehicles = {},
+			constructable_vehicles = {},
+			vehicle_list = {},
+			terrain_scanner_prefab = {},
+			terrain_scanners = {},
+			is_attack = false,
+			info = {
+				creation_version = nil,
+				full_reload_versions = {},
+				has_default_addon = false,
+				awaiting_reload = false,
+			},
+			tick_counter = 0,
+			sweep_and_prune = { -- used for sweep and prune, capture detection
+				flags = { -- only updates order in oncreate and is_world_create
+					x = {},
+					z = {}
+				},
+				ai_pairs = {}
+			},
+			ai_history = {
+				has_defended = 0, -- logs the time in ticks the player attacked at
+				defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
+				scout_death = -1, -- saves the time the scout plane was destroyed, allows the players some time between each time the scout comes
+			},
+			ai_knowledge = {
+				last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
+				scout = {}, -- the scout progress of each island
+			},
+			player_data = {},
+			cache = {
+				cargo = {
+					island_distances = {
+						sea = {},
+						land = {},
+						air = {}
+					},
+					best_routes = {}
+				}
+			},
+			cache_stats = {
+				reads = 0,
+				writes = 0,
+				failed_writes = 0,
+				resets = 0
+			},
+			profiler = {
+				working = {},
+				total = {},
+				display = {
+					average = {},
+					max = {},
+					current = {}
+				},
+				ui_id = nil
+			},
+			debug = {
+				chat = false,
+				profiler = false,
+				map = false
+			}
+		}
+		onCreate(true) -- makes the the script setup the world like if the world was just created
+	end
+
 	-- lets you keep debug mode enabled after reloads
 	--[[
 	if g_savedata.player_data then -- backwards compatibilty check for versions before 0.2.1
@@ -303,8 +390,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
 			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
-			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
-			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
+			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 19, 1, 1),
+			ISLAND_COUNT = property.slider("Island Count", 7, 21, 1, 21),
 		}
 	end
 
@@ -450,6 +537,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						players_capturing = 0,
 						defenders = 0,
 						is_scouting = false,
+						last_defended = 0,
 						cargo = {
 							oil = 0,
 							jet_fuel = 0,
@@ -476,15 +564,15 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			-- set up ai base as furthest from player
 			local flagZone = flag_zones[furthest_flagZone_index]
 			g_savedata.ai_base_island = {
-				name = flagZone.name, 
+				name = flagZone.name,
 				index = furthest_flagZone_index,
 				transform = flagZone.transform,
 				tags = flagZone.tags,
-				faction = FACTION_AI, 
+				faction = FACTION_AI,
 				is_contested = false,
 				capture_timer = 0,
-				map_id = s.getMapID(), 
-				assigned_squad_index = -1, 
+				map_id = s.getMapID(),
+				assigned_squad_index = -1,
 				production_timer = 0,
 				zones = {
 					turrets = {},
@@ -494,6 +582,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				players_capturing = 0,
 				defenders = 0,
 				is_scouting = false,
+				last_defended = 0,
 				cargo = {
 					oil = 0,
 					jet_fuel = 1500,
@@ -537,6 +626,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					players_capturing = 0,
 					defenders = 0,
 					is_scouting = false,
+					last_defended = 0,
 					cargo = {
 						oil = 0,
 						jet_fuel = 0,
@@ -676,7 +766,6 @@ end
 ---@return boolean spawned if the turret successfully spawned
 ---@return vehicle_data[] vehicle_data the vehicle data of the turret, if it did not successfully spawn, then it returns the error code
 function spawnTurret(island)
-	local selected_prefab = sm.spawn(true, "turret")
 
 	if (#island.zones.turrets < 1) then
 		return false, "theres no turret zones on this island!\nisland: "..island.name 
@@ -700,7 +789,13 @@ function spawnTurret(island)
 	local player_list = s.getPlayers()
 	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 3000, true) then -- makes sure players are not too close before spawning a turret
 		return false, "players are too close to the turret spawn point!" 
-	end 
+	end
+
+	local selected_prefab = sm.spawn(true, getTagValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
+
+	if not selected_prefab then
+		return false, "was unable to get a turret prefab! turret_type of turret spawn zone: "..getTagValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true)
+	end
 
 	island.zones.turrets[spawnbox_index].is_spawned = true
 	local spawn_transform = island.zones.turrets[spawnbox_index].transform
@@ -2638,7 +2733,7 @@ function tickGamemode()
 
 			local spawned, vehicle_data = spawnTurret(g_savedata.ai_base_island)
 			if not spawned then
-				d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
+				d.print("failed to spawn turret at "..g_savedata.ai_base_island.name.."\nError:\n"..vehicle_data, true, 1)
 			end
 			
 			local spawned, vehicle_data = spawnAIVehicle()
@@ -4387,6 +4482,7 @@ function tickModifiers()
 					if g_savedata.ai_history.defended_charge >= 6 then
 						g_savedata.ai_history.defended_charge = 0
 						g_savedata.ai_history.has_defended = g_savedata.tick_counter
+						island.last_defended = g_savedata.tick_counter
 						d.print(player.name.." has been detected to be attacking "..island.name..", the ai will be raising their defences!", true, 0)
 					end
 				end
@@ -4414,16 +4510,19 @@ function tickOther()
 end
 
 function tickCargo()
-	-- every 1 hour go through all islands and calculate weights for each island
-	-- the weight uses things such as if its a defensive position, if its being
-	-- used for attack, and if its low on cargo
+	d.startProfiler("tickCargo()", true)
+	local island_weights = {}
 	if isTickID(0, time.hour) then -- every 1 hour
+
+		d.print("checking cargo weights for all islands", true, 0)
+
 		for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
 			if island.faction == FACTION_AI then -- if the enemy ai owns the island
-
+				table.insert(island_weights, cargo.getWeight(island))
 			end
 		end
 	end
+	d.stopProfiler("tickCargo()", true, "onTick()")
 end
 
 function onTick(tick_time)
@@ -4497,13 +4596,12 @@ end
 function build_locations(playlist_index, location_index)
     local location_data = s.getLocationData(playlist_index, location_index)
 
-    local addon_components =
-    {
+    local addon_components = {
         vehicles = {},
         survivors = {},
         objects = {},
 		zones = {},
-		fires = {},
+		fires = {}
     }
 
     local is_valid_location = false
@@ -5140,6 +5238,46 @@ end
 --
 --------------------------------------------------------------------------------
 
+---@param island island[] the island you want to get the resupply weight of
+---@return weight[] weights the weights of all of the cargo types for the resupply island
+function cargo.getResupplyWeight(island) -- get the weight of the island (for resupplying the island)
+	-- weight by how much cargo the island has
+	local oil_weight = ((10000 - island.cargo.oil) / 9000) -- oil
+	local diesel_weight = ((5000 - island.cargo.diesel)/4500) -- diesel
+	local jet_fuel_weight = ((5000 - island.cargo.jet_fuel)/4500) -- jet fuel
+
+	-- weight by how many vehicles the island has defending
+	local weight_modifier = 1 * math.max(5 - island.defenders, 1) -- defenders
+
+	local target_island, origin_island = getObjectiveIsland()
+	if origin_island.name == island.name then -- if this island the ai is using to attack from
+		weight_modifier = weight_modifier * 1.2 -- increase weight
+	end
+
+	weight_modifier = weight_modifier * ((time.hour - island.last_defended) / (time.hour * 3)) -- weight by how long ago the player attacked
+
+	local weight = {
+		oil = oil_weight * (getTagValue(island.tags, "oil_consumption") and 1 or 0),
+		diesel = diesel_weight * weight_modifier,
+		jet_fuel = jet_fuel_weight * weight_modifier
+	}
+
+	return weight
+end
+
+---@param island island[] the island you want to get the resupplier weight of
+---@return weight[] weights the weights of all of the cargo types for the resupplier island
+function cargo.getResupplierWeight(island) -- get weight of the island (for using it to resupply another island)
+	local oil_weight = ((island.cargo.oil) / 9000) -- oil
+	local diesel_weight = ((island.cargo.diesel)/4500) -- diesel
+	local jet_fuel_weight = ((island.cargo.jet_fuel)/4500) -- jet fuel
+
+	local weight = {
+		oil = oil_weight * (getTagValue(island.tags, "oil_generation") and 1 or 0.2),
+		diesel = diesel_weight * (getTagValue(island.tags, "diesel_generation") and 1 or 0.2),
+		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_generation") and 1 or 0.2)
+	}
+end
 
 ---@param origin_island island[] the island of which the cargo is coming from
 ---@param dest_island island[] the island of which the cargo is going to
@@ -5623,7 +5761,7 @@ end
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
 		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "turret" or role == "cargo" then
+			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "SAM" or role == "SAM_small" or role == "bunker" or role == "cargo" then
 				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
 					if veh_type ~= "mod" and type(veh_data) == "table" then
 						for strat, strat_data in pairs(veh_data) do
@@ -5632,6 +5770,7 @@ function spawnModifiers.create() -- populates the constructable vehicles with th
 								for vehicle_id, v in pairs(strat_data) do
 									if type(v) == "table" and vehicle_id ~= "mod" then
 										g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
+										d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].location.data.name.." for adaptive AI", true, 0)
 									end
 								end
 							end
@@ -5713,11 +5852,15 @@ function spawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		sel_strat = randChance(strat_chances)
 		d.print("selected strategy: "..sel_strat, true, 0)
-		
-		for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
-			if type(v) == "table" then
-				vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
+		if g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat] then
+			for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+				if type(v) == "table" then
+					vehicle_chances[vehicle] = g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle].mod
+				end
 			end
+		else
+			d.print("There are no vehicles with the role \""..sel_role.."\", with the type \""..sel_veh_type.."\" and with the strat \""..sel_strat.."\"", true, 1)
+			return false
 		end
 		sel_vehicle = randChance(vehicle_chances)
 		d.print("selected vehicle: "..sel_vehicle, true, 0)
@@ -5875,6 +6018,9 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 	end
 end
 
+---@param debug_type integer the type of debug | 0 = debug | 1 = error | 2 = profiler | 3 = map
+---@param peer_id ?integer the peer_id of the player you want to check if they have it enabled, leave blank to check globally
+---@return boolean enabled if the specified type of debug is enabled
 function debugging.getDebug(debug_type, peer_id)
 	if not peer_id or peer_id == -1 then -- if any player has it enabled
 		if debug_type == -1 then -- any debug
