@@ -254,7 +254,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="129" cargo_zone_import_cargo_type="turret,turret_type=SAM_small" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="-0.010701" 02="0.999943" 20="-0.999943" 22="-0.010701" 30="5.700082" 31="18.54674" 32="20.924461"/>
+						<spawn_transform 00="0.999768" 02="0.021533" 20="-0.021533" 22="0.999768" 30="5.700082" 31="18.54674" 32="20.924461"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -2419,7 +2419,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="2877" cargo_zone_import_cargo_type="turret,turret_type=bunker" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.96373" 01="0" 02="-0.266878" 10="-0.003403" 11="0.999919" 12="-0.012288" 20="0.266856" 21="0.01275" 22="0.963652" 30="-133.108215" 31="7.224042" 32="266.461426"/>
+						<spawn_transform 00="0.96373" 02="-0.266878" 10="-0.003403" 11="0.999919" 12="-0.012288" 20="0.266856" 21="0.01275" 22="0.963652" 30="-133.108215" 31="7.224042" 32="266.461426"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>
@@ -2435,7 +2435,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="2879" cargo_zone_import_cargo_type="id_2879" display_name="land_ai_road" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 00="0.944346" 01="-0.023948" 02="-0.328081" 10="0.022621" 11="0.999713" 12="-0.007859" 20="0.328175" 21="0" 22="0.944617" 30="-289.246918" 31="14.768388" 32="335.810364"/>
+						<spawn_transform 00="0.944346" 01="-0.023948" 02="-0.328081" 10="0.022621" 11="0.999713" 12="-0.007859" 20="0.328175" 22="0.944617" 30="-289.246918" 31="14.768388" 32="335.810364"/>
 						<spawn_bounds>
 							<min x="-149.680143" y="-7.680962" z="-6.884689"/>
 							<max x="149.680143" y="7.680962" z="6.884689"/>

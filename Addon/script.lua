@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.32)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.33)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -377,6 +377,9 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 end
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
+
+	local world_setup_time = s.getTimeMillisec()
+
 	if not g_savedata.settings then
 		g_savedata.settings = { --set the boxes to "true" if you want them to be enabled by default (quotes )
 			SINKING_MODE = SINKING_MODE_BOX,
@@ -711,6 +714,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
 		end
 	end
+	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
 end
 
 function buildPrefabs(location_index)
@@ -1312,31 +1316,43 @@ local player_commands = {
 			short_desc = "lets you get an ai's spawning modifier",
 			desc = "lets you see what an ai's role, type, strategy or vehicle's spawning modifier is",
 			args = "(role) [type] [strategy] [constructable_vehicle_id]",
-			example = "?impwep aimod attack heli general 0",
+			example = "?impwep aimod attack heli general 0"
 		},
 		setmod = {
 			short_desc = "lets you change an ai's spawning modifier",
 			desc = "lets you change what the ai's role spawning modifier is, does not yet support type, strategy or constructable vehicle id",
 			args = "(\"reward\"|\"punish\") (role) (modifier: 1-5)",
-			example = "?impwep setmod reward attack 4",
+			example = "?impwep setmod reward attack 4"
 		},
 		dv = { -- delete vehicle
 			short_desc = "lets you delete an ai vehicle",
 			desc = "lets you delete an ai vehicle by vehicle id, or all by specifying \"all\", or all vehicles that have been damaged by specifying \"damaged\"",
 			args = "(vehicle_id|\"all\"|\"damaged\")",
-			example = "?impwep dv all",
+			example = "?impwep dv all"
 		},
 		si = { -- set scout intel
 			short_desc = "lets you set the ai's scout level",
 			desc = "lets you set the ai's scout level on a specific island, from 0 to 100 for 0% scouted to 100% scouted",
 			args = "(island_name) (0-100)",
-			example = "?impwep si North_Harbour 100",
+			example = "?impwep si North_Harbour 100"
 		},
 		setting = {
 			short_desc = "lets you change or get a specific setting and can get a list of all settings",
 			desc = "if you do not input the setting name, it will show a list of all valid settings, if you input a setting name but not a value, it will tell you the setting's current value, if you enter both the setting name and the setting value, it will change that setting to that value",
 			args = "[setting_name] [value]",
-			example = "?impwep setting MAX_BOAT_AMOUNT 5\n?impwep setting MAX_BOAT_AMOUNT\n?impwep setting",
+			example = "?impwep setting MAX_BOAT_AMOUNT 5\n?impwep setting MAX_BOAT_AMOUNT\n?impwep setting"
+		},
+		ai_knowledge = {
+			short_desc = "shows the 3 vehicles it thinks is good against you",
+			desc = "shows the 3 vehicles it thinks is good against you, and the 3 that it thinks is weak against you",
+			args = "none",
+			example = "?impwep ai_knowledge"
+		},
+		reset_cargo = {
+			short_desc = "resets the ai's cargo storages",
+			desc = "resets the all island cargo storages to 0 for each resource, leave island blank for all islands, leave cargo_type blank for all resources",
+			args = "[island] [cargo_type]",
+			example = "?impwep reset_cargo\n?impwep reset_cargo North_Harbour\n?impwep reset_cargo Garrison_Toddy oil"
 		},
 		debug_cache = {
 			short_desc = "",
@@ -1871,6 +1887,31 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							-- the setting they selected does not exist
 							d.print(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, 1, user_peer_id)
 						end
+					
+					elseif command == "ai_knowledge" then
+						local vehicles = sm.getStats()
+
+						if vehicles.best[1].mod == vehicles.worst[1].mod then
+							d.print("the adaptive AI doesn't know anything about you! all vehicles currently have the same chance to spawn!", false, 0, user_peer_id)
+						else
+							d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, user_peer_id)
+							for _, vehicle_data in ipairs(vehicles.best) do
+								d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, user_peer_id)
+							end
+							d.print("Bottom 3 vehicles the ai thinks is effective against you:", false, 0, user_peer_id)
+							for _, vehicle_data in ipairs(vehicles.worst) do
+								d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, user_peer_id)
+							end
+						end
+					
+					elseif command == "reset_cargo" then
+						local was_reset, error = cargo.reset(getIslandFromName(arg[1]), string.friendly(arg[2]))
+						if was_reset then
+							d.print("Reset the cargo storages for all islands", false, 0, user_peer_id)
+						else
+							d.print("Cargo failed to reset! error: "..error, false, 1, user_peer_id)
+						end
+					
 					elseif command == "debug_cache" then
 						d.print("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, 0, user_peer_id)
 					elseif command == "debug_cargo1" then
@@ -2285,7 +2326,7 @@ end
 
 function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 	if is_dlc_weapons then
-		if peer_id ~= -1 then
+		if peer_id ~= -1 and peer_id ~= 65535 then
 			-- player spawned vehicle
 			g_savedata.player_vehicles[vehicle_id] = {
 				current_damage = 0, 
@@ -2395,7 +2436,7 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
@@ -2845,6 +2886,28 @@ function tickGamemode()
 			local debug_data = ""
 			debug_data = debug_data.."--- This Island's Statistics ---\n\n"
 			debug_data = debug_data.."Number of Turrets: "..ai_base_island_turret_count.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+
+			-- cargo
+			debug_data = debug_data.."\n-- Cargo --\n"
+
+			debug_data = debug_data.."- Resupply Weights -\n"
+			local resupply_weight = cargo.getResupplyWeight(g_savedata.ai_base_island)
+			debug_data = debug_data..("%s%.3f%s"):format("Oil: ", resupply_weight.oil, "\n")
+			debug_data = debug_data..("%s%.3f%s"):format("Diesel: ", resupply_weight.diesel, "\n")
+			debug_data = debug_data..("%s%.3f%s"):format("Jet Fuel: ", resupply_weight.jet_fuel, "\n")
+
+			debug_data = debug_data.."- Resupplier Weights -\n"
+			local resupplier_weight = cargo.getResupplierWeight(g_savedata.ai_base_island)
+			debug_data = debug_data..("%s%.3f%s"):format("Oil: ", resupplier_weight.oil, "\n")
+			debug_data = debug_data..("%s%.3f%s"):format("Diesel: ", resupplier_weight.diesel, "\n")
+			debug_data = debug_data..("%s%.3f%s"):format("Jet Fuel: ", resupplier_weight.jet_fuel, "\n")
+
+			debug_data = debug_data.."- Cargo Storage -\n"
+			debug_data = debug_data..("%s%.1f%s"):format("Oil: ", g_savedata.ai_base_island.cargo.oil, "\n")
+			debug_data = debug_data..("%s%.1f%s"):format("Diesel: ", g_savedata.ai_base_island.cargo.diesel, "\n")
+			debug_data = debug_data..("%s%.1f%s"):format("Jet Fuel: ", g_savedata.ai_base_island.cargo.jet_fuel, "\n")
+
+
 			debug_data = debug_data.."\n--- Global Statistics ---\n\n"
 			debug_data = debug_data .. "Total AI Vehicles: "..army_count.."/"..(g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT).."\n"
 			debug_data = debug_data .. "Total Sea Vehicles: "..boat_count.."/"..g_savedata.settings.MAX_BOAT_AMOUNT.."\n"
@@ -2863,7 +2926,7 @@ function tickGamemode()
 			local player_list = s.getPlayers()
 			for peer_index, peer in pairs(player_list) do
 				if d.getDebug(3, peer.id) then
-					s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Ai Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
+					s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
 					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
 					s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
@@ -2919,6 +2982,26 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 					if island.faction == FACTION_AI then 
 						debug_data = debug_data.."\n\nNumber of defenders: "..island.defenders.."\n"
 						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
+
+						-- cargo weights
+						debug_data = debug_data.."\nCargo\n"
+
+						debug_data = debug_data.."\nResupply Weights\n"
+						local resupply_weight = cargo.getResupplyWeight(island)
+						debug_data = debug_data..("%s%.3f%s"):format("Oil: ", resupply_weight.oil, "\n")
+						debug_data = debug_data..("%s%.3f%s"):format("Diesel: ", resupply_weight.diesel, "\n")
+						debug_data = debug_data..("%s%.3f%s"):format("Jet Fuel: ", resupply_weight.jet_fuel, "\n")
+
+						debug_data = debug_data.."\nResupplier Weights\n"
+						local resupplier_weight = cargo.getResupplierWeight(island)
+						debug_data = debug_data..("%s%.3f%s"):format("Oil: ", resupplier_weight.oil, "\n")
+						debug_data = debug_data..("%s%.3f%s"):format("Diesel: ", resupplier_weight.diesel, "\n")
+						debug_data = debug_data..("%s%.3f%s"):format("Jet Fuel: ", resupplier_weight.jet_fuel, "\n")
+
+						debug_data = debug_data.."\nCargo Storage\n"
+						debug_data = debug_data..("%s%.1f%s"):format("Oil: ", island.cargo.oil, "\n")
+						debug_data = debug_data..("%s%.1f%s"):format("Diesel: ", island.cargo.diesel, "\n")
+						debug_data = debug_data..("%s%.1f%s"):format("Jet Fuel: ", island.cargo.jet_fuel, "\n")
 					end
 
 					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
@@ -3651,21 +3734,21 @@ function tickSquadrons()
 
 				local function retargetVehicle(vehicle_object, target_player_id, target_vehicle_id)
 					-- decrement previous target count
-					if vehicle_object.target_player_id ~= -1 then decrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then decrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 
 					vehicle_object.target_player_id = target_player_id
 					vehicle_object.target_vehicle_id = target_vehicle_id
 
 					-- increment new target count
-					if vehicle_object.target_player_id ~= -1 then incrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then incrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 				end
 
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- check existing target is still visible
 
-					if vehicle_object.target_player_id ~= -1 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
 						vehicle_object.target_player_id = -1
 					elseif vehicle_object.target_vehicle_id ~= -1 and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
 						vehicle_object.target_vehicle_id = -1
@@ -3673,7 +3756,7 @@ function tickSquadrons()
 
 					-- find targets if not targeting anything
 
-					if vehicle_object.target_player_id == -1 and vehicle_object.target_vehicle_id == -1 then
+					if (vehicle_object.target_player_id == -1 or vehicle_object.target_player_id == 65535) and vehicle_object.target_vehicle_id == -1 then
 						if #squad_vision.visible_players > 0 then
 							vehicle_object.target_player_id = squad_vision:getBestTargetPlayerID()
 							incrementCount(player_counts, vehicle_object.target_player_id)
@@ -3682,7 +3765,7 @@ function tickSquadrons()
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
 						end
 					else
-						if vehicle_object.target_player_id ~= -1 then
+						if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 							incrementCount(player_counts, vehicle_object.target_player_id)
 						elseif vehicle_object.target_vehicle_id ~= -1 then
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
@@ -3695,8 +3778,8 @@ function tickSquadrons()
 				local vehicles_per_target = math.max(math.floor(squad_vehicle_count / visible_target_count), 1)
 
 				local function isRetarget(target_player_id, target_vehicle_id)
-					return (target_player_id == -1 and target_vehicle_id == -1) 
-						or (target_player_id ~= -1 and getCount(player_counts, target_player_id) > vehicles_per_target)
+					return ((target_player_id == -1 or target_player_id == 65535) and target_vehicle_id == -1) 
+						or (target_player_id ~= -1 and target_player_id ~= 65535 and getCount(player_counts, target_player_id) > vehicles_per_target)
 						or (target_vehicle_id ~= -1 and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
 				end
 
@@ -3729,7 +3812,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if vehicle_object.target_player_id ~= -1 then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
@@ -3805,7 +3888,7 @@ function tickSquadrons()
 			end
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 or vehicle_object.target_vehicle_id ~= -1 then
 						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
@@ -4085,7 +4168,7 @@ function tickVehicles()
 								local squad_vision = squadGetVisionData(squad)
 								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
@@ -4511,15 +4594,128 @@ end
 
 function tickCargo()
 	d.startProfiler("tickCargo()", true)
-	local island_weights = {}
+
+	-- ticks cargo production and consumption
+	for island_index, island in pairs(g_savedata.controllable_islands) do -- at every island
+		if isTickID(island.index, time.minute) then -- every minute
+			if island.faction == FACTION_AI then
+
+				d.print("producing cargo at "..island.name, true, 0)
+
+				local cargo = {
+					production = {
+						oil = (getTagValue(island.tags, "oil_production") or 0)/60,
+						diesel = (getTagValue(island.tags, "diesel_production") or 0)/60,
+						jet_fuel = (getTagValue(island.tags, "jet_fuel_production") or 0)/60
+					},
+					consumption = {
+						oil = (getTagValue(island.tags, "oil_consumption") or 0)/60,
+						diesel = (getTagValue(island.tags, "diesel_consumption") or 0)/60,
+						jet_fuel = (getTagValue(island.tags, "jet_fuel_consumption") or 0)/60
+					}
+				}
+				
+				island.cargo.oil = math.min(island.cargo.oil + cargo.production.oil, 10000)
+				
+				if cargo.production.diesel > 0 then
+					island.cargo.diesel = math.min(island.cargo.diesel + island.cargo.oil/((cargo.production.jet_fuel/cargo.production.diesel)+1), 10000)
+				end
+				if cargo.production.jet_fuel > 0 then
+					island.cargo.jet_fuel = math.min(island.cargo.jet_fuel + island.cargo.oil/((cargo.production.diesel/cargo.production.jet_fuel)+1), 10000)
+				end
+
+				island.cargo.oil = island.cargo.oil - (
+					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.diesel) +
+					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.jet_fuel)	
+				)
+			end
+		end
+	end
+
+	if isTickID(g_savedata.ai_base_island.index, time.minute) then -- if its the tick for the AI base Island
+
+		d.print("producing cargo at "..g_savedata.ai_base_island.name, true, 0)
+
+		local cargo = {
+			production = {
+				oil = (getTagValue(g_savedata.ai_base_island.tags, "oil_production") or 0)/60,
+				diesel = (getTagValue(g_savedata.ai_base_island.tags, "diesel_production") or 0)/60,
+				jet_fuel = (getTagValue(g_savedata.ai_base_island.tags, "jet_fuel_production") or 0)/60
+			},
+			consumption = {
+				oil = (getTagValue(g_savedata.ai_base_island.tags, "oil_consumption") or 0)/60,
+				diesel = (getTagValue(g_savedata.ai_base_island.tags, "diesel_consumption") or 0)/60,
+				jet_fuel = (getTagValue(g_savedata.ai_base_island.tags, "jet_fuel_consumption") or 0)/60
+			}
+		}
+
+		local natural_production = 350/60 -- the ai_base island will produce these resources naturally at this rate per hour
+		
+		-- produce oil
+		g_savedata.ai_base_island.cargo.oil = math.min(g_savedata.ai_base_island.cargo.oil + cargo.production.oil + natural_production, 10000)
+		
+		-- produce diesel
+		g_savedata.ai_base_island.cargo.diesel = g_savedata.ai_base_island.cargo.diesel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+natural_production)), 10000)
+
+		-- produce jet fuel
+		g_savedata.ai_base_island.cargo.jet_fuel = g_savedata.ai_base_island.cargo.jet_fuel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+natural_production)), 10000)
+
+		-- consume the oil used to make the jet fuel and diesel
+		g_savedata.ai_base_island.cargo.oil = g_savedata.ai_base_island.cargo.oil - (
+			(math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+natural_production/2)) +
+			(math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+natural_production/2))
+		)
+	end
+
+	-- ticks resupplying islands
 	if isTickID(0, time.hour) then -- every 1 hour
 
-		d.print("checking cargo weights for all islands", true, 0)
+		d.print("getting cargo weights for all islands", true, 0)
+
+		local island_weights = {
+			resupply = {},
+			resupplier = {}
+		}
 
 		for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
 			if island.faction == FACTION_AI then -- if the enemy ai owns the island
-				table.insert(island_weights, cargo.getWeight(island))
+				table.insert(island_weights.resupply, { island = island, weight = cargo.getResupplyWeight(island) })
+				table.insert(island_weights.resupplier, { island = island, weight = cargo.getResupplierWeight(island) })
 			end
+		end
+
+		d.print("calculating island that needs resupply the most", true, 0)
+
+		local resupply_island = nil
+		local resupply_resource = {
+			oil = 0,
+			diesel = 0,
+			jet_fuel = 0,
+			total = 0
+		}
+
+		for _, resupply in pairs(island_weights.resupply) do
+			local total_weight = 0
+
+			for _, weight in pairs(resupply.weight) do
+				total_weight = total_weight + weight
+			end
+
+			if total_weight > resupply_resource.total then
+				resupply_island = resupply.island
+				resupply_resource = {
+					oil = resupply.weight.oil,
+					diesel = resupply.weight.diesel,
+					jet_fuel = resupply.weight.jet_fuel,
+					total = total_weight
+				}
+			end
+		end
+
+		if resupply_island then
+			d.print("Island that needs resupply the most: "..resupply_island.name, true, 0)
+		else
+			d.print("No islands found that need resupply (Potential Error)", true, 0)
 		end
 	end
 	d.stopProfiler("tickCargo()", true, "onTick()")
@@ -5257,9 +5453,9 @@ function cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	weight_modifier = weight_modifier * ((time.hour - island.last_defended) / (time.hour * 3)) -- weight by how long ago the player attacked
 
 	local weight = {
-		oil = oil_weight * (getTagValue(island.tags, "oil_consumption") and 1 or 0),
-		diesel = diesel_weight * weight_modifier,
-		jet_fuel = jet_fuel_weight * weight_modifier
+		oil = oil_weight * (getTagValue(island.tags, "oil_consumption") and 2.5 or 0),
+		diesel = diesel_weight * weight_modifier * (getTagValue(island.tags, "diesel_production") and 0 or 1),
+		jet_fuel = jet_fuel_weight * weight_modifier * (getTagValue(island.tags, "jet_fuel_production") and 0 or 1)
 	}
 
 	return weight
@@ -5268,15 +5464,17 @@ end
 ---@param island island[] the island you want to get the resupplier weight of
 ---@return weight[] weights the weights of all of the cargo types for the resupplier island
 function cargo.getResupplierWeight(island) -- get weight of the island (for using it to resupply another island)
-	local oil_weight = ((island.cargo.oil) / 9000) -- oil
-	local diesel_weight = ((island.cargo.diesel)/4500) -- diesel
-	local jet_fuel_weight = ((island.cargo.jet_fuel)/4500) -- jet fuel
+	local oil_weight = (island.cargo.oil/9000) -- oil
+	local diesel_weight = (island.cargo.diesel/4500) -- diesel
+	local jet_fuel_weight = (island.cargo.jet_fuel/4500) -- jet fuel
 
 	local weight = {
 		oil = oil_weight * (getTagValue(island.tags, "oil_generation") and 1 or 0.2),
 		diesel = diesel_weight * (getTagValue(island.tags, "diesel_generation") and 1 or 0.2),
 		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_generation") and 1 or 0.2)
 	}
+
+	return weight
 end
 
 ---@param origin_island island[] the island of which the cargo is coming from
@@ -5752,6 +5950,63 @@ function cargo.getIslandDistance(island1, island2)
 	end
 end
 
+---@param island ?island[] the island of which you want to reset the cargo of, leave blank for all islands
+---@param cargo_type ?string the type of cargo you want to reset, leave blank for all types | "oil", "diesel" or "jet_fuel"
+---@return boolean was_reset if it was reset
+---@return string error if was_reset is false, it will return an error code, otherwise its "reset"
+function cargo.reset(island, cargo_type)
+	if island then
+		local is_main_base = (island.index == g_savedata.island.index) and true or false
+		if not cargo_type then
+			for cargo_type, _ in pairs(island.cargo) do
+				if is_main_base then
+					g_savedata.ai_main_base.cargo[cargo_type] = 0
+				else
+					g_savedata.controllable_islands[island.index].cargo[cargo_type] = 0
+				end
+			end
+		else
+			if is_main_base then
+				if g_savedata.ai_main_base.cargo[cargo_type] then
+					g_savedata.ai_main_base.cargo[cargo_type] = 0
+				else
+					return false, "(cargo.reset) inputted cargo_type doesn't exist! cargo_type: "..cargo_type
+				end
+			else
+				if g_savedata.ai_main_base.cargo[cargo_type] then
+					g_savedata.controllable_islands[island.index].cargo[cargo_type] = 0
+				else
+					return false, "(cargo.reset) inputted cargo_type doesn't exist! cargo_type: "..cargo_type
+				end
+			end
+		end
+	else
+		if not cargo_type then
+			for cargo_type, _ in pairs(g_savedata.ai_base_island.cargo) do
+				d.print("cargo amount before: "..g_savedata.ai_base_island.cargo[cargo_type], true, 0)
+				g_savedata.ai_base_island.cargo[cargo_type] = 0
+				d.print("cargo amount after: "..g_savedata.ai_base_island.cargo[cargo_type], true, 0)
+			end
+			for island_index, island in pairs(g_savedata.controllable_islands) do
+				for cargo_type, _ in pairs(island.cargo) do
+					g_savedata.controllable_islands[island_index].cargo[cargo_type] = 0
+				end
+			end
+		else
+			if g_savedata.ai_main_base.cargo[cargo_type] then
+				g_savedata.ai_main_base.cargo[cargo_type] = 0
+				for island_index, island in pairs(g_savedata.controllable_islands) do
+					g_savedata.controllable_islands[island_index].cargo[cargo_type] = 0
+				end
+			else
+				return false, "(cargo.reset) inputted cargo_type doesn't exist! cargo_type: "..cargo_type
+			end
+		end
+	end
+
+	return true, "reset"
+end
+
 --------------------------------------------------------------------------------
 --
 -- Spawn Modifier Functions (Adaptive AI)
@@ -5760,26 +6015,24 @@ end
 
 function spawnModifiers.create() -- populates the constructable vehicles with their spawning modifiers
 	for role, role_data in pairs(g_savedata.constructable_vehicles) do
-		if type(role_data) == "table" then
-			if role == "attack" or role == "general" or role == "defend" or role == "roaming" or role == "stealth" or role == "scout" or role == "SAM" or role == "SAM_small" or role == "bunker" or role == "cargo" then
-				for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
-					if veh_type ~= "mod" and type(veh_data) == "table" then
-						for strat, strat_data in pairs(veh_data) do
-							if type(strat_data) == "table" and strat ~= "mod" then
-								g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
-								for vehicle_id, v in pairs(strat_data) do
-									if type(v) == "table" and vehicle_id ~= "mod" then
-										g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-										d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].location.data.name.." for adaptive AI", true, 0)
-									end
+		if type(role_data) == "table" and role ~= "varient" then
+			for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
+				if type(veh_data) == "table" then
+					for strat, strat_data in pairs(veh_data) do
+						if type(strat_data) == "table" then
+							g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
+							for vehicle_id, v in pairs(strat_data) do
+								if type(v) == "table" then
+									g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
+									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].location.data.name.." for adaptive AI", true, 0)
 								end
 							end
 						end
-						g_savedata.constructable_vehicles[role][veh_type].mod = 1
 					end
+					g_savedata.constructable_vehicles[role][veh_type].mod = 1
 				end
-				g_savedata.constructable_vehicles[role].mod = default_mods[role]
 			end
+			g_savedata.constructable_vehicles[role].mod = default_mods[role]
 		end
 	end
 end
@@ -5972,6 +6225,52 @@ function spawnModifiers.debug(user_peer_id, role, type, strategy, constructable_
 	end
 end
 
+---@return vehicles[] vehicles the top 3 vehicles that it thinks is good at killing the player, and the 3 worst (.best .worst)
+function spawnModifiers.getStats()
+
+	-- get all vehicles and put them in a table
+	local all_vehicles = {}
+	for role, role_data in pairs(g_savedata.constructable_vehicles) do
+		if type(role_data) == "table" then
+			for veh_type, veh_data in pairs(g_savedata.constructable_vehicles[role]) do
+				if type(veh_data) == "table" then
+					for strat, strat_data in pairs(veh_data) do
+						if type(strat_data) == "table" then
+							g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
+							for vehicle_id, v in pairs(strat_data) do
+								if type(v) == "table" then
+									table.insert(all_vehicles, {
+										mod = v.mod,
+										prefab_data = v
+									})
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- sort the table from greatest mod value to least
+	table.sort(all_vehicles, function(a, b) return a.mod > b.mod end)
+
+	local vehicles = {
+		best = {
+			all_vehicles[1],
+			all_vehicles[2],
+			all_vehicles[3]
+		},
+		worst = {
+			all_vehicles[#all_vehicles],
+			all_vehicles[#all_vehicles - 1],
+			all_vehicles[#all_vehicles - 2]
+		}
+	}
+
+	return vehicles
+end
+
 --------------------------------------------------------------------------------
 --
 -- Debugging Functions
@@ -5986,7 +6285,7 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 
 	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
-		local prefix = s.getAddonData((s.getAddonIndex())).name..suffix
+		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", IMPROVED_CONQUEST_VERSION)..suffix
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
 			if message then
@@ -6000,7 +6299,7 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 			printTable(message, requires_debug, debug_type, peer_id)
 
 		elseif requires_debug == true then
-			if toPlayer ~= -1 and toPlayer ~= nil then
+			if toPlayer ~= -1 and toPlayer ~= 65535 and toPlayer ~= nil then
 				if g_savedata.player_data.is_debugging.toPlayer then
 					s.announce(prefix, message, toPlayer)
 				end
@@ -6022,7 +6321,7 @@ end
 ---@param peer_id ?integer the peer_id of the player you want to check if they have it enabled, leave blank to check globally
 ---@return boolean enabled if the specified type of debug is enabled
 function debugging.getDebug(debug_type, peer_id)
-	if not peer_id or peer_id == -1 then -- if any player has it enabled
+	if not peer_id or (peer_id == -1 or peer_id == 65535) then -- if any player has it enabled
 		if debug_type == -1 then -- any debug
 			if g_savedata.debug.chat or g_savedata.debug.profiler or g_savedata.debug.map then
 				return true
@@ -6346,10 +6645,52 @@ end
 --
 --------------------------------------------------------------------------------
 
----@param time number the time you want to see how long its been since (in ticks)
----@return number time_since how many ticks its been since <time>
-function timeSince(time)
+---@param island_name string the island name you want to get
+---@return boolean island_found returns true if the island was found
+---@return island[] island the island data from the name
+function getIslandFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
+	if island_name then
+		island_name = string.friendly(island_name)
+		if island_name == string.friendly(g_savedata.ai_base_island.name) then
+			-- if its the ai's main base
+			return true, g_savedata.ai_base_island
+		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
+			-- if its the player's main base
+			return true, g_savedata.player_base_island
+		else
+			-- check all other islands
+			for _, island in pairs(g_savedata.controllable_islands) do
+				if island_name == string.friendly(island.name) then
+					return true, island
+				end
+			end
+		end
+	else
+		return false, "island_name was never inputted!"
+	end
+	return false, "island was not found! inputted island_name: "..island_name
+end
+
+---@param input_string string the string the make friendly
+---@return string friendly_string friendly string, nil if input_string was not a string
+function string.friendly(input_string) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
+	if type(input_string) == "string" then
+		return string.gsub(string.lower(input_string), "_", " ")
+	else
+		return nil
+	end
+end
+
+---@param start_tick number the time you want to see how long its been since (in ticks)
+---@return number ticks_since how many ticks its been since <start_tick>
+function ticksSince(start_tick)
 	return g_savedata.tick_counter - time
+end
+
+---@param start_ms number the time you want to see how long its been since (in ms)
+---@return number ms_since how many ms its been since <start_ms>
+function millisecondsSince(start_ms)
+	return s.getTimeMillisec() - start_ms
 end
 
 ---@param print_error boolean if you want it to print an error if any are nil (if true, the second argument must be a name for debugging puposes)
