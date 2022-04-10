@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.34)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.35)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -6679,7 +6679,7 @@ end
 ---@param start_tick number the time you want to see how long its been since (in ticks)
 ---@return number ticks_since how many ticks its been since <start_tick>
 function ticksSince(start_tick)
-	return g_savedata.tick_counter - time
+	return g_savedata.tick_counter - start_tick
 end
 
 ---@param start_ms number the time you want to see how long its been since (in ms)
