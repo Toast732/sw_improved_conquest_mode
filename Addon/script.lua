@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.33)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.34)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -2197,15 +2197,6 @@ function captureIsland(island, override, peer_id)
 	elseif island.capture_timer < 0 then -- if its less than 0% island capture
 		island.capture_timer = 0
 	end
-
-	if d.getDebug(3) then
-		local player_list = s.getPlayers()
-		for peer_index, peer in pairs(player_list) do
-			if d.getDebug(3, peer.id) then
-				updatePeerIslandMapData(player_id, island)
-			end
-		end
-	end
 end
 
 function onPlayerJoin(steam_id, name, peer_id)
@@ -2650,9 +2641,9 @@ function tickGamemode()
 					and squad.command ~= COMMAND_RESUPPLY -- makes sure the squad isnt resupplying
 					then
 					
-					if vehicle_object.target_island then -- makes sure it has a target island
+					if squad.target_island then -- makes sure it has a target island
 						has_island = true
-						g_savedata.sweep_and_prune.ai_pairs[vehicle_object.id] = vehicle_object.target_island -- sets to check this vehicle with its target island in sweep and prune
+						g_savedata.sweep_and_prune.ai_pairs[vehicle_object.id] = squad.target_island -- sets to check this vehicle with its target island in sweep and prune
 					end
 				end
 
@@ -2671,12 +2662,16 @@ function tickGamemode()
 		-- check all ai that are within the capture radius
 		for vehicle_id, island in pairs(g_savedata.sweep_and_prune.ai_pairs) do
 			local vehicle_object, squad, squad_index = squads.getVehicle(vehicle_id)
+			if vehicle_object then
 
-			local capture_radius = island.faction == FACTION_AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
+				local capture_radius = island.faction == FACTION_AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
 
-			-- if the ai vehicle is within the capture radius
-			if m.distance(vehicle_object.transform, island.transform) <= capture_radius then
-				island.ai_capturing = island.ai_capturing + 1
+				-- if the ai vehicle is within the capture radius
+				if xzDistance(vehicle_object.transform, island.transform) <= capture_radius then
+					g_savedata.controllable_islands[island.index].ai_capturing = g_savedata.controllable_islands[island.index].ai_capturing + 1
+				end
+			else
+				d.print("(tickGamemode) vehicle_object is nil!", true, 1)
 			end
 		end
 
@@ -2926,11 +2921,11 @@ function tickGamemode()
 			local player_list = s.getPlayers()
 			for peer_index, peer in pairs(player_list) do
 				if d.getDebug(3, peer.id) then
-					s.addMapObject(player_id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
+					s.addMapObject(peer.id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
 					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
-					s.removeMapObject(player_id, g_savedata.player_base_island.map_id)
-					s.addMapObject(player_id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
+					s.removeMapObject(peer.id, g_savedata.player_base_island.map_id)
+					s.addMapObject(peer.id, g_savedata.player_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
 				end
 			end
 		end
@@ -4372,13 +4367,13 @@ function tickVehicles()
 					local player_list = s.getPlayers()
 					for peer_index, peer in pairs(player_list) do
 						if d.getDebug(3, peer.id) then
-							s.removeMapObject(player_id, vehicle_object.map_id)
-							s.addMapObject(player_id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							s.removeMapObject(peer.id, vehicle_object.map_id)
+							s.addMapObject(peer.id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, "AI " .. vehicle_object.ai_type .. " " .. vehicle_id.."\n"..vehicle_object.name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
-								s.removeMapLine(player_id, vehicle_object.map_id)
+								s.removeMapLine(peer.id, vehicle_object.map_id)
 
-								s.addMapLine(player_id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
+								s.addMapLine(peer.id, vehicle_object.map_id, vehicle_pos, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), 0.5, r, g, b, 255)
 
 								for i = 1, #vehicle_object.path - 1 do
 									local waypoint = vehicle_object.path[i]
@@ -4387,8 +4382,8 @@ function tickVehicles()
 									local waypoint_pos = m.translation(waypoint.x, waypoint.y, waypoint.z)
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
-									s.removeMapLine(player_id, waypoint.ui_id)
-									s.addMapLine(player_id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
+									s.removeMapLine(peer.id, waypoint.ui_id)
+									s.addMapLine(peer.id, waypoint.ui_id, waypoint_pos, waypoint_pos_next, 0.5, r, g, b, 255)
 								end
 							end
 						end
@@ -4467,7 +4462,7 @@ function tickTerrainScanners()
 			end
 		else
 			-- debug for if something goes wrong
-			local time_since = timeSince(scanner.result.time)
+			local time_since = ticksSince(scanner.result.time)
 			if time_since % time.minute == 0 and time_since ~= 0 then -- if its been longer than a minute since the data was written, every 1 minute
 				d.print("(Terrain Scanner) Its been "..time_since/time.minute.." minute"..(time_since/time.minute ~= 1 and "s " or " ").."since the scanner data was written for scanner "..scanner_index.." maybe the scanner was never deleted from the table?", true, 1)
 			end
@@ -4655,10 +4650,10 @@ function tickCargo()
 		g_savedata.ai_base_island.cargo.oil = math.min(g_savedata.ai_base_island.cargo.oil + cargo.production.oil + natural_production, 10000)
 		
 		-- produce diesel
-		g_savedata.ai_base_island.cargo.diesel = g_savedata.ai_base_island.cargo.diesel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+natural_production)), 10000)
+		g_savedata.ai_base_island.cargo.diesel = g_savedata.ai_base_island.cargo.diesel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+(natural_production/2))), 10000)
 
 		-- produce jet fuel
-		g_savedata.ai_base_island.cargo.jet_fuel = g_savedata.ai_base_island.cargo.jet_fuel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+natural_production)), 10000)
+		g_savedata.ai_base_island.cargo.jet_fuel = g_savedata.ai_base_island.cargo.jet_fuel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+(natural_production/2))), 10000)
 
 		-- consume the oil used to make the jet fuel and diesel
 		g_savedata.ai_base_island.cargo.oil = g_savedata.ai_base_island.cargo.oil - (
@@ -5453,9 +5448,9 @@ function cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	weight_modifier = weight_modifier * ((time.hour - island.last_defended) / (time.hour * 3)) -- weight by how long ago the player attacked
 
 	local weight = {
-		oil = oil_weight * (getTagValue(island.tags, "oil_consumption") and 2.5 or 0),
-		diesel = diesel_weight * weight_modifier * (getTagValue(island.tags, "diesel_production") and 0 or 1),
-		jet_fuel = jet_fuel_weight * weight_modifier * (getTagValue(island.tags, "jet_fuel_production") and 0 or 1)
+		oil = oil_weight * (getTagValue(island.tags, "oil_consumption") and 1 or 0),
+		diesel = diesel_weight * weight_modifier * (getTagValue(island.tags, "diesel_production") and 0.3 or 1),
+		jet_fuel = jet_fuel_weight * weight_modifier * (getTagValue(island.tags, "jet_fuel_production") and 0.3 or 1)
 	}
 
 	return weight
@@ -5469,9 +5464,9 @@ function cargo.getResupplierWeight(island) -- get weight of the island (for usin
 	local jet_fuel_weight = (island.cargo.jet_fuel/4500) -- jet fuel
 
 	local weight = {
-		oil = oil_weight * (getTagValue(island.tags, "oil_generation") and 1 or 0.2),
-		diesel = diesel_weight * (getTagValue(island.tags, "diesel_generation") and 1 or 0.2),
-		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_generation") and 1 or 0.2)
+		oil = oil_weight * (getTagValue(island.tags, "oil_production") and 1 or 0.2),
+		diesel = diesel_weight * (getTagValue(island.tags, "diesel_production") and 1 or 0.2),
+		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_production") and 1 or 0.2)
 	}
 
 	return weight
@@ -6298,10 +6293,10 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 		if type(message) == "table" then
 			printTable(message, requires_debug, debug_type, peer_id)
 
-		elseif requires_debug == true then
-			if toPlayer ~= -1 and toPlayer ~= 65535 and toPlayer ~= nil then
+		elseif requires_debug then
+			if peer_id ~= -1 and peer_id ~= 65535 and peer_id ~= nil then
 				if g_savedata.player_data.is_debugging.toPlayer then
-					s.announce(prefix, message, toPlayer)
+					s.announce(prefix, message, peer_id)
 				end
 			else
 				local player_list = s.getPlayers()
@@ -6312,7 +6307,7 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 				end
 			end
 		else
-			s.announce(prefix, message, toPlayer or "-1")
+			s.announce(prefix, message, peer_id or "-1")
 		end
 	end
 end
