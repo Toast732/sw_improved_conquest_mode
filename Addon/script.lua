@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.35)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.36)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -387,11 +387,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60 * 60,
-			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
-			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
-			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
-			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
-			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
+			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 40, 1, 10),
+			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
+			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
+			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 40, 1, 10),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 7, 1, 3),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 19, 1, 1),
 			ISLAND_COUNT = property.slider("Island Count", 7, 21, 1, 21),
@@ -690,7 +690,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 				d.print("spawning initial ai vehicles...", true, 0)
 				
-				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1) do
+				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.ceil(math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.controllable_islands - 1)/2) do
 					local spawned, vehicle_data = spawnAIVehicleRetry(nil, true, 5) -- spawn initial ai
 				end
 				d.print("all initial ai vehicles spawned!")
@@ -710,8 +710,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					end
 				end
 			end
-			s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
-			s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
+			s.removeMapObject(-1, g_savedata.player_base_island.map_id)
+			s.removeMapObject(-1, g_savedata.ai_base_island.map_id)
 		end
 	end
 	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
@@ -1668,28 +1668,6 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 							d.print(debug_output, false, 0, user_peer_id)
 						end
 
-						--[[
-
-							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-								s.removeMapObject(user_peer_id, vehicle_object.map_id)
-								s.removeMapLine(user_peer_id, vehicle_object.map_id)
-								for i = 1, #vehicle_object.path - 1 do
-									local waypoint = vehicle_object.path[i]
-									s.removeMapLine(user_peer_id, waypoint.ui_id)
-								end
-							end
-						end
-
-						for island_index, island in pairs(g_savedata.controllable_islands) do
-							updatePeerIslandMapData(user_peer_id, island)
-						end
-						
-						updatePeerIslandMapData(user_peer_id, g_savedata.player_base_island)
-						updatePeerIslandMapData(user_peer_id, g_savedata.ai_base_island)
-						]]
-
-
 					elseif command == "st" then --spawn turret
 						local turrets_spawned = 0
 						-- spawn at ai's main base
@@ -2348,20 +2326,23 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	d.print("cleaning vehicle: "..vehicle_id, true, 0)
-	if g_savedata.debug.map then
+	if d.getDebug(3) then
 		local player_list = s.getPlayers()
 		for peer_index, peer in pairs(player_list) do
 			local steam_id = getSteamID(peer.id)
 			if g_savedata.player_data[steam_id].debug.map then
-				s.removeMapObject(player_id ,vehicle_object.map_id)
-				s.removeMapLine(player_id ,vehicle_object.map_id)
+				s.removeMapObject(peer.id ,vehicle_object.map_id)
+				s.removeMapLine(peer.id ,vehicle_object.map_id)
 				for i = 1, #vehicle_object.path - 1 do
 					local waypoint = vehicle_object.path[i]
-					s.removeMapLine(player_id, waypoint.ui_id)
+					s.removeMapLine(peer.id, waypoint.ui_id)
 				end
 			end
 		end
 	end
+
+	-- remove it from the sweep and prune pairs
+	g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
 
 	if vehicle_object.ai_type == AI_TYPE_TURRET and vehicle_object.spawnbox_index ~= nil then
 		for island_index, island in pairs(g_savedata.controllable_islands) do		
@@ -2570,7 +2551,7 @@ end
 
 function resetPath(vehicle_object)
 	for _, v in pairs(vehicle_object.path) do
-		s.removeMapID(0, v.ui_id)
+		s.removeMapID(-1, v.ui_id)
 	end
 
 	vehicle_object.path = {}
@@ -2844,7 +2825,6 @@ function tickGamemode()
 		if isTickID(60, 60) then
 		
 			local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
-			s.removeMapObject(player_debugging_id, g_savedata.ai_base_island.map_id)
 
 			local plane_count = 0
 			local heli_count = 0
@@ -2921,6 +2901,7 @@ function tickGamemode()
 			local player_list = s.getPlayers()
 			for peer_index, peer in pairs(player_list) do
 				if d.getDebug(3, peer.id) then
+					s.removeMapObject(peer.id, g_savedata.ai_base_island.map_id)
 					s.addMapObject(peer.id, g_savedata.ai_base_island.map_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
 					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
@@ -2999,7 +2980,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 						debug_data = debug_data..("%s%.1f%s"):format("Jet Fuel: ", island.cargo.jet_fuel, "\n")
 					end
 
-					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -4114,7 +4095,7 @@ function tickVehicles()
 	
 							if vehicle_object.ai_type == AI_TYPE_PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 7 then
 								if #vehicle_object.path > 1 then
-									s.removeMapID(0, vehicle_object.path[1].ui_id)
+									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 									if vehicle_object.ai_type == AI_TYPE_LAND then
 										setLandTarget(vehicle_id, vehicle_object)
@@ -4136,7 +4117,7 @@ function tickVehicles()
 								end
 							elseif vehicle_object.ai_type == AI_TYPE_BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
 								if #vehicle_object.path > 0 then
-									s.removeMapID(0, vehicle_object.path[1].ui_id)
+									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 								else
 									-- if we have reached last waypoint start holding there
@@ -6128,12 +6109,26 @@ end
 ---@param strategy string the strategy of the vehicle, such as strafe, bombing or general
 ---@param vehicle_list_id integer the index of the vehicle in the vehicle list
 ---@return integer constructable_vehicle_id the index of the vehicle in the constructable vehicle list, returns nil if not found
-function spawnModifiers.getConstructableVehicleID(role, type, strategy, vehicle_list_id)
+function spawnModifiers.getConstructableVehicleID(role, vehicle_type, strategy, vehicle_list_id)
 	local constructable_vehicle_id = nil
-	if g_savedata.constructable_vehicles[role][type][strategy] then
-		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][type][strategy]) do
-			if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][type][strategy][vehicle_id].id then
+	if g_savedata.constructable_vehicles[role] and g_savedata.constructable_vehicles[role][vehicle_type] and g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
+		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][vehicle_type][strategy]) do
+			if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][vehicle_type][strategy][vehicle_id].id then
 				constructable_vehicle_id = vehicle_id
+			end
+		end
+	else
+		if noneNil(role, vehicle_type, strategy) then
+			d.print("(sm.getContstructableVehicleID) Failed to get constructable vehicle id, role: "..role..", type: "..vehicle_type..", strategy: "..strategy..", vehicle_list_id: "..vehicle_list_id, true, 1)
+		else
+			if noneNil(role, vehicle_type) then
+				d.print("(sm.getContstructableVehicleID) strategy is nil! role: "..role..", type: "..vehicle_type..", vehicle_list_id: "..vehicle_list_id, true, 1)
+			else
+				if noneNil(role) then
+					d.print("(sm.getContstructableVehicleID) vehicle_type is nil! role: "..role..", vehicle_list_id: "..vehicle_list_id, true, 1)
+				else
+					d.print("(sm.getContstructableVehicleID) role is nil!", true, 1)
+				end
 			end
 		end
 	end
