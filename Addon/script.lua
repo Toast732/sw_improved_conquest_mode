@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.37)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.38)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -946,7 +946,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 	end
 
 	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then 
-		return false "AI hit vehicle limit!"
+		return false, "AI hit vehicle limit!"
 	end
 	
 	local selected_prefab = nil
@@ -993,7 +993,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
 			sm.train(PUNISH, attack, 5)
 			spawnAIVehicle()
-			return false "no islands to attack! cancelling spawning of attack vehicle"
+			return false, "no islands to attack! cancelling spawning of attack vehicle"
 		end
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
@@ -1115,7 +1115,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 	if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
 		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 2000)
 		if found_ocean == false then 
-			return false "unable to find ocean to spawn boat!"
+			return false, "unable to find ocean to spawn boat!"
 		end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
