@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.36)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.37)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -429,12 +429,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			if do_as_i_say then
 				if peer_id then
 					d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
-					-- removes all ai vehicles
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							killVehicle(squad_index, vehicle_id, true, true)
-						end
-					end
 
 					-- removes vehicle icons and paths
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -873,7 +867,8 @@ function spawnTurret(island)
 			},
 			capabilities = {
 				gps_target = hasTag(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
-				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE") -- used to press a button to fire the missiles
+				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE"), -- used to press a button to fire the missiles
+				target_mass = hasTag(selected_prefab.vehicle.tags, "TARGET_MASS") -- sends mass of targeted vehicle mass to the creation
 			},
 			is_aggressive = "normal",
 			terrain_type = "offroad",
@@ -950,7 +945,9 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		end
 	end
 
-	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then return end
+	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then 
+		return false "AI hit vehicle limit!"
+	end
 	
 	local selected_prefab = nil
 
@@ -996,7 +993,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
 			sm.train(PUNISH, attack, 5)
 			spawnAIVehicle()
-			return
+			return false "no islands to attack! cancelling spawning of attack vehicle"
 		end
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
@@ -1117,7 +1114,9 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
 		local boat_spawn_transform, found_ocean = s.getOceanTransform(spawn_transform, 500, 2000)
-		if found_ocean == false then d.print("unable to find ocean to spawn boat!", true, 0); return end
+		if found_ocean == false then 
+			return false "unable to find ocean to spawn boat!"
+		end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
 		spawn_transform = g_savedata.controllable_islands[selected_spawn].zones.land[math.random(1, #g_savedata.controllable_islands[selected_spawn].zones.land)].transform
@@ -1213,7 +1212,8 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			},
 			capabilities = {
 				gps_target = hasTag(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
-				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE") -- used to press a button to fire the missiles
+				gps_missile = hasTag(selected_prefab.vehicle.tags, "GPS_MISSILE"), -- used to press a button to fire the missiles
+				target_mass = hasTag(selected_prefab.vehicle.tags, "TARGET_MASS") -- sends mass of targeted vehicle mass to the creation
 			},
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			is_resupply_on_load = false,
@@ -2410,8 +2410,22 @@ function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local target = nil
 	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+		if vehicle_object.capabilities.target_mass then
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
+		end
+	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id ~= 65535 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+		if vehicle_object.capabilities.target_mass then
+			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+			if is_success then
+				d.print("(sending mass to keypad)"..vehicle_object.target_vehicle_id.."'s mass: "..vehicle_data.mass, true, 0)
+				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
+			end
+		end
+	else
+		if vehicle_object.capabilities.target_mass then
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
+		end
 	end
 	if target then
 		tx, ty, tz = m.position(target.last_known_pos)
@@ -2770,7 +2784,6 @@ function tickGamemode()
 				end
 			end
 
-
 			-- display new capture data
 			if island.players_capturing > 0 and island.ai_capturing > 0 and g_savedata.settings.CONTESTED_MODE then -- if theres ai and players capping, and if contested mode is enabled
 				if island.is_contested == false then -- notifies that an island is being contested
@@ -2779,10 +2792,10 @@ function tickGamemode()
 				end
 			else
 				island.is_contested = false
-				if island.players_capturing > 0 then -- tick player progress if theres one or more players capping
+				if island.players_capturing > 0 and g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- tick player progress if theres one or more players capping
 					island.capture_timer = island.capture_timer + ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)]) * capture_tick_rate
 
-				elseif island.ai_capturing > 0 then -- tick AI progress if theres one or more ai capping
+				elseif island.ai_capturing > 0 and g_savedata.settings.CAPTURE_TIME < island.capture_timer then -- tick AI progress if theres one or more ai capping
 					island.capture_timer = island.capture_timer - (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)]) * capture_tick_rate
 					
 				end
@@ -3553,7 +3566,7 @@ function tickSquadrons()
 						else
 							g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 							g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] = nil
-							g_savedata.ai_army.squad_vehicles[vehicle_id] = nil
+							g_savedata.ai_army.squad_vehicles[vehicle_id] = RESUPPLY_SQUAD_INDEX
 
 							d.print(vehicle_id.." leaving squad "..squad_index.." to resupply", true, 0)
 
@@ -4600,7 +4613,7 @@ function tickCargo()
 					island.cargo.jet_fuel = math.min(island.cargo.jet_fuel + island.cargo.oil/((cargo.production.diesel/cargo.production.jet_fuel)+1), 10000)
 				end
 
-				island.cargo.oil = island.cargo.oil - (
+				island.cargo.oil = island.cargo.oil - noNaN(
 					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.diesel) +
 					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.jet_fuel)	
 				)
@@ -6756,4 +6769,8 @@ end
 ---@return number clamped_x the number clamped between the min and max
 function math.clamp(x, min, max)
     return max<x and max or min>x and min or x
+end
+
+function noNaN(x)
+	return x ~= x and 0 or x
 end
