@@ -4,13 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.4)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.5)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
 local IS_DEVELOPMENT_VERSION = false
 
 local MAX_SQUAD_SIZE = 3
@@ -159,7 +159,8 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 		has_default_addon = false,
-		awaiting_reload = false,
+		has_ai_paths = false,
+		awaiting_reload = false
 	},
 	land_spawn_zones = {},
 	tick_counter = 0,
@@ -220,21 +221,28 @@ end
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
 	if not s.dlcWeapons() then
-		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
+		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, user_peer_id)
 	end
+
 	-- check if they left the default addon enabled
 	if g_savedata.info.has_default_addon then
-		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+		wpDLCDebug("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled! name of addon: \"DLC Weapons AI\"", false, true, user_peer_id)
+		is_dlc_weapons = false
+
+	elseif not g_savedata.info.has_ai_paths then
+		wpDLCDebug("ERROR: The AI Paths addon was disabled! This addon uses it for pathfinding for the ships, you may have issues with the ship's pathfinding!")
 	end
+	
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
+		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, user_peer_id)
+
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, peer_id)
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, user_peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, peer_id)
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, user_peer_id)
 		end
 	end
 end
@@ -243,6 +251,12 @@ local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when dam
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
 
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
+
+	-- backwards compatability for before 0.2.5
+	if g_savedata.info.has_ai_paths == nil then
+		g_savedata.info.has_ai_paths = false
+	end
+
 	-- lets you keep debug mode enabled after reloads
 	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
 		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
@@ -277,13 +291,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
-			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
-			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
-			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
-			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
-			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
+			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5 ", 10, 600, 1, 60) * 60,
+			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 40, 1, 10),
+			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
+			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
+			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 40, 1, 10),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 7, 1, 3),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 30, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
 			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
 		}
@@ -296,6 +310,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
 		g_savedata.info.has_default_addon = true
+	end
+
+	local addon_index, is_success = s.getAddonIndex("AI Paths")
+	if is_success then
+		g_savedata.info.has_ai_paths = true
 	end
 
 	warningChecks(-1)
@@ -466,6 +485,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				defenders = 0,
 				is_scouting = false
 			}
+			
 			for _, turretZone in pairs(turret_zones) do
 				if(m.distance(turretZone.transform, flagZone.transform) <= 1000) then
 					table.insert(g_savedata.ai_base_island.zones, turretZone)
@@ -1131,8 +1151,9 @@ local player_commands = {
 }
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, command, ...)
-	if is_dlc_weapons then
-		if prefix == "?impwep" then
+
+	if prefix == "?impwep" then
+		if is_dlc_weapons then
 			if command then
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
@@ -1143,8 +1164,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				if command == "info" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
 					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
-					if g_savedata.info.has_default_addon then
-						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
+					if not g_savedata.info.has_ai_paths then
+						wpDLCDebug("AI Paths Disabled (will cause ship pathfinding issues)", false, true, user_peer_id)
 					end
 					wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
 					wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
@@ -1200,7 +1221,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 													if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
 														if vehicle_data.ai_type == AI_TYPE_BOAT then
 															local player_pos = s.getPlayerPos(user_peer_id)
-															local new_location found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+															local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 															if found_new_location then
 																-- teleport vehicle to new position
 																local veh_x, veh_y, veh_z = m.position(new_location)
@@ -1706,6 +1727,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 			else
 				wpDLCDebug("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, true, user_peer_id)
 			end
+		else
+			if g_savedata.info.has_default_addon then
+				wpDLCDebug("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, true, user_peer_id)
+			end
 		end
 	end
 end
@@ -1901,7 +1926,7 @@ end
 
 function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 	if is_dlc_weapons then
-		if peer_id ~= -1 then
+		if peer_id ~= -1 and peer_id ~= 65535 then
 			-- player spawned vehicle
 			g_savedata.player_vehicles[vehicle_id] = {
 				current_damage = 0, 
@@ -2001,7 +2026,7 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
@@ -3145,21 +3170,21 @@ function tickSquadrons()
 
 				local function retargetVehicle(vehicle_object, target_player_id, target_vehicle_id)
 					-- decrement previous target count
-					if vehicle_object.target_player_id ~= -1 then decrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then decrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 
 					vehicle_object.target_player_id = target_player_id
 					vehicle_object.target_vehicle_id = target_vehicle_id
 
 					-- increment new target count
-					if vehicle_object.target_player_id ~= -1 then incrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then incrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 				end
 
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- check existing target is still visible
 
-					if vehicle_object.target_player_id ~= -1 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
 						vehicle_object.target_player_id = -1
 					elseif vehicle_object.target_vehicle_id ~= -1 and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
 						vehicle_object.target_vehicle_id = -1
@@ -3167,7 +3192,7 @@ function tickSquadrons()
 
 					-- find targets if not targeting anything
 
-					if vehicle_object.target_player_id == -1 and vehicle_object.target_vehicle_id == -1 then
+					if (vehicle_object.target_player_id == -1 or vehicle_object.target_player_id == 65535) and vehicle_object.target_vehicle_id == -1 then
 						if #squad_vision.visible_players > 0 then
 							vehicle_object.target_player_id = squad_vision:getBestTargetPlayerID()
 							incrementCount(player_counts, vehicle_object.target_player_id)
@@ -3176,7 +3201,7 @@ function tickSquadrons()
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
 						end
 					else
-						if vehicle_object.target_player_id ~= -1 then
+						if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 							incrementCount(player_counts, vehicle_object.target_player_id)
 						elseif vehicle_object.target_vehicle_id ~= -1 then
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
@@ -3189,8 +3214,8 @@ function tickSquadrons()
 				local vehicles_per_target = math.max(math.floor(squad_vehicle_count / visible_target_count), 1)
 
 				local function isRetarget(target_player_id, target_vehicle_id)
-					return (target_player_id == -1 and target_vehicle_id == -1) 
-						or (target_player_id ~= -1 and getCount(player_counts, target_player_id) > vehicles_per_target)
+					return ((target_player_id == -1 or target_player_id == 65535) and target_vehicle_id == -1) 
+						or ((target_player_id ~= -1 and target_player_id ~= 65535) and getCount(player_counts, target_player_id) > vehicles_per_target)
 						or (target_vehicle_id ~= -1 and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
 				end
 
@@ -3223,7 +3248,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if vehicle_object.target_player_id ~= -1 then
+					if target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
@@ -3299,7 +3324,7 @@ function tickSquadrons()
 			end
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
+					if (vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535) or vehicle_object.target_vehicle_id ~= -1 then
 						if vehicle_object.capabilities.gps_missiles then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
@@ -3591,7 +3616,7 @@ function tickVehicles()
 								local squad_vision = squadGetVisionData(squad)
 								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
@@ -4113,10 +4138,9 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		wpDLCDebug("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, true)
-		wpDLCDebug("component index: "..component, false, true)
-		wpDLCDebug("playlist_index: "..playlist_index, false, true)
-		wpDLCDebug("location_index: "..location_index, false, true)
+		d.print("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, 1)
+		d.print("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, 1)
+		is_dlc_weapons = false
 		return nil
 	end
 end
@@ -4435,7 +4459,7 @@ function hasTag(tags, tag)
 			end
 		end
 	else
-		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead! (this can be safely ignored)", true, true)
 	end
 	return false
 end
@@ -4453,7 +4477,7 @@ function getTagValue(tags, tag, as_string)
 			end
 		end
 	else
-		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead! (this can be safely ignored)", true, true)
 	end
 	return nil
 end
