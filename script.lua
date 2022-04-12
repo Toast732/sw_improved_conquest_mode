@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.5.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.5.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -291,13 +291,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60,
-			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 20, 1, 10),
-			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 20, 1, 10),
-			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 20, 1, 10),
-			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 20, 1, 10),
-			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 4, 1, 3),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
+			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5 ", 10, 600, 1, 60) * 60,
+			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 40, 1, 10),
+			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
+			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
+			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 40, 1, 10),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 7, 1, 3),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 30, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 17, 1, 1),
 			ISLAND_COUNT = property.slider("Island Count", 7, 19, 1, 19),
 		}
