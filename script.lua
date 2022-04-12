@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.4)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.5.1)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FULL_RELOAD"
-local IS_DEVELOPMENT_VERSION = false
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
+local IS_DEVELOPMENT_VERSION = true
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -1201,7 +1201,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 													if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
 														if vehicle_data.ai_type == AI_TYPE_BOAT then
 															local player_pos = s.getPlayerPos(user_peer_id)
-															local new_location found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+															local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 															if found_new_location then
 																-- teleport vehicle to new position
 																local veh_x, veh_y, veh_z = m.position(new_location)
@@ -1902,7 +1902,7 @@ end
 
 function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 	if is_dlc_weapons then
-		if peer_id ~= -1 then
+		if peer_id ~= -1 and peer_id ~= 65535 then
 			-- player spawned vehicle
 			g_savedata.player_vehicles[vehicle_id] = {
 				current_damage = 0, 
@@ -2002,7 +2002,7 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
@@ -3146,21 +3146,21 @@ function tickSquadrons()
 
 				local function retargetVehicle(vehicle_object, target_player_id, target_vehicle_id)
 					-- decrement previous target count
-					if vehicle_object.target_player_id ~= -1 then decrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then decrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 
 					vehicle_object.target_player_id = target_player_id
 					vehicle_object.target_vehicle_id = target_vehicle_id
 
 					-- increment new target count
-					if vehicle_object.target_player_id ~= -1 then incrementCount(player_counts, vehicle_object.target_player_id)
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then incrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 				end
 
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- check existing target is still visible
 
-					if vehicle_object.target_player_id ~= -1 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
 						vehicle_object.target_player_id = -1
 					elseif vehicle_object.target_vehicle_id ~= -1 and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
 						vehicle_object.target_vehicle_id = -1
@@ -3168,7 +3168,7 @@ function tickSquadrons()
 
 					-- find targets if not targeting anything
 
-					if vehicle_object.target_player_id == -1 and vehicle_object.target_vehicle_id == -1 then
+					if (vehicle_object.target_player_id == -1 or vehicle_object.target_player_id == 65535) and vehicle_object.target_vehicle_id == -1 then
 						if #squad_vision.visible_players > 0 then
 							vehicle_object.target_player_id = squad_vision:getBestTargetPlayerID()
 							incrementCount(player_counts, vehicle_object.target_player_id)
@@ -3177,7 +3177,7 @@ function tickSquadrons()
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
 						end
 					else
-						if vehicle_object.target_player_id ~= -1 then
+						if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 							incrementCount(player_counts, vehicle_object.target_player_id)
 						elseif vehicle_object.target_vehicle_id ~= -1 then
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
@@ -3190,8 +3190,8 @@ function tickSquadrons()
 				local vehicles_per_target = math.max(math.floor(squad_vehicle_count / visible_target_count), 1)
 
 				local function isRetarget(target_player_id, target_vehicle_id)
-					return (target_player_id == -1 and target_vehicle_id == -1) 
-						or (target_player_id ~= -1 and getCount(player_counts, target_player_id) > vehicles_per_target)
+					return ((target_player_id == -1 or target_player_id == 65535) and target_vehicle_id == -1) 
+						or ((target_player_id ~= -1 and target_player_id ~= 65535) and getCount(player_counts, target_player_id) > vehicles_per_target)
 						or (target_vehicle_id ~= -1 and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
 				end
 
@@ -3224,7 +3224,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if vehicle_object.target_player_id ~= -1 then
+					if target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
@@ -3300,7 +3300,7 @@ function tickSquadrons()
 			end
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.target_player_id ~= -1 or vehicle_object.target_vehicle_id ~= -1 then
+					if (vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535) or vehicle_object.target_vehicle_id ~= -1 then
 						if vehicle_object.capabilities.gps_missiles then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
@@ -3592,7 +3592,7 @@ function tickVehicles()
 								local squad_vision = squadGetVisionData(squad)
 								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
