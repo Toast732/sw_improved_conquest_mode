@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.5.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.5.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -159,7 +159,8 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 		has_default_addon = false,
-		awaiting_reload = false,
+		has_ai_paths = false,
+		awaiting_reload = false
 	},
 	land_spawn_zones = {},
 	tick_counter = 0,
@@ -220,21 +221,28 @@ end
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
 	if not s.dlcWeapons() then
-		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, peer_id)
+		wpDLCDebug("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon mod will not function properly!", false, true, user_peer_id)
 	end
+
 	-- check if they left the default addon enabled
 	if g_savedata.info.has_default_addon then
-		wpDLCDebug("WARNING: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, true, peer_id)
+		wpDLCDebug("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled! name of addon: \"DLC Weapons AI\"", false, true, user_peer_id)
+		is_dlc_weapons = false
+
+	elseif not g_savedata.info.has_ai_paths then
+		wpDLCDebug("ERROR: The AI Paths addon was disabled! This addon uses it for pathfinding for the ships, you may have issues with the ship's pathfinding!")
 	end
+	
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, peer_id)
+		wpDLCDebug("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, false, user_peer_id)
+
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, peer_id)
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, true, user_peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
-			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, peer_id)
+			wpDLCDebug("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, true, user_peer_id)
 		end
 	end
 end
@@ -243,6 +251,12 @@ local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Vehicles sink when dam
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting", "true")
 
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
+
+	-- backwards compatability for before 0.2.5
+	if g_savedata.info.has_ai_paths == nil then
+		g_savedata.info.has_ai_paths = false
+	end
+
 	-- lets you keep debug mode enabled after reloads
 	if g_savedata.playerData then -- backwards compatibilty check for versions before 0.2.1
 		for player_id, is_debugging in pairs(g_savedata.playerData.isDebugging) do
@@ -296,6 +310,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
 		g_savedata.info.has_default_addon = true
+	end
+
+	local addon_index, is_success = s.getAddonIndex("AI Paths")
+	if is_success then
+		g_savedata.info.has_ai_paths = true
 	end
 
 	warningChecks(-1)
@@ -1132,8 +1151,9 @@ local player_commands = {
 }
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, command, ...)
-	if is_dlc_weapons then
-		if prefix == "?impwep" then
+
+	if prefix == "?impwep" then
+		if is_dlc_weapons then
 			if command then
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
@@ -1144,8 +1164,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				if command == "info" then
 					wpDLCDebug("------ Improved Conquest Mode Info ------", false, false, user_peer_id)
 					wpDLCDebug("Version: "..IMPROVED_CONQUEST_VERSION, false, false, user_peer_id)
-					if g_savedata.info.has_default_addon then
-						wpDLCDebug("Has default conquest mode addon enabled, this will cause issues and errors!", false, true, user_peer_id)
+					if not g_savedata.info.has_ai_paths then
+						wpDLCDebug("AI Paths Disabled (will cause ship pathfinding issues)", false, true, user_peer_id)
 					end
 					wpDLCDebug("World Creation Version: "..g_savedata.info.creation_version, false, false, user_peer_id)
 					wpDLCDebug("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, false, user_peer_id)
@@ -1706,6 +1726,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 
 			else
 				wpDLCDebug("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, true, user_peer_id)
+			end
+		else
+			if g_savedata.info.has_default_addon then
+				wpDLCDebug("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, true, user_peer_id)
 			end
 		end
 	end
@@ -4114,10 +4138,9 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		wpDLCDebug("Failed to spawn addon component! please attach the following in a bug report on the discord server", false, true)
-		wpDLCDebug("component index: "..component, false, true)
-		wpDLCDebug("playlist_index: "..playlist_index, false, true)
-		wpDLCDebug("location_index: "..location_index, false, true)
+		d.print("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, 1)
+		d.print("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, 1)
+		is_dlc_weapons = false
 		return nil
 	end
 end
@@ -4436,7 +4459,7 @@ function hasTag(tags, tag)
 			end
 		end
 	else
-		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		wpDLCDebug("hasTag() was expecting a table, but got a "..type(tags).." instead! (this can be safely ignored)", true, true)
 	end
 	return false
 end
@@ -4454,7 +4477,7 @@ function getTagValue(tags, tag, as_string)
 			end
 		end
 	else
-		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, true)
+		wpDLCDebug("getTagValue() was expecting a table, but got a "..type(tags).." instead! (this can be safely ignored)", true, true)
 	end
 	return nil
 end
