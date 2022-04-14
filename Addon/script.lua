@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.38)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.39)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -71,6 +71,13 @@ local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 local VISIBLE_DISTANCE = 1500
 local WAYPOINT_CONSUME_DISTANCE = 100
 
+local explosion_depths = {
+	plane = -4,
+	land = -4,
+	heli = -4,
+	boat = -17,
+	turret = -999
+}
 local PLANE_EXPLOSION_DEPTH = -4
 local HELI_EXPLOSION_DEPTH = -4
 local BOAT_EXPLOSION_DEPTH = -17
@@ -944,10 +951,6 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			if vehicle_object.ai_type == AI_TYPE_BOAT then boat_count = boat_count + 1 end
 		end
 	end
-
-	if army_count >= #g_savedata.controllable_islands * MAX_SQUAD_SIZE then 
-		return false, "AI hit vehicle limit!"
-	end
 	
 	local selected_prefab = nil
 
@@ -973,7 +976,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			return false, "plane limit reached"
 		end
 		if army_count > g_savedata.settings.MAX_BOAT_AMOUNT + g_savedata.settings.MAX_LAND_AMOUNT + g_savedata.settings.MAX_HELI_AMOUNT + g_savedata.settings.MAX_PLANE_AMOUNT then
-			return false, "too many ai vehicles"
+			return false, "AI hit vehicle limit!"
 		end
 	end
 
@@ -2081,6 +2084,12 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 	end
 end
 
+function onCaptureIsland(island, new_faction, old_faction) -- triggers whenever an island is captured
+	-- reset cached cargo best routes
+	d.print("Clearing cached cargo best routes", true, 0)
+	cache.reset("cargo_best_routes")
+end
+
 function captureIsland(island, override, peer_id)
 	local faction_to_set = nil
 
@@ -2097,6 +2106,7 @@ function captureIsland(island, override, peer_id)
 
 	-- set it to ai
 	if faction_to_set == FACTION_AI then
+		onCaptureIsland(island, faction_to_set, island.faction)
 		island.capture_timer = 0
 		island.faction = FACTION_AI
 		g_savedata.is_attack = false
@@ -2122,6 +2132,7 @@ function captureIsland(island, override, peer_id)
 		end
 	-- set it to player
 	elseif faction_to_set == FACTION_PLAYER then
+		onCaptureIsland(island, faction_to_set, island.faction)
 		island.capture_timer = g_savedata.settings.CAPTURE_TIME
 		island.faction = FACTION_PLAYER
 		updatePeerIslandMapData(-1, island)
@@ -2148,6 +2159,7 @@ function captureIsland(island, override, peer_id)
 		end
 	-- set it to neutral
 	elseif faction_to_set == FACTION_NEUTRAL then
+		onCaptureIsland(island, faction_to_set, island.faction)
 		island.capture_timer = g_savedata.settings.CAPTURE_TIME/2
 		island.faction = FACTION_NEUTRAL
 		updatePeerIslandMapData(-1, island)
@@ -2317,6 +2329,7 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	local squad_index, squad = squads.getSquad(vehicle_id)
 
 	if squad_index then
+		d.print("onVehicleDespawn: "..vehicle_object.name.." ("..vehicle_id..")", true, 0)
 		cleanVehicle(squad_index, vehicle_id)
 	end
 end
@@ -2778,9 +2791,12 @@ function tickGamemode()
 
 			-- spawn turrets at owned islands (to remove as will be replaced to be dependant on logistics system)
 			if island.faction == FACTION_AI and g_savedata.ai_base_island.production_timer == 0 then
-				local spawned, vehicle_data = spawnTurret(island)
-				if not spawned then
-					d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
+				-- check to see if turrets are disabled
+				if g_savedata.settings.MAX_TURRET_AMOUNT > 0 then
+					local spawned, vehicle_data = spawnTurret(island)
+					if not spawned then
+						d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
+					end
 				end
 			end
 
@@ -3404,47 +3420,56 @@ function getResupplyIsland(ai_vehicle_transform)
 end
 
 function addToSquadron(vehicle_object)
-	local new_squad = nil
+	if vehicle_object then
+		if not vehicle_object.is_killed then
+			local new_squad = nil
 
-	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
-			if squad.ai_type == vehicle_object.ai_type then
-				local _, squad_leader = getSquadLeader(squad)
-				if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
-					if vehicle_object.role ~= "scout" and squad.ai_type ~= "scout" then
-						if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
-							squad.vehicles[vehicle_object.id] = vehicle_object
-							g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
-							new_squad = squad
-							break
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
+					if squad.ai_type == vehicle_object.ai_type then
+						local _, squad_leader = getSquadLeader(squad)
+						if squad.ai_type ~= AI_TYPE_TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
+							if vehicle_object.role ~= "scout" and squad.ai_type ~= "scout" then
+								if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
+									squad.vehicles[vehicle_object.id] = vehicle_object
+									g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
+									new_squad = squad
+									break
+								end
+							end
 						end
 					end
 				end
 			end
+
+			if new_squad == nil then
+				new_squad_index = #g_savedata.ai_army.squadrons + 1
+				new_squad = { 
+					command = COMMAND_NONE,
+					index = new_squad_index,
+					ai_type = vehicle_object.ai_type,
+					role = vehicle_object.role,
+					vehicles = {},
+					target_island = nil,
+					target_players = {},
+					target_vehicles = {},
+					investigate_transform = nil,
+				}
+
+				new_squad.vehicles[vehicle_object.id] = vehicle_object
+				table.insert(g_savedata.ai_army.squadrons, new_squad)
+				g_savedata.ai_army.squad_vehicles[vehicle_object.id] = new_squad_index
+			end
+
+			squadInitVehicleCommand(new_squad, vehicle_object)
+			return new_squad
+		else
+			d.print("(addToSquadron) "..vehicle_object.name.." is killed!", true, 1)
 		end
+	else
+		d.print("(addToSquadron) vehicle_object is nil!", true, 1)
 	end
-
-	if new_squad == nil then
-		new_squad_index = #g_savedata.ai_army.squadrons + 1
-		new_squad = { 
-			command = COMMAND_NONE,
-			index = new_squad_index,
-			ai_type = vehicle_object.ai_type,
-			role = vehicle_object.role,
-			vehicles = {},
-			target_island = nil,
-			target_players = {},
-			target_vehicles = {},
-			investigate_transform = nil,
-		}
-
-		new_squad.vehicles[vehicle_object.id] = vehicle_object
-		table.insert(g_savedata.ai_army.squadrons, new_squad)
-		g_savedata.ai_army.squad_vehicles[vehicle_object.id] = new_squad_index
-	end
-
-	squadInitVehicleCommand(new_squad, vehicle_object)
-	return new_squad
+	return nil
 end
 
 function killVehicle(squad_index, vehicle_id, instant, delete)
@@ -4056,8 +4081,14 @@ function tickVehicles()
 				end
 
 				local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-				if vehicle_y <= BOAT_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_BOAT or vehicle_y <= HELI_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_y <= PLANE_EXPLOSION_DEPTH and vehicle_object.ai_type == AI_TYPE_PLANE then
+				if vehicle_y <= explosion_depths[vehicle_object.ai_type] then
 					killVehicle(squad_index, vehicle_id, true)
+					if vehicle_object.ai_type == AI_TYPE_BOAT then
+						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+					else
+						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water!", true, 0)
+					end
+					return
 				end
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
@@ -4587,124 +4618,41 @@ function tickCargo()
 	-- ticks cargo production and consumption
 	for island_index, island in pairs(g_savedata.controllable_islands) do -- at every island
 		if isTickID(island.index, time.minute) then -- every minute
-			if island.faction == FACTION_AI then
-
-				d.print("producing cargo at "..island.name, true, 0)
-
-				local cargo = {
-					production = {
-						oil = (getTagValue(island.tags, "oil_production") or 0)/60,
-						diesel = (getTagValue(island.tags, "diesel_production") or 0)/60,
-						jet_fuel = (getTagValue(island.tags, "jet_fuel_production") or 0)/60
-					},
-					consumption = {
-						oil = (getTagValue(island.tags, "oil_consumption") or 0)/60,
-						diesel = (getTagValue(island.tags, "diesel_consumption") or 0)/60,
-						jet_fuel = (getTagValue(island.tags, "jet_fuel_consumption") or 0)/60
-					}
-				}
-				
-				island.cargo.oil = math.min(island.cargo.oil + cargo.production.oil, 10000)
-				
-				if cargo.production.diesel > 0 then
-					island.cargo.diesel = math.min(island.cargo.diesel + island.cargo.oil/((cargo.production.jet_fuel/cargo.production.diesel)+1), 10000)
-				end
-				if cargo.production.jet_fuel > 0 then
-					island.cargo.jet_fuel = math.min(island.cargo.jet_fuel + island.cargo.oil/((cargo.production.diesel/cargo.production.jet_fuel)+1), 10000)
-				end
-
-				island.cargo.oil = island.cargo.oil - noNaN(
-					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.diesel) +
-					(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*cargo.production.jet_fuel)	
-				)
-			end
+			cargo.produce(island)
 		end
 	end
 
 	if isTickID(g_savedata.ai_base_island.index, time.minute) then -- if its the tick for the AI base Island
-
-		d.print("producing cargo at "..g_savedata.ai_base_island.name, true, 0)
-
-		local cargo = {
-			production = {
-				oil = (getTagValue(g_savedata.ai_base_island.tags, "oil_production") or 0)/60,
-				diesel = (getTagValue(g_savedata.ai_base_island.tags, "diesel_production") or 0)/60,
-				jet_fuel = (getTagValue(g_savedata.ai_base_island.tags, "jet_fuel_production") or 0)/60
-			},
-			consumption = {
-				oil = (getTagValue(g_savedata.ai_base_island.tags, "oil_consumption") or 0)/60,
-				diesel = (getTagValue(g_savedata.ai_base_island.tags, "diesel_consumption") or 0)/60,
-				jet_fuel = (getTagValue(g_savedata.ai_base_island.tags, "jet_fuel_consumption") or 0)/60
-			}
-		}
-
-		local natural_production = 350/60 -- the ai_base island will produce these resources naturally at this rate per hour
-		
-		-- produce oil
-		g_savedata.ai_base_island.cargo.oil = math.min(g_savedata.ai_base_island.cargo.oil + cargo.production.oil + natural_production, 10000)
-		
-		-- produce diesel
-		g_savedata.ai_base_island.cargo.diesel = g_savedata.ai_base_island.cargo.diesel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+(natural_production/2))), 10000)
-
-		-- produce jet fuel
-		g_savedata.ai_base_island.cargo.jet_fuel = g_savedata.ai_base_island.cargo.jet_fuel + math.min((math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+(natural_production/2))), 10000)
-
-		-- consume the oil used to make the jet fuel and diesel
-		g_savedata.ai_base_island.cargo.oil = g_savedata.ai_base_island.cargo.oil - (
-			(math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.diesel+natural_production/2)) +
-			(math.min(g_savedata.ai_base_island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel), 1)*(cargo.production.jet_fuel+natural_production/2))
-		)
+		cargo.produce(g_savedata.ai_base_island, 350/60)
 	end
 
 	-- ticks resupplying islands
 	if isTickID(0, time.hour) then -- every 1 hour
 
-		d.print("getting cargo weights for all islands", true, 0)
-
-		local island_weights = {
-			resupply = {},
-			resupplier = {}
-		}
-
-		for island_index, island in pairs(g_savedata.controllable_islands) do -- go through every island
-			if island.faction == FACTION_AI then -- if the enemy ai owns the island
-				table.insert(island_weights.resupply, { island = island, weight = cargo.getResupplyWeight(island) })
-				table.insert(island_weights.resupplier, { island = island, weight = cargo.getResupplierWeight(island) })
-			end
-		end
-
-		d.print("calculating island that needs resupply the most", true, 0)
-
-		local resupply_island = nil
-		local resupply_resource = {
-			oil = 0,
-			diesel = 0,
-			jet_fuel = 0,
-			total = 0
-		}
-
-		for _, resupply in pairs(island_weights.resupply) do
-			local total_weight = 0
-
-			for _, weight in pairs(resupply.weight) do
-				total_weight = total_weight + weight
-			end
-
-			if total_weight > resupply_resource.total then
-				resupply_island = resupply.island
-				resupply_resource = {
-					oil = resupply.weight.oil,
-					diesel = resupply.weight.diesel,
-					jet_fuel = resupply.weight.jet_fuel,
-					total = total_weight
-				}
-			end
-		end
+		local resupply_island, resupply_weights = cargo.getBestResupplyIsland()
 
 		if resupply_island then
-			d.print("Island that needs resupply the most: "..resupply_island.name, true, 0)
+			d.print("(tickCargo) Island that needs resupply the most: "..resupply_island.name, true, 0)
+			local resupplier_island = cargo.getBestResupplierIsland(resupply_weights)
+			if resupplier_island then
+				d.print("(tickCargo) Island best to resupply the island: "..resupplier_island.name, true, 0)
+				local best_route = cargo.getBestRoute(resupplier_island, resupply_island)
+				d.print("got best route!", true, 0)
+				if not best_route[1] then
+					d.print("best route doesnt exist?", true, 1)
+				end
+
+				-- parse the route
+				for route_index, route in ipairs(best_route) do
+					d.print("\n(tickCargo) Route Index: "..route_index, true, 0)
+					d.print("(tickCargo) to island: "..g_savedata.controllable_islands[route.island_index].name, true, 0)
+					d.print("(tickCargo) with vehicle: "..route.transport_method.name, true, 0)
+				end
+			else
+				d.print("(tickCargo) No islands found that can be a resupplier (Potential Error)", true, 0)
+			end
 		else
-			d.print("No islands found that need resupply (Potential Error)", true, 0)
+			d.print("(tickCargo) No islands found that need resupply (Potential Error)", true, 0)
 		end
 	end
 	d.stopProfiler("tickCargo()", true, "onTick()")
@@ -5423,6 +5371,144 @@ end
 --
 --------------------------------------------------------------------------------
 
+---@param island island[] the island you want to produce the cargo at
+---@param natural_production string the natural production of this island
+function cargo.produce(island, natural_production)
+
+	local natural_production = natural_production or 0 -- the ai_base island will produce these resources naturally at this rate per hour
+
+	local cargo = {
+		production = {
+			oil = (getTagValue(island.tags, "oil_production") or 0)/60,
+			diesel = (getTagValue(island.tags, "diesel_production") or 0)/60,
+			jet_fuel = (getTagValue(island.tags, "jet_fuel_production") or 0)/60
+		},
+		consumption = {
+			oil = (getTagValue(island.tags, "oil_consumption") or 0)/60,
+			diesel = (getTagValue(island.tags, "diesel_consumption") or 0)/60,
+			jet_fuel = (getTagValue(island.tags, "jet_fuel_consumption") or 0)/60
+		}
+	}
+	
+	-- produce oil
+	if cargo.production.oil ~= 0 or natural_production ~= 0 then
+		island.cargo.oil = math.min(island.cargo.oil + cargo.production.oil + natural_production, 10000)
+	end
+	
+	-- produce diesel
+	if cargo.production.diesel ~= 0 or natural_production ~= 0 then
+		island.cargo.diesel = island.cargo.diesel + math.min((math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel+natural_production/2), 1)*(cargo.production.diesel+(natural_production/2))), 10000)
+	end
+	-- produce jet fuel
+	if cargo.production.jet_fuel ~= 0 or natural_production ~= 0 then
+		island.cargo.jet_fuel = island.cargo.jet_fuel + math.min((math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel+natural_production/2), 1)*(cargo.production.jet_fuel+(natural_production/2))), 10000)
+	end
+	-- consume the oil used to make the jet fuel and diesel
+	if cargo.production.jet_fuel ~= 0 or cargo.production.diesel ~= 0 or natural_production ~= 0 then
+		island.cargo.oil = island.cargo.oil - (
+			(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel+natural_production/2), 1)*(cargo.production.diesel+natural_production/2)) +
+			(math.min(island.cargo.oil/(cargo.production.jet_fuel+cargo.production.diesel+natural_production/2), 1)*(cargo.production.jet_fuel+natural_production/2))
+		)
+	end
+end
+---@return island island[] the island thats best to resupply
+---@return weight weight[] the weights of all of the cargo types for the resupply island
+function cargo.getBestResupplyIsland()
+
+	local island_weights = {}
+
+	for island_index, island in pairs(g_savedata.controllable_islands) do
+		if island.faction == FACTION_AI then
+			table.insert(island_weights, {
+				island = island,
+				weight = cargo.getResupplyWeight(island)
+			})
+		end
+	end
+
+	local resupply_island = nil
+	local resupply_resource = {
+		oil = 0,
+		diesel = 0,
+		jet_fuel = 0,
+		total = 0
+	}
+
+	for _, resupply in pairs(island_weights) do
+		local total_weight = 0
+
+		for _, weight in pairs(resupply.weight) do
+			total_weight = total_weight + weight
+		end
+
+		d.print("total weight: "..total_weight.." island name: "..resupply.island.name, true, 0)
+
+		if total_weight > resupply_resource.total then
+			resupply_island = resupply.island
+			resupply_resource = {
+				oil = resupply.weight.oil,
+				diesel = resupply.weight.diesel,
+				jet_fuel = resupply.weight.jet_fuel,
+				total = total_weight
+			}
+		end
+	end
+
+	return resupply_island, resupply_resource
+end
+
+---@param resupply_weights weights[] the weights of all of the cargo types for the resupply island
+---@return island[] island the resupplier island
+---@return weights[] resupplier_weights the weights of all the cargo types for the resupplier island, sorted from most to least weight
+function cargo.getBestResupplierIsland(resupply_weights)
+
+	local island_weights = {}
+
+	-- get all island resupplier weights (except for player main base)
+
+	for island_index, island in pairs(g_savedata.controllable_islands) do
+		table.insert(island_weights, {
+			island = island,
+			weight = cargo.getResupplierWeight(island)
+		})
+	end
+
+	-- add ai's main base to list
+	table.insert(island_weights, {
+		island = g_savedata.ai_base_island,
+		weight = cargo.getResupplierWeight(g_savedata.ai_base_island)
+	})
+
+	local resupplier_island = nil
+	local resupplier_resource = {
+		oil = 0,
+		diesel = 0,
+		jet_fuel = 0,
+	}
+	local total_resupplier_resource = -1
+
+	for _, resupplier in pairs(island_weights) do
+		local total_weight = 0
+
+		for _, weight in pairs(resupplier.weight) do
+			total_weight = total_weight + weight
+		end
+
+		if total_weight > total_resupplier_resource then
+			resupplier_island = resupplier.island
+			resupply_resource = {
+				oil = resupplier.weight.oil * resupply_weights.oil,
+				diesel = resupplier.weight.diesel * resupply_weights.diesel,
+				jet_fuel = resupplier.weight.jet_fuel * resupply_weights.jet_fuel
+			}
+		end
+	end
+
+	table.sort(resupplier_resource, function(a, b) return a < b end)
+
+	return resupplier_island, resupplier_resource
+end
+
 ---@param island island[] the island you want to get the resupply weight of
 ---@return weight[] weights the weights of all of the cargo types for the resupply island
 function cargo.getResupplyWeight(island) -- get the weight of the island (for resupplying the island)
@@ -5457,10 +5543,17 @@ function cargo.getResupplierWeight(island) -- get weight of the island (for usin
 	local diesel_weight = (island.cargo.diesel/4500) -- diesel
 	local jet_fuel_weight = (island.cargo.jet_fuel/4500) -- jet fuel
 
+	local controller_weight = 1
+	if island.faction == FACTION_NEUTRAL then
+		controller_weight = 0.3
+	elseif island.faction == FACTION_PLAYER then
+		controller_weight = 0.1
+	end
+
 	local weight = {
-		oil = oil_weight * (getTagValue(island.tags, "oil_production") and 1 or 0.2),
-		diesel = diesel_weight * (getTagValue(island.tags, "diesel_production") and 1 or 0.2),
-		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_production") and 1 or 0.2)
+		oil = oil_weight * (getTagValue(island.tags, "oil_production") and 1 or 0.2) * controller_weight,
+		diesel = diesel_weight * (getTagValue(island.tags, "diesel_production") and 1 or 0.2) * controller_weight,
+		jet_fuel = jet_fuel_weight * (getTagValue(island.tags, "jet_fuel_production") and 1 or 0.2) * controller_weight
 	}
 
 	return weight
@@ -5468,7 +5561,11 @@ end
 
 ---@param origin_island island[] the island of which the cargo is coming from
 ---@param dest_island island[] the island of which the cargo is going to
-function cargo.getBestRoute(origin_island, dest_island)
+---@return route[] best_route the best route to go from the origin to the destination
+function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier island | dest = resupply island
+	local start_time = s.getTimeMillisec()
+
+	d.print("Calculating Pathfinding route from "..origin_island.name.." to "..dest_island.name, true, 0)
 
 	local best_route = {}
 
@@ -5544,37 +5641,46 @@ function cargo.getBestRoute(origin_island, dest_island)
 		-- gets the speed of all of the vehicles we were given
 		--
 		for vehicle_index, vehicle_object in pairs(transport_vehicle) do
-			if vehicle_object then -- checks if the vehicle exists (would return nil if there are none of those vehicles)
+			if vehicle_object.name ~= "none" and vehicle_object.name ~= "unknown" then
 
 				local movement_speed = 0.001
-				if vehicle_object.name ~= "none" and vehicle_object.vehicle then
-					if vehicle_object.vehicle.ai_type == AI_TYPE_BOAT then
-						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT
-					elseif vehicle_object.vehicle.ai_type == AI_TYPE_PLANE then
-						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_PLANE
-					elseif vehicle_object.vehicle.ai_type == AI_TYPE_HELI then
-						movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_HELI
-					elseif vehicle_object.vehicle.ai_type == AI_TYPE_LAND then
-						if vehicle_object.vehicle.is_aggressive and vehicle_object.vehicle.terrain_type then
-							movement_speed = (vehicle_object.speed.land[vehicle_object.vehicle.is_aggressive][vehicle_object.vehicle.terrain_type] or vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND)
-						else
-							movement_speed = vehicle_object.vehicle.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_LAND
-						end
-					end
+				if vehicle_object.vehicle.ai_type == AI_TYPE_BOAT then
+					movement_speed = getTagValue(vehicle_object.vehicle.tags, "pseudo_speed") or AI_SPEED_PSEUDO_BOAT
+				elseif vehicle_object.vehicle.ai_type == AI_TYPE_PLANE then
+					movement_speed = getTagValue(vehicle_object.vehicle.tags, "pseudo_speed") or AI_SPEED_PSEUDO_PLANE
+				elseif vehicle_object.vehicle.ai_type == AI_TYPE_HELI then
+					movement_speed = getTagValue(vehicle_object.vehicle.tags, "pseudo_speed") or AI_SPEED_PSEUDO_HELI
+				elseif vehicle_object.vehicle.ai_type == AI_TYPE_LAND then
+					movement_speed = getTagValue(vehicle_object.vehicle.tags, "offroad_speed_normal") or getTagValue(vehicle_object.vehicle.tags, "pseudo_speed") or AI_SPEED_PSEUDO_LAND
 				end
 
-				transport_vehicle[vehicle_index].movement_speed = movement_speed or 0.001
+				transport_vehicle[vehicle_index].movement_speed = movement_speed
 			end
 		end
+
+		local occupier_multiplications = {
+			ai = 1,
+			neutral = 3,
+			player = 500
+		}
 
 		local paths = {}
 
 		-- get the first path for all islands
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.transform ~= origin_island.transform then -- makes sure its not the origin island
-				if island.faction == FACTION_AI then -- makes sure the ai owns the island
-					paths[island_index] = { island = island, distance = cargo.getIslandDistance(origin_island, island) }
+
+				local distance = cargo.getIslandDistance(origin_island, island)
+
+				-- calculate the occupier multiplications
+				for transport_type, transport_distance in pairs(distance) do
+					-- if the distance is not nil
+					if transport_distance then
+						distance[transport_type] = transport_distance * occupier_multiplications[island.faction]
+					end
 				end
+
+				paths[island_index] = { island = island, distance = distance }
 			end
 		end
 
@@ -5583,9 +5689,18 @@ function cargo.getBestRoute(origin_island, dest_island)
 			for island_index, island in pairs(g_savedata.controllable_islands) do
 				-- makes sure the island we are at is not the destination island, and that we are not trying to go to the island we are at
 				if first_path_island.island.transform ~= dest_island.transform and island_index ~= first_path_island_index then
-					if island.faction == FACTION_AI then -- makes sure the ai owns the island
-						paths[first_path_island_index][island_index] = { island = island, distance = cargo.getIslandDistance(first_path_island.island, island) }
+
+					local distance = cargo.getIslandDistance(first_path_island.island, island)
+
+					-- calculate the occupier multiplications
+					for transport_type, transport_distance in pairs(distance) do
+						-- if the distance is not nil
+						if transport_distance then
+							distance[transport_type] = transport_distance * occupier_multiplications[island.faction]
+						end
 					end
+
+					paths[first_path_island_index][island_index] = { island = island, distance = distance }
 				end
 			end
 		end
@@ -5594,7 +5709,18 @@ function cargo.getBestRoute(origin_island, dest_island)
 		for first_path_island_index, first_path_island in pairs(paths) do
 			for second_path_island_index, second_path_island in pairs(paths[first_path_island_index]) do
 				if second_path_island.island and second_path_island.island.transform ~= dest_island.transform and dest_island.index ~= first_path_island_index and dest_island.index ~= second_path_island_index then
-					paths[first_path_island_index][second_path_island_index][dest_island.index] = { island = dest_island, distance = cargo.getIslandDistance(second_path_island.island, dest_island) }
+					
+					local distance = cargo.getIslandDistance(second_path_island.island, dest_island)
+
+					-- calculate the occupier multiplications
+					for transport_type, transport_distance in pairs(distance) do
+						-- if the distance is not nil
+						if transport_distance then
+							distance[transport_type] = transport_distance * occupier_multiplications[dest_island.faction]
+						end
+					end
+
+					paths[first_path_island_index][second_path_island_index][dest_island.index] = { island = dest_island, distance = distance }
 				end 
 			end
 		end
@@ -5607,15 +5733,26 @@ function cargo.getBestRoute(origin_island, dest_island)
 			-- get the travel time from the origin island to the next one for each vehicle type
 			--
 			if first_path_island.distance then
+
+				-- create the table with the indexes if it does not yet exist
+				if not total_travel_time[first_path_island_index] then
+					total_travel_time[first_path_island_index] = {
+						heli = 0,
+						boat = 0,
+						plane = 0,
+						land = 0
+					}
+				end
+
 				if first_path_island.distance.air then
-					if transport_vehicle.heli then
+					if transport_vehicle.heli.name ~= "none" and transport_vehicle.heli.name ~= "unknown" then
 						--
 						total_travel_time[first_path_island_index].heli = 
 						(total_travel_time[first_path_island_index].heli or 0) + 
 						(first_path_island.distance.air/transport_vehicle.heli.movement_speed)
 						--
 					end
-					if transport_vehicle.plane then
+					if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
 						--
 						total_travel_time[first_path_island_index].plane = 
 						(total_travel_time[first_path_island_index].plane or 0) + 
@@ -5624,7 +5761,7 @@ function cargo.getBestRoute(origin_island, dest_island)
 					end
 				end
 				if first_path_island.distance.land then
-					if transport_vehicle.land then
+					if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
 						--
 						total_travel_time[first_path_island_index].land = 
 						(total_travel_time[first_path_island_index].land or 0) + 
@@ -5633,7 +5770,7 @@ function cargo.getBestRoute(origin_island, dest_island)
 					end
 				end
 				if first_path_island.distance.sea then
-					if transport_vehicle.sea then
+					if transport_vehicle.sea.name ~= "none" and transport_vehicle.sea.name ~= "unknown" then
 						--
 						total_travel_time[first_path_island_index].sea = 
 						(total_travel_time[first_path_island_index].sea or 0) + 
@@ -5641,82 +5778,110 @@ function cargo.getBestRoute(origin_island, dest_island)
 						--
 					end
 				end
+
+				-- second path islands
 				if first_path_island_index ~= dest_island.index then
-					for second_path_island_index in pairs(paths[first_path_island_index]) do
+					for second_path_island_index, second_path_island in pairs(paths[first_path_island_index]) do
 						--
 						-- get the travel time from the first island to the next one for each vehicle type
 						--
-						if second_path_island.distance.air then
-							if transport_vehicle.heli then
-								--
-								total_travel_time[first_path_island_index][second_path_island_index].heli = 
-								(total_travel_time[first_path_island_index].heli or 0) + 
-								(second_path_island.distance.air/transport_vehicle.heli.movement_speed)
-								--
+						if second_path_island.distance then
+							
+							-- create the table with the indexes if it does not yet exist
+							if not total_travel_time[first_path_island_index][second_path_island_index] then
+								total_travel_time[first_path_island_index][second_path_island_index] = {
+									heli = 0,
+									boat = 0,
+									plane = 0,
+									land = 0
+								}
 							end
-							if transport_vehicle.plane then
-								--
-								total_travel_time[first_path_island_index][second_path_island_index].plane = 
-								(total_travel_time[first_path_island_index].plane or 0) + 
-								(second_path_island.distance.air/transport_vehicle.plane.movement_speed)
-								--
-							end
-						end
-						if second_path_island.distance.land then
-							if transport_vehicle.land then
-								--
-								total_travel_time[first_path_island_index][second_path_island_index].land = 
-								(total_travel_time[first_path_island_index].land or 0) + 
-								(second_path_island.distance.land/transport_vehicle.land.movement_speed)
-								--
-							end
-						end
-						if second_path_island.distance.sea then
-							if transport_vehicle.sea then
-								--
-								total_travel_time[first_path_island_index][second_path_island_index].sea = 
-								(total_travel_time[first_path_island_index].sea or 0) + 
-								(second_path_island.distance.sea/transport_vehicle.sea.movement_speed)
-								--
-							end
-						end
-						if second_path_island_index ~= dest_island.index then
-							for third_path_island_index in pairs(paths[first_path_island_index][second_path_island_index]) do
-								--
-								-- get the travel time from the second island to the destination for each vehicle type
-								--
-								if third_path_island.distance.air then
-									if transport_vehicle.heli then
-										--
-										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].heli = 
-										(total_travel_time[first_path_island_index][second_path_island_index].heli or 0) + 
-										(third_path_island.distance.air/transport_vehicle.heli.movement_speed)
-										--
-									end
-									if transport_vehicle.plane then
-										--
-										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].plane = 
-										(total_travel_time[first_path_island_index][second_path_island_index].plane or 0) + 
-										(third_path_island.distance.air/transport_vehicle.plane.movement_speed)
-										--
-									end
+
+							if second_path_island.distance.air then
+								if transport_vehicle.heli.name ~= "none" and transport_vehicle.heli.name ~= "unknown" then
+									--
+									total_travel_time[first_path_island_index][second_path_island_index].heli = 
+									(total_travel_time[first_path_island_index].heli or 0) + 
+									(second_path_island.distance.air/transport_vehicle.heli.movement_speed)
+									--
 								end
-								if third_path_island.distance.land then
-									if transport_vehicle.land then
-										--
-										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
-										(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
-										(third_path_island.distance.land/transport_vehicle.land.movement_speed)
-										--
-									end
+								if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
+									--
+									total_travel_time[first_path_island_index][second_path_island_index].plane = 
+									(total_travel_time[first_path_island_index].plane or 0) + 
+									(second_path_island.distance.air/transport_vehicle.plane.movement_speed)
+									--
 								end
-								if third_path_island.distance.sea then
-									if transport_vehicle.sea then
-										--
-										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].sea = 
-										(total_travel_time[first_path_island_index][second_path_island_index].sea or 0) + 
-										(third_path_island.distance.sea/transport_vehicle.sea.movement_speed)
-										--
+							end
+							if second_path_island.distance.land then
+								if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
+									--
+									total_travel_time[first_path_island_index][second_path_island_index].land = 
+									(total_travel_time[first_path_island_index].land or 0) + 
+									(second_path_island.distance.land/transport_vehicle.land.movement_speed)
+									--
+								end
+							end
+							if second_path_island.distance.sea then
+								if transport_vehicle.sea.name ~= "none" and transport_vehicle.sea.name ~= "unknown" then
+									--
+									total_travel_time[first_path_island_index][second_path_island_index].sea = 
+									(total_travel_time[first_path_island_index].sea or 0) + 
+									(second_path_island.distance.sea/transport_vehicle.sea.movement_speed)
+									--
+								end
+							end
+							if second_path_island_index ~= dest_island.index then
+								for third_path_island_index, third_path_island in pairs(paths[first_path_island_index][second_path_island_index]) do
+									--
+									-- get the travel time from the second island to the destination for each vehicle type
+									--
+
+									-- create the table with the indexes if it does not yet exist
+									if not total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index] then
+										total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index] = {
+											heli = 0,
+											boat = 0,
+											plane = 0,
+											land = 0
+										}
+									end
+
+									if third_path_island.distance then
+										if third_path_island.distance.air then
+											if transport_vehicle.heli.name ~= "none" and transport_vehicle.heli.name ~= "unknown" then
+												--
+												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].heli = 
+												(total_travel_time[first_path_island_index][second_path_island_index].heli or 0) + 
+												(third_path_island.distance.air/transport_vehicle.heli.movement_speed)
+												--
+											end
+											if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
+												--
+												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].plane = 
+												(total_travel_time[first_path_island_index][second_path_island_index].plane or 0) + 
+												(third_path_island.distance.air/transport_vehicle.plane.movement_speed)
+												--
+											end
+										end
+										if third_path_island.distance.land then
+											if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
+												--
+												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
+												(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
+												(third_path_island.distance.land/transport_vehicle.land.movement_speed)
+												--
+											end
+										end
+										if third_path_island.distance.sea then
+											if transport_vehicle.sea.name ~= "none" and transport_vehicle.sea.name ~= "unknown" then
+												--
+												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].sea = 
+												(total_travel_time[first_path_island_index][second_path_island_index].sea or 0) + 
+												(third_path_island.distance.sea/transport_vehicle.sea.movement_speed)
+												--
+											end
+										end
 									end
 								end
 							end
@@ -5734,9 +5899,52 @@ function cargo.getBestRoute(origin_island, dest_island)
 
 		for first_path_island_index, first_path_island_travel_time in pairs(total_travel_time) do
 			if first_path_island_index ~= dest_island.index then
-				for second_path_island_index, second_path_island_travel_time in pairs(total_travel_time[first_path_island_index]) do
-					if second_path_island_index ~= dest_island.index then
-						for third_path_island_index, third_path_island_travel_time in pairs(total_travel_time[first_path_island_index][second_path_island_index]) do
+				if type(first_path_island_travel_time) == "table" then
+					for second_path_island_index, second_path_island_travel_time in pairs(total_travel_time[first_path_island_index]) do
+						if second_path_island_index ~= dest_island.index then
+							if type(second_path_island_travel_time) == "table" then
+								for third_path_island_index, third_path_island_travel_time in pairs(total_travel_time[first_path_island_index][second_path_island_index]) do
+									if type(third_path_island_travel_time) == "table" then
+										local first_route_time = time.day
+										local first_route = {}
+										for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
+											if type(path_travel_time) == "number" then
+												if path_travel_time < first_route_time then
+													first_route_time = path_travel_time
+													first_route = {
+														[1] = {island_index = first_path_island_index, transport_method = transport_type}
+													}
+												end
+											end
+										end
+										local second_route_time = time.day
+										local second_route = {}
+										for transport_type, path_travel_time in pairs(second_path_island_travel_time) do
+											if type(path_travel_time) == "number" then
+												if path_travel_time < second_route_time then
+													second_route_time = path_travel_time
+													second_route = {
+														[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method},
+														[2] = {island_index = second_path_island_index, transport_method = transport_type}
+													}
+												end
+											end
+										end
+										for transport_type, path_travel_time in pairs(third_path_island_travel_time) do
+											if type(path_travel_time) == "number" then
+												if path_travel_time + first_route_time + second_route_time < best_route_time then
+													best_route = {
+														[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
+														[2] = {island_index = second_path_island_index, transport_method = second_route[2].transport_method},
+														[3] = {island_index = third_path_island_index, transport_method = transport_type}
+													}
+												end
+											end
+										end
+									end
+								end
+							end
+						else
 							local first_route_time = time.day
 							local first_route = {}
 							for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
@@ -5749,51 +5957,14 @@ function cargo.getBestRoute(origin_island, dest_island)
 									end
 								end
 							end
-							local second_route_time = time.day
-							local second_route = {}
 							for transport_type, path_travel_time in pairs(second_path_island_travel_time) do
 								if type(path_travel_time) == "number" then
-									if path_travel_time < second_route_time then
-										second_route_time = path_travel_time
-										second_route = {
-											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method},
+									if path_travel_time + first_route_time < best_route_time then
+										best_route = {
+											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
 											[2] = {island_index = second_path_island_index, transport_method = transport_type}
 										}
 									end
-								end
-							end
-							for transport_type, path_travel_time in pairs(path_island_travel_time) do
-								if type(path_travel_time) == "number" then
-									if path_travel_time + first_route_time + second_route_time < best_route_time then
-										best_route = {
-											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
-											[2] = {island_index = second_path_island_index, transport_method = second_route[2].transport_method},
-											[3] = {island_index = third_path_island_index, transport_method = transport_type}
-										}
-									end
-								end
-							end
-						end
-					else
-						local first_route_time = time.day
-						local first_route = {}
-						for transport_type, path_travel_time in pairs(first_path_island_travel_time) do
-							if type(path_travel_time) == "number" then
-								if path_travel_time < first_route_time then
-									first_route_time = path_travel_time
-									first_route = {
-										[1] = {island_index = first_path_island_index, transport_method = transport_type}
-									}
-								end
-							end
-						end
-						for transport_type, path_travel_time in pairs(path_island_travel_time) do
-							if type(path_travel_time) == "number" then
-								if path_travel_time + first_route_time < best_route_time then
-									best_route = {
-										[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
-										[2] = {island_index = second_path_island_index, transport_method = transport_type}
-									}
 								end
 							end
 						end
@@ -5818,6 +5989,7 @@ function cargo.getBestRoute(origin_island, dest_island)
 		------
 		cache.write("cargo.best_routes["..first_cache_index.."]["..second_cache_index.."]["..transport_vehicle.heli.name.."]["..transport_vehicle.land.name.."]["..transport_vehicle.plane.name.."]["..transport_vehicle.sea.name.."]", best_route)
 	end
+	d.print("Calculated Best Route! Time taken: "..millisecondsSince(start_time).."ms", true, 0)
 	return best_route
 end
 
@@ -5838,13 +6010,10 @@ end
 ---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
 function cargo.getIslandDistance(island1, island2)
 
-
-	d.print("(cargo.getIslandDistance)\nisland1: "..island1.name, true, 0)
-	d.print("island2: "..island2.name, true, 0)
 	local first_cache_index = island2.index
 	local second_cache_index = island1.index
 
-	if origin_island.index > dest_island.index then
+	if island1.index > island2.index then
 		first_cache_index = island1.index
 		second_cache_index = island2.index
 	end
@@ -5937,6 +6106,7 @@ function cargo.getIslandDistance(island1, island2)
 			end
 		end
 	end
+	return distance
 end
 
 ---@param island ?island[] the island of which you want to reset the cargo of, leave blank for all islands
@@ -6644,6 +6814,30 @@ end
 
 --------------------------------------------------------------------------------
 --
+-- Custom String Functions
+--
+--------------------------------------------------------------------------------
+
+---@param str string the string to make the first letter uppercase
+---@return string str the string with the first letter uppercase
+function string.upperFirst(str)
+	if type(str) == "string" then
+		return (str:gsub("^%l", string.upper))
+	end
+	return nil
+end
+
+---@param str string the string the make friendly
+---@return string friendly_string friendly string, nil if input_string was not a string
+function string.friendly(str) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
+	if type(str) == "string" then
+		return string.gsub(string.lower(str), "_", " ")
+	end
+	return nil
+end
+
+--------------------------------------------------------------------------------
+--
 -- Other
 --
 --------------------------------------------------------------------------------
@@ -6672,16 +6866,6 @@ function getIslandFromName(island_name) -- function that gets the island by its 
 		return false, "island_name was never inputted!"
 	end
 	return false, "island was not found! inputted island_name: "..island_name
-end
-
----@param input_string string the string the make friendly
----@return string friendly_string friendly string, nil if input_string was not a string
-function string.friendly(input_string) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
-	if type(input_string) == "string" then
-		return string.gsub(string.lower(input_string), "_", " ")
-	else
-		return nil
-	end
 end
 
 ---@param start_tick number the time you want to see how long its been since (in ticks)
