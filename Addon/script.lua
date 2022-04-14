@@ -11,7 +11,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.39)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.40)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -185,6 +185,7 @@ g_savedata = {
 		creation_version = nil,
 		full_reload_versions = {},
 		has_default_addon = false,
+		has_ai_paths = false,
 		awaiting_reload = false,
 	},
 	tick_counter = 0,
@@ -245,21 +246,24 @@ g_savedata = {
 function warningChecks(user_peer_id)
 	-- check for if they have the weapons dlc enabled
 	if not s.dlcWeapons() then
-		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, peer_id)
+		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, user_peer_id)
 	end
 	-- check if they left the default addon enabled
 	if g_savedata.info.has_default_addon then
-		d.print("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, 1, peer_id)
+		d.print("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, 1, user_peer_id)
+		is_dlc_weapons = false
+	elseif not g_savedata.info.has_ai_paths then
+		d.print("ERROR: The AI Paths addon was disabled! This addon uses it for pathfinding for the ships, you may have issues with the ship's pathfinding!", false, 1, user_peer_id)
 	end
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		d.print("hey! thanks for using and testing the development version! just note you will very likely experience errors!", false, 0, peer_id)
+		d.print("Hey! Thanks for using and testing the development version! just note you will very likely experience errors!", false, 0, user_peer_id)
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
-			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, 1, peer_id)
+			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, 1, user_peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
-			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, peer_id)
+			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, user_peer_id)
 		end
 	end
 end
@@ -393,13 +397,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
-			CAPTURE_TIME = property.slider("Capture Time (Mins)", 10, 600, 1, 60) * 60 * 60,
+			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5 ", 10, 600, 1, 60) * 60 * 60,
 			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 40, 1, 10),
 			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
 			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
 			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 40, 1, 10),
 			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 7, 1, 3),
-			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 15, 1, 5),
+			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 30, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 19, 1, 1),
 			ISLAND_COUNT = property.slider("Island Count", 7, 21, 1, 21),
 		}
@@ -409,10 +413,17 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
     is_dlc_weapons = s.dlcWeapons()
 
+	-- checks for Vanilla Conquest Mode addon
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
 		g_savedata.info.has_default_addon = true
 		is_dlc_weapons = false
+	end
+
+	-- checks for AI Paths addon
+	local addon_index, is_success = s.getAddonIndex("AI Paths")
+	if is_success then
+		g_savedata.info.has_ai_paths = true
 	end
 
 	warningChecks(-1)
@@ -1122,7 +1133,8 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		end
 		spawn_transform = m.multiply(boat_spawn_transform, m.translation(math.random(-500, 500), 0, math.random(-500, 500)))
 	elseif hasTag(selected_prefab.vehicle.tags, "type=wep_land") then
-		spawn_transform = g_savedata.controllable_islands[selected_spawn].zones.land[math.random(1, #g_savedata.controllable_islands[selected_spawn].zones.land)].transform
+		local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.controllable_islands[selected_spawn]
+		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	else
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
 	end
@@ -1131,7 +1143,6 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if m.distance(spawn_transform, vehicle_object.transform) < (getTagValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
-				d.print("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
 				return false, "spawn location was too close to vehicle "..vehicle_id
 			end
 		end
@@ -1399,8 +1410,8 @@ local player_commands = {
 }
 
 function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, command, ...)
-	if is_dlc_weapons then
-		if prefix == "?impwep" then
+	if prefix == "?impwep" then
+		if is_dlc_weapons then
 			if command then
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
@@ -1411,8 +1422,8 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				if command == "info" then
 					d.print("------ Improved Conquest Mode Info ------", false, 0, user_peer_id)
 					d.print("Version: "..IMPROVED_CONQUEST_VERSION, false, 0, user_peer_id)
-					if g_savedata.info.has_default_addon then
-						d.print("Has default conquest mode addon enabled, this will cause issues and errors!", false, 1, user_peer_id)
+					if not g_savedata.info.has_ai_paths then
+						wpDLCDebug("AI Paths Disabled (will cause ship pathfinding issues)", false, true, user_peer_id)
 					end
 					d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, user_peer_id)
 					d.print("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, 0, user_peer_id)
@@ -2080,6 +2091,10 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 			else
 				d.print("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, 1, user_peer_id)
 			end
+		else
+			if g_savedata.info.has_default_addon then
+				d.print("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, 1, user_peer_id)
+			end
 		end
 	end
 end
@@ -2307,7 +2322,7 @@ end
 
 function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 	if is_dlc_weapons then
-		if peer_id ~= -1 and peer_id ~= 65535 then
+		if isPlayer(peer_id) then
 			-- player spawned vehicle
 			g_savedata.player_vehicles[vehicle_id] = {
 				current_damage = 0, 
@@ -2326,7 +2341,7 @@ function onVehicleDespawn(vehicle_id, peer_id)
 		end
 	end
 
-	local squad_index, squad = squads.getSquad(vehicle_id)
+	local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
 	if squad_index then
 		d.print("onVehicleDespawn: "..vehicle_object.name.." ("..vehicle_id..")", true, 0)
@@ -2421,17 +2436,16 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+	if isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 		if vehicle_object.capabilities.target_mass then
 			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
 		end
-	elseif vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id ~= 65535 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+	elseif isPlayer(vehicle_object.target_vehicle_id) and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 		if vehicle_object.capabilities.target_mass then
 			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
 			if is_success then
-				d.print("(sending mass to keypad)"..vehicle_object.target_vehicle_id.."'s mass: "..vehicle_data.mass, true, 0)
 				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
 			end
 		end
@@ -3748,21 +3762,21 @@ function tickSquadrons()
 
 				local function retargetVehicle(vehicle_object, target_player_id, target_vehicle_id)
 					-- decrement previous target count
-					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then decrementCount(player_counts, vehicle_object.target_player_id)
+					if isPlayer(vehicle_object.target_player_id) then decrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 
 					vehicle_object.target_player_id = target_player_id
 					vehicle_object.target_vehicle_id = target_vehicle_id
 
 					-- increment new target count
-					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then incrementCount(player_counts, vehicle_object.target_player_id)
+					if isPlayer(vehicle_object.target_player_id) then incrementCount(player_counts, vehicle_object.target_player_id)
 					elseif vehicle_object.target_vehicle_id ~= -1 then incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
 				end
 
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- check existing target is still visible
 
-					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
+					if isPlayer(vehicle_object.target_player_id) and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
 						vehicle_object.target_player_id = -1
 					elseif vehicle_object.target_vehicle_id ~= -1 and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
 						vehicle_object.target_vehicle_id = -1
@@ -3770,7 +3784,7 @@ function tickSquadrons()
 
 					-- find targets if not targeting anything
 
-					if (vehicle_object.target_player_id == -1 or vehicle_object.target_player_id == 65535) and vehicle_object.target_vehicle_id == -1 then
+					if notPlayer(vehicle_object.target_player_id) and vehicle_object.target_vehicle_id == -1 then
 						if #squad_vision.visible_players > 0 then
 							vehicle_object.target_player_id = squad_vision:getBestTargetPlayerID()
 							incrementCount(player_counts, vehicle_object.target_player_id)
@@ -3779,7 +3793,7 @@ function tickSquadrons()
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
 						end
 					else
-						if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
+						if isPlayer(vehicle_object.target_player_id) then
 							incrementCount(player_counts, vehicle_object.target_player_id)
 						elseif vehicle_object.target_vehicle_id ~= -1 then
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
@@ -3792,8 +3806,8 @@ function tickSquadrons()
 				local vehicles_per_target = math.max(math.floor(squad_vehicle_count / visible_target_count), 1)
 
 				local function isRetarget(target_player_id, target_vehicle_id)
-					return ((target_player_id == -1 or target_player_id == 65535) and target_vehicle_id == -1) 
-						or (target_player_id ~= -1 and target_player_id ~= 65535 and getCount(player_counts, target_player_id) > vehicles_per_target)
+					return (notPlayer(target_player_id) and target_vehicle_id == -1) 
+						or (isPlayer(target_player_id) and getCount(player_counts, target_player_id) > vehicles_per_target)
 						or (target_vehicle_id ~= -1 and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
 				end
 
@@ -3826,7 +3840,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
+					if isPlayer(vehicle_object.target_player_id) then
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
@@ -3902,7 +3916,7 @@ function tickSquadrons()
 			end
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 or vehicle_object.target_vehicle_id ~= -1 then
+					if isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id ~= -1 then
 						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
@@ -4188,7 +4202,7 @@ function tickVehicles()
 								local squad_vision = squadGetVisionData(squad)
 								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-								elseif vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+								elseif isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 								end
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
@@ -4856,6 +4870,8 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 		return component.id
 	else -- then it failed to spawn the addon component
 		d.print("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, 1)
+		d.print("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, 1)
+		is_dlc_weapons = false
 		return nil
 	end
 end
@@ -5173,7 +5189,7 @@ function hasTag(tags, tag)
 			end
 		end
 	else
-		d.print("hasTag() was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag, true, 1)
+		d.print("hasTag() was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
 	end
 	return false
 end
@@ -5191,7 +5207,7 @@ function getTagValue(tags, tag, as_string)
 			end
 		end
 	else
-		d.print("getTagValue() was expecting a table, but got a "..type(tags).." instead!", true, 1)
+		d.print("getTagValue() was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
 	end
 	return nil
 end
@@ -6472,7 +6488,7 @@ function debugging.print(message, requires_debug, debug_type, peer_id) -- glorio
 			printTable(message, requires_debug, debug_type, peer_id)
 
 		elseif requires_debug then
-			if peer_id ~= -1 and peer_id ~= 65535 and peer_id ~= nil then
+			if isPlayer(peer_id) and peer_id then
 				if g_savedata.player_data.is_debugging.toPlayer then
 					s.announce(prefix, message, peer_id)
 				end
@@ -6494,7 +6510,7 @@ end
 ---@param peer_id ?integer the peer_id of the player you want to check if they have it enabled, leave blank to check globally
 ---@return boolean enabled if the specified type of debug is enabled
 function debugging.getDebug(debug_type, peer_id)
-	if not peer_id or (peer_id == -1 or peer_id == 65535) then -- if any player has it enabled
+	if not peer_id or notPlayer(peer_id) then -- if any player has it enabled
 		if debug_type == -1 then -- any debug
 			if g_savedata.debug.chat or g_savedata.debug.profiler or g_savedata.debug.map then
 				return true
@@ -6957,4 +6973,14 @@ end
 
 function noNaN(x)
 	return x ~= x and 0 or x
+end
+
+-- returns true if the peer_id is a player id
+function isPlayer(peer_id)
+	return (peer_id ~= -1 and peer_id ~= 65535)
+end
+
+-- returns true if the peer_id is not a player id
+function notPlayer(peer_id)
+	return (peer_id == -1 or peer_id == 65535)
 end
