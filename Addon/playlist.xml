@@ -2668,12 +2668,12 @@
 						<graph_links/>
 					</c>
 					<c component_type="5" id="304" vehicle_parent_id="81" name="id_104" zone_radius="5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.3">
-						<spawn_transform 30="-1.25661" 31="7.521031" 32="-3.709751"/>
+						<spawn_transform 30="-1.662603" 31="7.521031" 32="-5.218024"/>
 						<spawn_bounds>
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="0.342672" 31="-0.689835" 32="-2.831023"/>
+						<vehicle_parent_transform 30="-0.063321" 31="-0.689835" 32="-4.339296"/>
 						<graph_links/>
 					</c>
 				</components>

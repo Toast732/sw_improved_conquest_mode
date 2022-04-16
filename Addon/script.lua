@@ -1,9 +1,10 @@
 -- library prefixes
-local spawnModifiers = {}
-local cargo = {}
-local cache = {}
-local squads = {}
-local debugging = {}
+
+local spawnModifiers = {} -- functions relating to the Adaptive AI
+local cargo = {} -- functions relating to the Transport AI
+local cache = {} -- functions relating to the custom Cache
+local squads = {} -- functions for squads
+local debugging = {} -- functions related to debugging
 
 -- shortened library names
 local d = debugging
@@ -11,7 +12,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.40)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.41)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -337,7 +338,8 @@ function checkSavedata() -- does a check for savedata, is used for backwards com
 				reads = 0,
 				writes = 0,
 				failed_writes = 0,
-				resets = 0
+				resets = 0,
+				failed_resets = 0
 			},
 			profiler = {
 				working = {},
@@ -826,7 +828,7 @@ function spawnTurret(island)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
-		for key, char in  pairs(spawned_objects.survivors) do
+		for key, char in pairs(spawned_objects.survivors) do
 			local c = s.getCharacterData(char.id)
 			s.setCharacterData(char.id, c.hp, true, true)
 			s.setAIState(char.id, 1)
@@ -892,8 +894,8 @@ function spawnTurret(island)
 			terrain_type = "offroad",
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			transform = spawn_transform,
-			target_player_id = -1,
-			target_vehicle_id = -1,
+			target_player_id = nil,
+			target_vehicle_id = nil,
 			home_island = island,
 			current_damage = 0,
 			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
@@ -1011,7 +1013,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		end
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
-				if selected_spawn_transform == nil or xzDistance(target.transform, island.transform) < xzDistance(target.transform, selected_spawn_transform) then
+				if selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform) then
 					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
 						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 							selected_spawn_transform = island.transform
@@ -1051,7 +1053,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			local closest_player_pos = nil
 			for player_steam_id, player_transform in pairs(g_savedata.ai_knowledge.last_seen_positions) do
 				for island_index, island_transform in pairs(islands_needing_checked) do
-					local player_to_island_dist = xzDistance(player_transform, island_transform)
+					local player_to_island_dist = m.xzDistance(player_transform, island_transform)
 					if player_to_island_dist < 6000 then
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
 							if playersNotNearby(player_list, island_transform, 3000, true) then
@@ -1069,7 +1071,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 				for island_index, island_transform in pairs(islands_needing_checked) do
 					for player_island_index, player_island in pairs(g_savedata.controllable_islands) do
 						if player_island.faction == FACTION_PLAYER then
-							if xzDistance(selected_spawn_transform, island_transform) > xzDistance(player_island.transform, island_transform) then
+							if m.xzDistance(selected_spawn_transform, island_transform) > m.xzDistance(player_island.transform, island_transform) then
 								if playersNotNearby(player_list, island_transform, 3000, true) then
 									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 										selected_spawn_transform = island_transform
@@ -1136,7 +1138,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.controllable_islands[selected_spawn]
 		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	else
-		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 200, math.random(-500, 500)))
+		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 400, math.random(-500, 500)))
 	end
 
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -1166,7 +1168,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
-		for key, char in  pairs(spawned_objects.survivors) do
+		for key, char in pairs(spawned_objects.survivors) do
 			local c = s.getCharacterData(char.id)
 			s.setCharacterData(char.id, c.hp, true, true)
 			s.setAIState(char.id, 1)
@@ -1232,8 +1234,8 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			is_resupply_on_load = false,
 			transform = spawn_transform,
-			target_vehicle_id = -1,
-			target_player_id = -1,
+			target_vehicle_id = nil,
+			target_player_id = nil,
 			current_damage = 0,
 			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
 			damage_dealt = {},
@@ -1397,6 +1399,12 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		vision_reset = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
@@ -1413,6 +1421,7 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 	if prefix == "?impwep" then
 		if is_dlc_weapons then
 			if command then
+				command = string.lower(command) -- makes the command friendly, removing underscores and captitals
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
 
@@ -1463,6 +1472,14 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 								end
 							end
 						end
+
+					elseif command == "vision_reset" then
+						d.print("resetting all squad vision data", false, 0, user_peer_id)
+						for squad_index, squad in pairs(g_savedata.squadrons) do
+							squad.target_players = {}
+							squad.target_vehicles = {}
+						end
+						d.print("reset all squad vision data", false, 0, user_peer_id)
 						
 					elseif command == "sv" then --spawn vehicle
 						if arg[1] then
@@ -2077,10 +2094,9 @@ function onCustomCommand(full_message, user_peer_id, is_admin, is_auth, prefix, 
 				-- if the command they entered exists
 				local is_command = false
 				for permission_level, command_list in pairs(player_commands) do
-					for command_name, command_info in pairs(command_list) do
-						if command_name == command then
-							is_command = true
-						end
+					if command_list[command] then
+						is_command = true
+						break
 					end
 				end
 
@@ -2210,6 +2226,7 @@ function onPlayerJoin(steam_id, name, peer_id)
 	if not g_savedata.player_data[tostring(steam_id)] then
 		g_savedata.player_data[tostring(steam_id)] = {
 			peer_id = peer_id,
+			name = name,
 			fully_reloading = false,
 			do_as_i_say = false,
 			debug = {
@@ -2261,7 +2278,7 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.target_vehicle_id == vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
-							if xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
+							if m.xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
 								valid_ai_vehicles[vehicle_id] = vehicle_object
 								if not vehicle_object.damage_dealt[vehicle_id] then vehicle_object.damage_dealt[vehicle_id] = 0 end
 							end
@@ -2436,12 +2453,12 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+	if isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
 		if vehicle_object.capabilities.target_mass then
 			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
 		end
-	elseif isPlayer(vehicle_object.target_vehicle_id) and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+	elseif vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 		if vehicle_object.capabilities.target_mass then
 			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
@@ -2641,8 +2658,7 @@ function addPath(vehicle_object, target_dest)
 		end
 		setLandTarget(vehicle_id, vehicle_object)
 	else
-		local dest_x, dest_y, dest_z = m.position(target_dest)
-		table.insert(vehicle_object.path, { x = dest_x, y = dest_y, z = dest_z, ui_id = s.getMapID() })
+		table.insert(vehicle_object.path, { x = target_dest[13], y = target_dest[14], z = target_dest[15], ui_id = s.getMapID() })
 	end
 
 	vehicle_object.state.s = VEHICLE_STATE_PATHING
@@ -2689,7 +2705,7 @@ function tickGamemode()
 				local capture_radius = island.faction == FACTION_AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
 
 				-- if the ai vehicle is within the capture radius
-				if xzDistance(vehicle_object.transform, island.transform) <= capture_radius then
+				if m.xzDistance(vehicle_object.transform, island.transform) <= capture_radius then
 					g_savedata.controllable_islands[island.index].ai_capturing = g_savedata.controllable_islands[island.index].ai_capturing + 1
 				end
 			else
@@ -3086,7 +3102,7 @@ function tickAI()
 				if squad.command == COMMAND_DEFEND or squad.command == COMMAND_TURRET then
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if island.faction == FACTION_AI then
-							if xzDistance(island.transform, vehicle_object.transform) < 1500 then
+							if m.xzDistance(island.transform, vehicle_object.transform) < 1500 then
 								island.defenders = island.defenders + 1
 							end
 						end
@@ -3360,24 +3376,24 @@ function getObjectiveIsland(ignore_scouted)
 							origin_island = ai_island
 							target_island = island
 							if island.faction == FACTION_PLAYER then
-								target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
+								target_best_distance = m.xzDistance(ai_island.transform, island.transform)/1.5
 							else
-								target_best_distance = xzDistance(ai_island.transform, island.transform)
+								target_best_distance = m.xzDistance(ai_island.transform, island.transform)
 							end
 						elseif island.faction == FACTION_PLAYER then -- if the player owns the island we are checking
-							if target_island.faction == FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+							if target_island.faction == FACTION_PLAYER and m.xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
 								origin_island = ai_island
 								target_island = island
-								target_best_distance = xzDistance(ai_island.transform, island.transform)
-							elseif target_island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
+								target_best_distance = m.xzDistance(ai_island.transform, island.transform)
+							elseif target_island.faction ~= FACTION_PLAYER and m.xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
 								origin_island = ai_island
 								target_island = island
-								target_best_distance = xzDistance(ai_island.transform, island.transform)/1.5
+								target_best_distance = m.xzDistance(ai_island.transform, island.transform)/1.5
 							end
-						elseif island.faction ~= FACTION_PLAYER and xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
+						elseif island.faction ~= FACTION_PLAYER and m.xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
 							origin_island = ai_island
 							target_island = island
-							target_best_distance = xzDistance(ai_island.transform, island.transform)
+							target_best_distance = m.xzDistance(ai_island.transform, island.transform)
 						end
 					end
 				end
@@ -3392,21 +3408,21 @@ function getObjectiveIsland(ignore_scouted)
 					if not target_island then
 						target_island = island
 						if island.faction == FACTION_PLAYER then
-							target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
+							target_best_distance = m.xzDistance(origin_island.transform, island.transform)/1.5
 						else
-							target_best_distance = xzDistance(origin_island.transform, island.transform)
+							target_best_distance = m.xzDistance(origin_island.transform, island.transform)
 						end
 					elseif island.faction == FACTION_PLAYER then
-						if target_island.faction == FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
+						if target_island.faction == FACTION_PLAYER and m.xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
 							target_island = island
-							target_best_distance = xzDistance(origin_island.transform, island.transform)
-						elseif target_island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
+							target_best_distance = m.xzDistance(origin_island.transform, island.transform)
+						elseif target_island.faction ~= FACTION_PLAYER and m.xzDistance(origin_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
 							target_island = island
-							target_best_distance = xzDistance(origin_island.transform, island.transform)/1.5
+							target_best_distance = m.xzDistance(origin_island.transform, island.transform)/1.5
 						end
-					elseif island.faction ~= FACTION_PLAYER and xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
+					elseif island.faction ~= FACTION_PLAYER and m.xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
 						target_island = island
-						target_best_distance = xzDistance(origin_island.transform, island.transform)
+						target_best_distance = m.xzDistance(origin_island.transform, island.transform)
 					end
 				end
 			end
@@ -3762,29 +3778,35 @@ function tickSquadrons()
 
 				local function retargetVehicle(vehicle_object, target_player_id, target_vehicle_id)
 					-- decrement previous target count
-					if isPlayer(vehicle_object.target_player_id) then decrementCount(player_counts, vehicle_object.target_player_id)
-					elseif vehicle_object.target_vehicle_id ~= -1 then decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
+					if isPlayer(vehicle_object.target_player_id) then 
+						decrementCount(player_counts, vehicle_object.target_player_id)
+					elseif vehicle_object.target_vehicle_id then 
+						decrementCount(vehicle_counts, vehicle_object.target_vehicle_id) 
+					end
 
 					vehicle_object.target_player_id = target_player_id
 					vehicle_object.target_vehicle_id = target_vehicle_id
 
 					-- increment new target count
-					if isPlayer(vehicle_object.target_player_id) then incrementCount(player_counts, vehicle_object.target_player_id)
-					elseif vehicle_object.target_vehicle_id ~= -1 then incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) end
+					if isPlayer(vehicle_object.target_player_id) then 
+						incrementCount(player_counts, vehicle_object.target_player_id)
+					elseif vehicle_object.target_vehicle_id then 
+						incrementCount(vehicle_counts, vehicle_object.target_vehicle_id) 
+					end
 				end
 
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- check existing target is still visible
 
 					if isPlayer(vehicle_object.target_player_id) and squad_vision:isPlayerVisible(vehicle_object.target_player_id) == false then
-						vehicle_object.target_player_id = -1
-					elseif vehicle_object.target_vehicle_id ~= -1 and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
-						vehicle_object.target_vehicle_id = -1
+						vehicle_object.target_player_id = nil
+					elseif vehicle_object.target_vehicle_id and squad_vision:isVehicleVisible(vehicle_object.target_vehicle_id) == false then
+						vehicle_object.target_vehicle_id = nil
 					end
 
 					-- find targets if not targeting anything
 
-					if notPlayer(vehicle_object.target_player_id) and vehicle_object.target_vehicle_id == -1 then
+					if notPlayer(vehicle_object.target_player_id) and not vehicle_object.target_vehicle_id then
 						if #squad_vision.visible_players > 0 then
 							vehicle_object.target_player_id = squad_vision:getBestTargetPlayerID()
 							incrementCount(player_counts, vehicle_object.target_player_id)
@@ -3795,7 +3817,7 @@ function tickSquadrons()
 					else
 						if isPlayer(vehicle_object.target_player_id) then
 							incrementCount(player_counts, vehicle_object.target_player_id)
-						elseif vehicle_object.target_vehicle_id ~= -1 then
+						elseif vehicle_object.target_vehicle_id then
 							incrementCount(vehicle_counts, vehicle_object.target_vehicle_id)
 						end
 					end
@@ -3806,9 +3828,9 @@ function tickSquadrons()
 				local vehicles_per_target = math.max(math.floor(squad_vehicle_count / visible_target_count), 1)
 
 				local function isRetarget(target_player_id, target_vehicle_id)
-					return (notPlayer(target_player_id) and target_vehicle_id == -1) 
+					return (notPlayer(target_player_id) and target_vehicle_id) 
 						or (isPlayer(target_player_id) and getCount(player_counts, target_player_id) > vehicles_per_target)
-						or (target_vehicle_id ~= -1 and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
+						or (target_vehicle_id and getCount(vehicle_counts, target_vehicle_id) > vehicles_per_target)
 				end
 
 				-- find vehicles to retarget to visible players
@@ -3817,7 +3839,7 @@ function tickSquadrons()
 					if getCount(player_counts, visible_player_id) < vehicles_per_target then
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							if isRetarget(vehicle_object.target_player_id, vehicle_object.target_vehicle_id) then
-								retargetVehicle(vehicle_object, visible_player_id, -1)
+								retargetVehicle(vehicle_object, visible_player_id, nil)
 								break
 							end
 						end
@@ -3830,7 +3852,7 @@ function tickSquadrons()
 					if getCount(vehicle_counts, visible_vehicle_id) < vehicles_per_target then
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							if isRetarget(vehicle_object.target_player_id, vehicle_object.target_vehicle_id) then
-								retargetVehicle(vehicle_object, -1, visible_vehicle_id)
+								retargetVehicle(vehicle_object, nil, visible_vehicle_id)
 								break
 							end
 						end
@@ -3840,71 +3862,78 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if isPlayer(vehicle_object.target_player_id) then
-						local target_player_id = vehicle_object.target_player_id
-						local target_player_data = squad_vision.visible_players_map[target_player_id]
-						local target_player = target_player_data.obj
-						local target_x, target_y, target_z = m.position(target_player.last_known_pos)
-						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-						
+					-- if its targeting a player or a vehicle
+					if isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+						local target_pos = nil
+						local target_id = nil
+						if isPlayer(vehicle_object.target_player_id) then -- if its targeting a player
+							target_pos = squad_vision.visible_players_map[vehicle_object.target_player_id].obj.last_known_pos
+							target_id = vehicle_object.target_player_id
+						else -- if its targeting a vehicle
+							target_pos = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj.last_known_pos
+							target_id = vehicle_object.target_vehicle_id
+						end
 
-						if #vehicle_object.path <= 1 then
-							resetPath(vehicle_object)
 
-							if vehicle_object.ai_type == AI_TYPE_PLANE then
+						-- make sure we have a target position and target id
+						if target_pos and target_id then
 
-								if xzDistance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
-									addPath(vehicle_object, m.multiply(target_player.last_known_pos, m.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 75), target_player.last_known_pos)))
-									vehicle_object.is_strafing = true
-								elseif xzDistance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 150 and vehicle_object.is_strafing ~= true then
-									addPath(vehicle_object, m.multiply(target_player.last_known_pos, m.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 75, 200), target_player.last_known_pos)))
-								elseif xzDistance(target_player.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) < 250 then
-									addPath(vehicle_object, m.multiply(target_player.last_known_pos, m.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 15, 50), target_player.last_known_pos)))
-									vehicle_object.is_strafing = false
-								else
-									addPath(vehicle_object, m.multiply(target_player.last_known_pos, m.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 75), target_player.last_known_pos))) 
+							if #vehicle_object.path <= 1 then -- if we dont have any more paths or we only have 1
+								
+								-- reset its path
+								resetPath(vehicle_object)
+
+								if vehicle_object.ai_type == AI_TYPE_PLANE then -- if this vehicle is a plane
+									if vehicle_object.strategy == "strafing" then -- if the plane has a strategy of strafing
+										if target_pos[14] <= 50 and vehicle_object.state.is_simulating then -- if the target's y is below the threshold for detecting its a air vehicle
+											local dist_in_front = 870
+											local engage_dist = 775
+											-- distance from <dist_in_front>m in front of the jet to target
+											local in_front_dist = m.xzDistance(target_pos, matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, dist_in_front)))
+
+											--[[ debug
+											if not g_savedata.temp_map_id then
+												g_savedata.temp_map_id = s.getMapID()
+											end
+
+											local in_front = matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, dist_in_front))
+											s.removeMapObject(-1, g_savedata.temp_map_id)
+											s.addMapObject(-1, g_savedata.temp_map_id, 1, 11, in_front[13], in_front[15], 0, 0, 0, 0, "in front", 0, "in front", 255, 255, 0, 255)
+											]]
+											
+											-- distance from jet to target
+											local jet_dist = m.xzDistance(target_pos, vehicle_object.transform)
+
+											-- if in front of the jet is closer to the target than the jet is, and its within distance to start the strafe
+											if in_front_dist < jet_dist and jet_dist <= engage_dist then
+												addPath(vehicle_object, m.translation(target_pos[13], math.max(target_pos[14] + 5, 15), target_pos[15]))
+												--d.print("strafing")
+											else
+												--[[
+												local a = " 1" -- 1 =  jet is closer than infront dist
+												if in_front_dist < jet_dist then -- 2 = not within engage dist
+													a = " 2"
+												end
+												d.print("normal"..a)
+												]]
+												addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] + 160, target_pos[15]))
+											end
+										else -- if we think its an air vehicle
+											addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] + 3, target_pos[15]))
+										end
+									end
+									-- to write: dive bombing
+								elseif vehicle_object.ai_type ~= AI_TYPE_LAND then
+									addPath(vehicle_object, m.multiply(target_pos, m.translation(target_pos[13], target_pos[14] + math.max(target_pos[14] + (vehicle_object.id % 5) + 25, 75), target_pos[15])))
 								end
-							elseif vehicle_object.ai_type ~= AI_TYPE_LAND then
-								addPath(vehicle_object, m.multiply(target_player.last_known_pos, m.translation(target_player.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 75), target_player.last_known_pos)))
 							end
-						end
-
-						for i, char in pairs(vehicle_object.survivors) do
-							s.setAITargetCharacter(char.id, vehicle_object.target_player_id)
-
-							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_TURRET then
-								s.setAIState(char.id, 1)
-							end
-						end
-					elseif vehicle_object.target_vehicle_id ~= -1 then
-						local target_vehicle = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-						local target_x, target_y, target_z = m.position(target_vehicle.last_known_pos)
-						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-
-						
-						if #vehicle_object.path <= 1 then
-							resetPath(vehicle_object)
-							if vehicle_object.type == AI_TYPE_PLANE then
-								if m.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 700 then
-									addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
-									vehicle_object.is_strafing = true
-								elseif m.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) > 150 and vehicle_object.is_strafing ~= true then
-									addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 75, 100), target_vehicle.last_known_pos)))
-								elseif m.distance(target_vehicle.last_known_pos, vehicle_object.transform) - math.abs(target_y - vehicle_y) < 250 then
-									addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 15, 25), target_vehicle.last_known_pos)))
-									vehicle_object.is_strafing = false
-								else
-									addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
+								
+							for i, char in pairs(vehicle_object.survivors) do
+								s.setAITargetCharacter(char.id, target_id)
+	
+								if i ~= 1 or vehicle_object.ai_type == AI_TYPE_TURRET then
+									s.setAIState(char.id, 1)
 								end
-							elseif vehicle_object.ai_type ~= AI_TYPE_LAND then
-								addPath(vehicle_object, m.multiply(target_vehicle.last_known_pos, m.translation(target_vehicle.last_known_pos, target_y + math.max(target_y + (vehicle_object.id % 5) + 25, 50), target_vehicle.last_known_pos)))
-							end
-						end
-						for i, char in pairs(vehicle_object.survivors) do
-							s.setAITargetVehicle(char.id, vehicle_object.target_vehicle_id)
-
-							if i ~= 1 or vehicle_object.ai_type == AI_TYPE_TURRET then
-								s.setAIState(char.id, 1)
 							end
 						end
 					end
@@ -3916,7 +3945,7 @@ function tickSquadrons()
 			end
 			if squad.command ~= COMMAND_RETREAT then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id ~= -1 then
+					if isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
 						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
 					end
 				end
@@ -3936,9 +3965,11 @@ function tickVision()
 				local weather = s.getWeather(vehicle_transform)
 				local clock = s.getTime()
 				if vehicle_object.vision.is_radar then
-					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.2)) * (0.6 + (clock.daylight_factor * 0.2)) * (1 - (weather.rain * 0.2))
+					-- has radar
+					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.2)) * (0.8 + (math.min(clock.daylight_factor*1.8, 1) * 0.2)) * (1 - (weather.rain * 0.2))
 				else
-					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.6)) * (0.2 + (clock.daylight_factor * 0.6)) * (1 - (weather.rain * 0.6))
+					-- no radar
+					vehicle_object.vision.radius = vehicle_object.vision.base_radius * (1 - (weather.fog * 0.6)) * (0.4 + (math.min(clock.daylight_factor*1.8, 1) * 0.6)) * (1 - (weather.rain * 0.6))
 				end
 			end
 		end
@@ -4007,35 +4038,36 @@ function tickVision()
 	end
 
 	-- analyse players
-	local playerList = s.getPlayers()
-	for player_id, player in pairs(playerList) do
-		if isTickID(player_id, 30) then
-			if player.object_id then
+	local player_list = s.getPlayers()
+	for player_index, player in pairs(player_list) do
+		if isTickID(player_index, 30) then
+			local player_steam_id = tostring(player.steam_id)
+			if player_steam_id then
 				local player_transform = s.getPlayerPos(player.id)
 				
 				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 					if squad_index ~= RESUPPLY_SQUAD_INDEX then
 						-- reset target visibility state to investigate
 
-						if squad.target_players[player.object_id] ~= nil then
-							squad.target_players[player.object_id].state = TARGET_VISIBILITY_INVESTIGATE
+						if squad.target_players[player_steam_id] ~= nil then
+							squad.target_players[player_steam_id].state = TARGET_VISIBILITY_INVESTIGATE
 						end
 
 						-- check if target is visible to any vehicles
 
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							local vehicle_transform = vehicle_object.transform
-							local distance = m.distance(player_transform, vehicle_transform)
+							local distance = m.xzDistance(player_transform, vehicle_transform)
 
 							if distance < vehicle_object.vision.radius then
-								g_savedata.ai_knowledge.last_seen_positions[player.steam_id] = player_transform
-								if squad.target_players[player.object_id] == nil then
-									squad.target_players[player.object_id] = {
+								g_savedata.ai_knowledge.last_seen_positions[player_steam_id] = player_transform
+								if squad.target_players[player_steam_id] == nil then
+									squad.target_players[player_steam_id] = {
 										state = TARGET_VISIBILITY_VISIBLE,
 										last_known_pos = player_transform,
 									}
 								else
-									local target_player = squad.target_players[player.object_id]
+									local target_player = squad.target_players[player_steam_id]
 									target_player.state = TARGET_VISIBILITY_VISIBLE
 									target_player.last_known_pos = player_transform
 								end
@@ -4071,7 +4103,7 @@ function tickVehicles()
 								setSquadCommandScout(squad)
 							end
 							local attack_target_island, attack_origin_island = getObjectiveIsland()
-							if xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
+							if m.xzDistance(vehicle_object.transform, target_island.transform) <= vehicle_object.vision.radius then
 								if attack_target_island.name == target_island.name then -- if the scout is scouting the island that the ai wants to attack
 									-- scout it normally
 									if target_island.faction == FACTION_NEUTRAL then
@@ -4185,9 +4217,26 @@ function tickVehicles()
 							end
 						end
 
-						if squad.command == COMMAND_ENGAGE and vehicle_object.ai_type == AI_TYPE_HELI then
-							ai_state = 3
+						if squad.command == COMMAND_ENGAGE then 
+							if vehicle_object.ai_type == AI_TYPE_HELI then
+								ai_state = 3
+							elseif vehicle_object.ai_type == AI_TYPE_PLANE then
+								target_pos = nil
+								if vehicle_object.target_player_id then
+									target_pos = s.getPlayerPos(g_savedata.player_data[vehicle_object.target_player_id].peer_id)
+								elseif vehicle_object.target_vehicle_id then
+									target_pos = s.getVehiclePos(vehicle_object.target_vehicle_id)
+								end
+								
+								if target_pos and target_pos[14] >= 50 then
+									ai_state = 2
+								else
+									ai_state = 1
+								end
+							end
+
 						end
+
 
 						refuel(vehicle_id)
 					elseif vehicle_object.state.s == VEHICLE_STATE_HOLDING then
@@ -4200,7 +4249,7 @@ function tickVehicles()
 							local target = nil
 							if squad_index ~= RESUPPLY_SQUAD_INDEX then -- makes sure its not resupplying
 								local squad_vision = squadGetVisionData(squad)
-								if vehicle_object.target_vehicle_id ~= -1 and vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+								if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 								elseif isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
 									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
@@ -4229,8 +4278,11 @@ function tickVehicles()
 								addPath(vehicle_object, vehicle_object.transform)
 							end
 
-							ai_state = 1
+							
+							
 							ai_target = m.translation(vehicle_object.path[1].x + g_holding_pattern[vehicle_object.holding_index].x, vehicle_object.path[1].y, vehicle_object.path[1].z + g_holding_pattern[vehicle_object.holding_index].z)
+
+							ai_state = 1
 
 							local vehicle_pos = vehicle_object.transform
 							local distance = m.distance(ai_target, vehicle_pos)
@@ -4295,9 +4347,8 @@ function tickVehicles()
 					if squad.target_island then 
 						debug_data = debug_data.."Target Island: "..squad.target_island.name.."\n" 
 					end
-
-					debug_data = debug_data .. "Target Player: " .. vehicle_object.target_player_id .."\n"
-					debug_data = debug_data .. "Target Vehicle: " .. vehicle_object.target_vehicle_id .."\n\n"
+					debug_data = debug_data .. "Target Player: "..(vehicle_object.target_player_id and g_savedata.player_data[vehicle_object.target_player_id].name or "nil").."\n"
+					debug_data = debug_data .. "Target Vehicle: "..(vehicle_object.target_vehicle_id and vehicle_object.target_vehicle_id or "nil").."\n\n"
 
 					if squad_index ~= RESUPPLY_SQUAD_INDEX then
 						local squad_vision = squadGetVisionData(squad)
@@ -4588,7 +4639,7 @@ function tickModifiers()
 				local player_list = s.getPlayers()
 				for player_index, player in pairs(player_list) do
 					local player_pos = s.getPlayerPos(player)
-					local player_island_dist = xzDistance(player_pos, island.transform)
+					local player_island_dist = m.xzDistance(player_pos, island.transform)
 					if player_island_dist < 1000 then
 						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
 					elseif player_island_dist < 2000 then
@@ -4975,8 +5026,8 @@ function setSquadCommand(squad, command)
 end
 
 function squadInitVehicleCommand(squad, vehicle_object)
-	vehicle_object.target_vehicle_id = -1
-	vehicle_object.target_player_id = -1
+	vehicle_object.target_vehicle_id = nil
+	vehicle_object.target_player_id = nil
 
 	if squad.command == COMMAND_PATROL then
 		resetPath(vehicle_object)
@@ -5068,11 +5119,11 @@ function squadGetVisionData(squad)
 		end,
 	}
 
-	for object_id, player_object in pairs(squad.target_players) do
-		local player_data = { id = object_id, obj = player_object }
+	for steam_id, player_object in pairs(squad.target_players) do
+		local player_data = { id = steam_id, obj = player_object }
 
 		if player_object.state == TARGET_VISIBILITY_VISIBLE then
-			vision_data.visible_players_map[object_id] = player_data
+			vision_data.visible_players_map[steam_id] = player_data
 			table.insert(vision_data.visible_players, player_data)
 		elseif player_object.state == TARGET_VISIBILITY_INVESTIGATE then
 			table.insert(vision_data.investigate_players, player_data)
@@ -5308,20 +5359,14 @@ end
 ---@param boolean success returns true if successfully cleared the cache
 function cache.reset(location) -- resets the cache
 	if not location then
-		g_savedata.cache = {
-			cargo = {
-				island_distances = {
-					sea = {},
-					land = {},
-					air = {}
-				},
-				best_routes = {}
-			}
-		}
+		g_savedata.cache = {}
 	else
 		if g_savedata.cache[location] then
 			g_savedata.cache[location] = nil
 		else
+			if not g_savedata.cache_stats.failed_resets then
+				g_savedata.cache_stats.failed_resets = 0
+			end
 			g_savedata.cache_stats.failed_resets = g_savedata.cache_stats.failed_resets + 1
 			return false
 		end
@@ -5928,7 +5973,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 												if path_travel_time < first_route_time then
 													first_route_time = path_travel_time
 													first_route = {
-														[1] = {island_index = first_path_island_index, transport_method = transport_type}
+														[1] = {island_index = first_path_island_index, transport_method = transport_vehicle[transport_type]}
 													}
 												end
 											end
@@ -5941,7 +5986,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 													second_route_time = path_travel_time
 													second_route = {
 														[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method},
-														[2] = {island_index = second_path_island_index, transport_method = transport_type}
+														[2] = {island_index = second_path_island_index, transport_method = transport_vehicle[transport_type]}
 													}
 												end
 											end
@@ -5952,7 +5997,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 													best_route = {
 														[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
 														[2] = {island_index = second_path_island_index, transport_method = second_route[2].transport_method},
-														[3] = {island_index = third_path_island_index, transport_method = transport_type}
+														[3] = {island_index = third_path_island_index, transport_method = transport_vehicle[transport_type]}
 													}
 												end
 											end
@@ -5968,7 +6013,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 									if path_travel_time < first_route_time then
 										first_route_time = path_travel_time
 										first_route = {
-											[1] = {island_index = first_path_island_index, transport_method = transport_type}
+											[1] = {island_index = first_path_island_index, transport_method = transport_vehicle[transport_type]}
 										}
 									end
 								end
@@ -5978,7 +6023,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 									if path_travel_time + first_route_time < best_route_time then
 										best_route = {
 											[1] = {island_index = first_path_island_index, transport_method = first_route[1].transport_method}, 
-											[2] = {island_index = second_path_island_index, transport_method = transport_type}
+											[2] = {island_index = second_path_island_index, transport_method = transport_vehicle[transport_type]}
 										}
 									end
 								end
@@ -5992,7 +6037,7 @@ function cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 						if path_travel_time < best_route_time then
 							best_route_time = path_travel_time
 							best_route = {
-								[1] = {island_index = first_path_island_index, transport_method = transport_type}
+								[1] = {island_index = first_path_island_index, transport_method = transport_vehicle[transport_type]}
 							}
 						end
 					end
@@ -6052,7 +6097,7 @@ function cargo.getIslandDistance(island1, island2)
 			
 			-- calculate the distance
 
-			distance.air = xzDistance(island1.transform, island2.transform)
+			distance.air = m.xzDistance(island1.transform, island2.transform)
 			
 			-- write to cache
 
@@ -6854,6 +6899,20 @@ end
 
 --------------------------------------------------------------------------------
 --
+-- Custom Matrix Functions
+--
+--------------------------------------------------------------------------------
+
+---@param matrix1 Matrix the first matrix
+---@param matrix2 Matrix the second matrix
+function matrix.xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
+	ox, oy, oz = m.position(matrix1)
+	tx, ty, tz = m.position(matrix2)
+	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
+end
+
+--------------------------------------------------------------------------------
+--
 -- Other
 --
 --------------------------------------------------------------------------------
@@ -6915,14 +6974,6 @@ function noneNil(print_error,...) -- check for if none of the inputted variables
 	return none_nil
 end
 
----@param matrix1 Matrix the first matrix
----@param matrix2 Matrix the second matrix
-function xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
-	ox, oy, oz = m.position(matrix1)
-	tx, ty, tz = m.position(matrix2)
-	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
-end
-
 ---@param player_list Players[] the list of players to check
 ---@param target_pos Matrix the position that you want to check
 ---@param min_dist number the minimum distance between the player and the target position
@@ -6931,7 +6982,7 @@ end
 function playersNotNearby(player_list, target_pos, min_dist, ignore_y)
 	local players_clear = true
 	for player_index, player in pairs(player_list) do
-		if ignore_y and xzDistance(s.getPlayerPos(player_index), target_pos) < min_dist then
+		if ignore_y and m.xzDistance(s.getPlayerPos(player_index), target_pos) < min_dist then
 			players_clear = false
 		elseif not ignore_y and m.distance(s.getPlayerPos(player_index), target_pos) < min_dist then
 			players_clear = false
@@ -6977,10 +7028,10 @@ end
 
 -- returns true if the peer_id is a player id
 function isPlayer(peer_id)
-	return (peer_id ~= -1 and peer_id ~= 65535)
+	return (peer_id and peer_id ~= -1 and peer_id ~= 65535)
 end
 
 -- returns true if the peer_id is not a player id
 function notPlayer(peer_id)
-	return (peer_id == -1 or peer_id == 65535)
+	return (peer_id == -1 or peer_id == 65535 or not peer_id)
 end
