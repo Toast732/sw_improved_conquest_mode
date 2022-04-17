@@ -1,3 +1,10 @@
+-- Author: Toastery
+-- GitHub: https://github.com/Toast732
+-- Workshop: 
+--
+--- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
+--- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
+
 -- library prefixes
 
 local spawnModifiers = {} -- functions relating to the Adaptive AI
@@ -12,7 +19,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.41)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.42)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
