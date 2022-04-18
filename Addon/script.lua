@@ -19,7 +19,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.42)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.43)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -747,11 +747,11 @@ function buildPrefabs(location_index)
 
 		local prefab_data = {location = location, vehicle = vehicle, survivors = {}, fires = {}}
 
-		for key, char in  pairs(location.objects.survivors) do
+		for key, char in pairs(location.objects.survivors) do
 			table.insert(prefab_data.survivors, char)
 		end
 
-		for key, fire in  pairs(location.objects.fires) do
+		for key, fire in pairs(location.objects.fires) do
 			table.insert(prefab_data.fires, fire)
 		end
 
@@ -812,7 +812,7 @@ function spawnTurret(island)
 	end
 	
 	local player_list = s.getPlayers()
-	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 3000, true) then -- makes sure players are not too close before spawning a turret
+	if not playersNotNearby(player_list, island.zones.turrets[spawnbox_index].transform, 2500, true) then -- makes sure players are not too close before spawning a turret
 		return false, "players are too close to the turret spawn point!" 
 	end
 
@@ -1009,6 +1009,8 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 	-- get spawn location
 	-------
 
+	local min_player_dist = 2500
+
 	-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
 	if getTagValue(selected_prefab.vehicle.tags, "role", true) == "attack" or getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
 		target, ally = getObjectiveIsland()
@@ -1021,7 +1023,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
 				if selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform) then
-					if playersNotNearby(player_list, island.transform, 3000, true) then -- makes sure no player is within 3km
+					if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 							selected_spawn_transform = island.transform
 							selected_spawn = island_index
@@ -1039,7 +1041,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		local islands_needing_checked = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
-				if playersNotNearby(player_list, island.transform, 3000, true) then -- make sure no players are within 3km of the island
+				if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 						if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
 							lowest_defenders = island.defenders -- set the new lowest defender amount on an island
@@ -1063,7 +1065,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 					local player_to_island_dist = m.xzDistance(player_transform, island_transform)
 					if player_to_island_dist < 6000 then
 						if not closest_player_pos or player_to_island_dist < closest_player_pos then
-							if playersNotNearby(player_list, island_transform, 3000, true) then
+							if playersNotNearby(player_list, island_transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 								if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 									closest_player_pos = player_to_island_dist
 									selected_spawn_transform = island_transform
@@ -1079,7 +1081,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 					for player_island_index, player_island in pairs(g_savedata.controllable_islands) do
 						if player_island.faction == FACTION_PLAYER then
 							if m.xzDistance(selected_spawn_transform, island_transform) > m.xzDistance(player_island.transform, island_transform) then
-								if playersNotNearby(player_list, island_transform, 3000, true) then
+								if playersNotNearby(player_list, island_transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 									if hasTag(g_savedata.controllable_islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
 										selected_spawn_transform = island_transform
 										selected_spawn = island_index
@@ -1097,7 +1099,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 		local valid_island_index = {}
 		for island_index, island in pairs(g_savedata.controllable_islands) do
 			if island.faction == FACTION_AI then
-				if playersNotNearby(player_list, island.transform, 3000, true) then
+				if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 					if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
 						table.insert(valid_islands, island)
 						table.insert(valid_island_index, island_index)
@@ -1114,7 +1116,7 @@ function spawnAIVehicle(requested_prefab, force_spawn)
 
 	-- try spawning at the ai's main base if it was unable to find a valid spawn
 	if not g_savedata.controllable_islands[selected_spawn] then
-		if playersNotNearby(player_list, g_savedata.ai_base_island.transform, 3000, true) then
+		if playersNotNearby(player_list, g_savedata.ai_base_island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
 			-- if it can spawn at the ai's main base, or the vehicle is being forcibly spawned and its not a land vehicle
 			if hasTag(g_savedata.ai_base_island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or force_spawn and getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true) ~= "wep_land" then
 				selected_spawn_transform = g_savedata.ai_base_island.transform
@@ -2888,7 +2890,7 @@ function tickGamemode()
 
 	-- update ai's main base island debug
 	if d.getDebug(3) then
-		if isTickID(60, 60) then
+		if isTickID(0, 60) then
 		
 			local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
 
