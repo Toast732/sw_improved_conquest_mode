@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.5)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.6.1)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -564,8 +564,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					end
 				end
 			end
-			s.removeMapObject(user_peer_id, g_savedata.player_base_island.map_id)
-			s.removeMapObject(user_peer_id, g_savedata.ai_base_island.map_id)
+			s.removeMapObject(-1, g_savedata.player_base_island.map_id)
+			s.removeMapObject(-1, g_savedata.ai_base_island.map_id)
 		end
 	end
 end
@@ -2165,7 +2165,7 @@ end
 
 function resetPath(vehicle_object)
 	for _, v in pairs(vehicle_object.path) do
-		s.removeMapID(0, v.ui_id)
+		s.removeMapID(-1, v.ui_id)
 	end
 
 	vehicle_object.path = {}
@@ -2256,7 +2256,7 @@ function tickGamemode()
 						if squad.command == COMMAND_ATTACK and squad.target_island.name == island.name or squad.command ~= COMMAND_ATTACK and squad.command ~= COMMAND_SCOUT and squad.command ~= COMMAND_RESUPPLY then
 							for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 								if isTickID(vehicle_id, tick_rate) then
-									if vehicle_object.role ~= "scout" then
+									if vehicle_object.role ~= "scout" and not vehicle_object.is_killed then
 										if m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS / 1.5 then
 											island.ai_capturing = island.ai_capturing + 1
 										elseif m.distance(island.transform, vehicle_object.transform) < CAPTURE_RADIUS and island.faction == FACTION_AI then
@@ -2448,7 +2448,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 						debug_data = debug_data.."Number of Turrets: "..turret_amount.."/"..g_savedata.settings.MAX_TURRET_AMOUNT.."\n"
 					end
 
-					s.addMapObject(player_debugging_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					s.addMapObject(peer_id, island.map_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -3248,7 +3248,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					-- update waypoint and target data
 
-					if target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
+					if vehicle_object.target_player_id ~= -1 and vehicle_object.target_player_id ~= 65535 then
 						local target_player_id = vehicle_object.target_player_id
 						local target_player_data = squad_vision.visible_players_map[target_player_id]
 						local target_player = target_player_data.obj
@@ -3567,7 +3567,7 @@ function tickVehicles()
 	
 							if vehicle_object.ai_type == AI_TYPE_PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == AI_TYPE_HELI or vehicle_object.ai_type == AI_TYPE_LAND and distance < 7 then
 								if #vehicle_object.path > 1 then
-									s.removeMapID(0, vehicle_object.path[1].ui_id)
+									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 									if vehicle_object.ai_type == AI_TYPE_LAND then
 										setLandTarget(vehicle_id, vehicle_object)
@@ -3589,7 +3589,7 @@ function tickVehicles()
 								end
 							elseif vehicle_object.ai_type == AI_TYPE_BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
 								if #vehicle_object.path > 0 then
-									s.removeMapID(0, vehicle_object.path[1].ui_id)
+									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 								else
 									-- if we have reached last waypoint start holding there
@@ -3852,7 +3852,6 @@ function tickUpdateVehicleData()
 end
 
 function tickTerrainScanners()
-	printTable(g_savedata.terrain_scanner_links, true, false)
 	for vehicle_id, terrain_scanner in pairs(g_savedata.terrain_scanner_links) do
 		local vehicle_object = nil
 
@@ -3865,38 +3864,40 @@ function tickTerrainScanners()
 		end
 
 		local terrain_scanner_data = s.getVehicleData(terrain_scanner)
-		
-		if vehicle_object then
-			if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
-				wpDLCDebug("terrain scanner loading!", true, false)
-				wpDLCDebug("ter id: "..terrain_scanner, true, false)
-				wpDLCDebug("veh id: "..vehicle_id, true, false)
-				dial_read_attempts = 0
-				repeat
-					dial_read_attempts = dial_read_attempts + 1
-					terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
-					if success and terrain_height.value ~= 0 then
-						printTable(terrain_height, true, false)
-						local new_terrain_height = (1000 - terrain_height.value) + 5
-						local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-						local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
-						s.setVehiclePos(vehicle_id, new_vehicle_matrix)
-						wpDLCDebug("set land vehicle to new y level!", true, false)
-						g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
-						s.despawnVehicle(terrain_scanner, true)
-					else
-						if success then
-							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+
+		if terrain_scanner_data then
+			if vehicle_object then
+				if hasTag(terrain_scanner_data.tags, "type=dlc_weapons_terrain_scanner") then
+					wpDLCDebug("terrain scanner loading!", true, false)
+					wpDLCDebug("ter id: "..terrain_scanner, true, false)
+					wpDLCDebug("veh id: "..vehicle_id, true, false)
+					dial_read_attempts = 0
+					repeat
+						dial_read_attempts = dial_read_attempts + 1
+						terrain_height, success = s.getVehicleDial(terrain_scanner, "MEASURED_DISTANCE")
+						if success and terrain_height.value ~= 0 then
+							printTable(terrain_height, true, false)
+							local new_terrain_height = (1000 - terrain_height.value) + 5
+							local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
+							local new_vehicle_matrix = m.translation(vehicle_x, new_terrain_height, vehicle_z)
+							s.setVehiclePos(vehicle_id, new_vehicle_matrix)
+							wpDLCDebug("set land vehicle to new y level!", true, false)
+							g_savedata.terrain_scanner_links[vehicle_id] = "Just Teleported"
+							s.despawnVehicle(terrain_scanner, true)
 						else
-							wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+							if success then
+								wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (read = 0)", true, true)
+							else
+								wpDLCDebug("Unable to get terrain height checker's dial! "..dial_read_attempts.."x (not success)", true, true)
+							end
+							
 						end
-						
-					end
-					if dial_read_attempts >= 2 then return end
-				until(success and terrain_height.value ~= 0)
+						if dial_read_attempts >= 2 then return end
+					until(success and terrain_height.value ~= 0)
+				end
+			else -- the vehicle seems to have been destroyed in some way
+				g_savedata.terrain_scanner_links[vehicle_id] = nil
 			end
-		else -- the vehicle seems to have been destroyed in some way
-			g_savedata.terrain_scanner_links[vehicle_id] = nil
 		end
 	end
 end
@@ -4138,8 +4139,8 @@ function spawnObjectType(spawn_transform, playlist_index, location_index, object
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		d.print("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, 1)
-		d.print("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, 1)
+		wpDLCDebug("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, true)
+		wpDLCDebug("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, true)
 		is_dlc_weapons = false
 		return nil
 	end
