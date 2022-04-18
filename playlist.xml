@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Minor_Updates" folder_path="data/missions/Improved_Conquest_Mode_Minor_Updates" file_store="4" name="Improved Conquest Mode (0.2.5)">
+<playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Minor_Updates" folder_path="data/missions/Improved_Conquest_Mode_Minor_Updates" file_store="4" name="Improved Conquest Mode (0.2.6)">
 	<locations location_id_counter="149" component_id_counter="2831">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
