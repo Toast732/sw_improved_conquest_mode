@@ -7,12 +7,12 @@
 
 require("LifeBoatAPI")			  -- Type 'LifeBoatAPI.' and use intellisense to checkout the new LifeBoatAPI library functions; such as the LBVec vector maths library
 
+-- still need to add ballistics trajectory calculations
+
 created = false
 tick_counter = 0
 
-last_fired_missile = 0
-
-missiles_fired = 0
+last_fired = 0
 
 yaw = 0
 pitch = 0
@@ -34,8 +34,7 @@ horizontal_min = property.getNumber("Horizontal Min Angle")
 vertical_max = property.getNumber("Vertical Max Angle")
 vertical_min = property.getNumber("Vertical Min Angle")
 
-total_missiles = property.getNumber("Missile Count")
-time_between_missiles = property.getNumber("Time Between Missiles (s)")
+time_between_shots = property.getNumber("Time Between Shots (s)")
 
 min_mass = property.getNumber("Min Mass")
 max_mass = property.getNumber("Max Mass")
@@ -57,7 +56,7 @@ yaw_modifier = 1
 pitch_modifier = 1
 
 function getAngle(tx, tz, px, pz)
-	return math.atan(px - tx, pz - tz)/tau
+	return math.atan(tx - px, tz - pz)/tau
 end
 
 function getDist(px, pz, tx, tz)
@@ -103,6 +102,7 @@ function onCreate()
 end
 
 function onTick()
+    local tick_fired = false
 	-- when the script is first started
 	if not created then
 		onCreate()
@@ -114,82 +114,88 @@ function onTick()
 	yaw = 0
 	pitch = 0
 
-	-- if we still have missiles to fire
-	if missiles_fired < total_missiles then
+	within_yaw = false
+	within_pitch = false
 
-		is_occupied = input.getBool(1)
+    is_occupied = input.getBool(1)
 
-		-- if the seat is occupied
-			-- if the seat is occupied
-		if not requires_occupied or requires_occupied and is_occupied then
+    -- if the seat is occupied
+    if not requires_occupied or requires_occupied and is_occupied then
 
-			target_mass = input.getNumber(10)
+        target_mass = input.getNumber(10)
 
-			-- if its within the mass
-			if max_mass == 0 and min_mass == 0 or max_mass == 0 and min_mass >= 0 and target_mass >= min_mass or target_mass >= min_mass and target_mass <= max_mass then
+        -- if its within the mass
+        if max_mass == 0 and min_mass == 0 or max_mass == 0 and min_mass >= 0 and target_mass >= min_mass or target_mass >= min_mass and target_mass <= max_mass then
 
-				target_y = input.getNumber(2)
+            target_y = input.getNumber(2)
 
-				-- if its within the y
-				if target_y >= min_y and target_y <= max_y then
-					
-					pos_x = input.getNumber(7)
-					pos_z = input.getNumber(9)
-				
-					target_x = input.getNumber(1)
-					target_z = input.getNumber(3)
+            -- if its within the y
+            if target_y >= min_y and target_y <= max_y then
+                
+                pos_x = input.getNumber(7)
+                pos_z = input.getNumber(9)
+            
+                target_x = input.getNumber(1)
+                target_z = input.getNumber(3)
 
-					distance = getDist(pos_x, pos_z, target_x, target_z)
+                distance = getDist(pos_x, pos_z, target_x, target_z)
 
-					-- if its within the min and max distance
-					if distance >= min_distance and distance <= max_distance + 300 then
+                -- if its within the min and max distance
+                if distance >= min_distance and distance <= max_distance + 300 then
 
-						pos_y = input.getNumber(8)
-	
-						pos_rot = -input.getNumber(4)
-	
-						horizontal_rot = input.getNumber(5)
-						vertical_rot = input.getNumber(6)
-	
-						tar_rot = pos_rot - getAngle(target_x, target_z, pos_x, pos_z)
-	
-						yaw = noNaN(math.clamp(tar_rot, horizontal_min, horizontal_max)*yaw_modifier)
-						
-						-- robotic
-						if horizontal_type <= 1 then
-							yaw = noNaN(wrap(yaw, -1, 1))
-						end
-	
-						-- horizontal
-						if horizontal_type >= 2 then
-							-- velocity
-							yaw = noNaN(((yaw-horizontal_rot*horizontal_modifier)%1+1.5)%1-0.5)
-						end
-	
-						pitch = noNaN(math.clamp(math.atan((target_y-pos_y)/distance)/tau, vertical_min, vertical_max)*pitch_modifier)
-	
-						-- vertical
-						if vertical_type >= 2 then
-							-- velocity
-							pitch = noNaN(((pitch-vertical_rot*vertical_modifier)%1+1.5)%1-0.5)
-						end
+                    pos_y = input.getNumber(8)
 
-						if horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) <= yaw_threshold or horizontal_type >= 2 and math.abs(yaw) <= yaw_threshold then -- if its within yaw threshold
-							if vertical_type <= 1 and math.abs(vertical_rot*pitch_modifier - pitch) <= pitch_threshold or vertical_type >= 2 and math.abs(pitch) <= pitch_threshold then -- if its within pitch threshold
-								if last_fired_missile == 0 or tick_counter - last_fired_missile >= time_between_missiles * 60 then
-									if distance < max_distance then
-										missiles_fired = missiles_fired + 1
-										output.setBool(missiles_fired, true)
-										last_fired_missile = tick_counter
-									end
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+                    pos_rot = -input.getNumber(4)
+
+                    horizontal_rot = input.getNumber(5)
+                    vertical_rot = input.getNumber(6)
+
+					main_body_pitch = input.getNumber(11) * 4
+
+                    tar_rot = pos_rot - getAngle(target_x, target_z, pos_x, pos_z)
+
+                    yaw = noNaN(math.clamp(tar_rot, horizontal_min, horizontal_max)*yaw_modifier)
+                    
+                    -- robotic
+                    if horizontal_type <= 1 then
+                        yaw = noNaN(wrap(yaw, -1, 1))
+                    end
+
+					-- horizontal
+                    if horizontal_type >= 2 then
+                        -- velocity
+                        yaw = noNaN(((yaw-horizontal_rot*horizontal_modifier)%1+1.5)%1-0.5)
+                    end
+
+                    pitch = noNaN(math.clamp(math.atan((target_y-pos_y)/distance)/tau, vertical_min, vertical_max)*pitch_modifier) + main_body_pitch
+
+                    -- vertical
+                    if vertical_type >= 2 then
+                        -- velocity
+                        pitch = noNaN(((pitch-vertical_rot*vertical_modifier)%1+1.5)%1-0.5)
+                    end
+
+					within_yaw = (horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) <= yaw_threshold or horizontal_type >= 2 and math.abs(yaw) <= yaw_threshold)
+					within_pitch = (vertical_type <= 1 and math.abs(vertical_rot*pitch_modifier - pitch) <= pitch_threshold or vertical_type >= 2 and math.abs(pitch) <= pitch_threshold)
+
+                    if within_yaw then -- if its within yaw threshold
+                        if within_pitch then -- if its within pitch threshold
+                            if last_fired == 0 or tick_counter - last_fired >= time_between_shots * 60 then
+                                if distance < max_distance then
+                                    output.setBool(1, true)
+                                    tick_fired = true
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if not tick_fired then
+        output.setBool(1, false)
+    end
 	output.setNumber(1, yaw)
 	output.setNumber(2, pitch)
 end
@@ -197,7 +203,7 @@ end
 function onDraw()
 	if debug_mode then
 		if horizontal_rot then
-			if horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) <= yaw_threshold or horizontal_type >= 2 and math.abs(yaw) <= yaw_threshold then
+			if within_yaw then
 				screen.drawText(0, 0, "VALID yaw thrsh: "..("%.3f"):format(yaw_threshold).."\nyaw from tar: "..("%.3f"):format(horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) or horizontal_type >= 2 and math.abs(yaw)))
 			else
 				screen.drawText(0, 0, "INVALID yaw thrsh: "..("%.3f"):format(yaw_threshold).."\nyaw from tar: "..("%.3f"):format(horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) or horizontal_type >= 2 and math.abs(yaw)))
@@ -206,10 +212,10 @@ function onDraw()
 			screen.drawText(0, 0, "horizontal_rot doesnt exist")
 		end
 		if vertical_rot then
-			if vertical_type <= 1 and math.abs(vertical_rot*vertical_modifier - pitch) <= pitch_threshold or vertical_type >= 2 and math.abs(pitch) <= pitch_threshold then
-				screen.drawText(0, 20, "VALID pitch thrsh: "..("%.3f"):format(pitch_threshold).."\npitch from tar: "..("%.3f"):format(vertical_type <= 1 and math.abs(vertical_rot*vertical_modifier - pitch) or vertical_type >= 2 and math.abs(pitch)))
+			if within_pitch then
+				screen.drawText(0, 20, "VALID pitch thrsh: "..("%.3f"):format(pitch_threshold).."\npitch from tar: "..("%.3f"):format(vertical_type <= 1 and math.abs(vertical_rot*pitch_modifier - pitch) or vertical_type >= 2 and math.abs(pitch)))
 			else
-				screen.drawText(0, 20, "INVALID pitch thrsh: "..("%.3f"):format(pitch_threshold).."\npitch from tar: "..("%.3f"):format(vertical_type <= 1 and math.abs(vertical_rot*vertical_modifier - pitch) or vertical_type >= 2 and math.abs(pitch)))
+				screen.drawText(0, 20, "INVALID pitch thrsh: "..("%.3f"):format(pitch_threshold).."\npitch from tar: "..("%.3f"):format(vertical_type <= 1 and math.abs(vertical_rot*pitch_modifier - pitch) or vertical_type >= 2 and math.abs(pitch)))
 			end
 		else
 			screen.drawText(0, 20, "vertical_rot doesnt exist")

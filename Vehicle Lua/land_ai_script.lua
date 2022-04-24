@@ -5,10 +5,13 @@
 require("_build._simulator_config") -- default simulator config, CTRL+CLICK it or F12 to goto this file and edit it. Its in a separate file just for convenience.
 require("LifeBoatAPI")              -- Type 'LifeBoatAPI.' and use intellisense to checkout the new LifeBoatAPI library functions; such as the LBVec vector maths library
 
-local last_steering_amount = 0
-local is_reverse = false
+last_steering_amount = 0
+last_throttle_amount = 0
+is_reverse = false
 
-local random_speed_range = property.getNumber("random_speed_range")
+random_speed_range = property.getNumber("random_speed_range")
+
+tau = math.pi*2
 
 local agr_speeds = {
     [0] = {
@@ -34,7 +37,7 @@ function randomNum(x,y) --returns a number between x and y including decimals. c
 end
 
 function getAngle(tx, tz, px, pz)
-	return math.deg(math.atan(px - tx, pz - tz))
+	return math.atan(tx - px, tz - pz)/tau
 end
 
 function getDist(px, pz, tx, tz)
@@ -49,9 +52,13 @@ function canMove(d, sf)
 	end
 end
 
+local turning_rate_random_range = property.getNumber("turning_rate_random_range")
+local turning_rate = property.getNumber("turning_rate")+randomNum(-turning_rate_random_range,-turning_rate_random_range)
 function ws(amount, is_car, angle_diff, dist)
     if not is_car then
-	    output.setNumber(1, amount)
+        local new_throttle_amount = last_throttle_amount-math.max(math.min(last_throttle_amount-amount, turning_rate), -turning_rate)
+        output.setNumber(1, new_throttle_amount)
+        last_throttle_amount = new_throttle_amount
     else
 
         local aggressive_behaviour = property.getNumber("aggressive_behaviour")
@@ -76,15 +83,13 @@ function ws(amount, is_car, angle_diff, dist)
             if agr == 1 then
                 min_speed = min_speed * 1.5
             end
-            output.setNumber(1, math.max(agr_speeds[road_type][agr]/math.max(angle_diff/90, 1)*(dist_modifier), min_speed))
+            output.setNumber(1, math.max(agr_speeds[road_type][agr]/math.max(angle_diff, 1)*(dist_modifier), min_speed))
         else
             output.setNumber(1, 0)
         end
     end
 end
 
-local turning_rate_random_range = property.getNumber("turning_rate_random_range")
-local turning_rate = property.getNumber("turning_rate")+randomNum(-turning_rate_random_range,-turning_rate_random_range)
 function ad(amount, is_smooth)
     if not is_smooth then
 	    output.setNumber(2, amount)
@@ -122,10 +127,10 @@ function onTick()
     local final_dest_z = input.getNumber(16)
 	
     -- compass
-	local pos_angle = input.getNumber(5)*-360
+	local pos_angle = -input.getNumber(5)
 	
 	-- angle to get to destination
-	local dest_angle = getAngle(pos_x, pos_z, dest_x, dest_z)
+	local dest_angle = getAngle(dest_x, dest_z, pos_x, pos_z)
 	
 	-- the distance sensors
 	local ds_front = input.getNumber(6)
@@ -147,12 +152,12 @@ function onTick()
 		dist = getDist(pos_x, pos_z, dest_x, dest_z)
         final_dist = getDist(pos_x, pos_z, final_dest_x, final_dest_z)
         output.setNumber(5, dist)
-		if final_dist > 2 and is_driver then
+		if final_dist >= 2.5 and is_driver then
             output.setBool(1, true)
 
             output.setNumber(3, pos_angle)
             
-            local angleDiff = dest_angle-pos_angle
+            local angleDiff = (((pos_angle-dest_angle)%1+1.5)%1-0.5)
 
             output.setNumber(5, dest_angle)
 
@@ -161,7 +166,7 @@ function onTick()
                 local steering_radius = property.getNumber("steering_max_angle")
                 local current_speed = input.getNumber(12) 
                 
-                if angleDiff > 91 or angleDiff < -91 then -- turn by backing up
+                if angleDiff > 0.7 or angleDiff < -0.7 then -- turn by backing up
                     if not is_reverse then
                         output.setBool(2, true)
                         ws(0)
@@ -173,7 +178,7 @@ function onTick()
                         end
                     else
                         output.setBool(3, false)
-                        ad(-(angleDiff/90*steering_radius/57.2), true)
+                        ad(-(angleDiff*steering_radius), true)
                         ws(1, true, angleDiff, final_dist)
                         output.setBool(2, true)
                         is_reverse = true
@@ -191,7 +196,7 @@ function onTick()
                         end
                     else
                         output.setBool(3, false)
-                        ad((angleDiff/90*steering_radius/57.2), true)
+                        ad((angleDiff*steering_radius), true)
                         ws(1, true, angleDiff, final_dist)
                         output.setBool(2, false)
                         is_reverse = false
@@ -209,7 +214,7 @@ function onTick()
                         end
                     else
                         output.setBool(3, false)
-                        ad(-(angleDiff/90*steering_radius/57.2), true)
+                        ad(-(angleDiff*steering_radius), true)
                         ws(1, true, angleDiff, final_dist)
                         output.setBool(2, true)
                         is_reverse = true
@@ -229,25 +234,41 @@ function onTick()
                 end
                 
                 local angle_multi = 1
-                if math.abs(angleDiff) < 50 then
-                    angle_multi = math.max(math.abs(angleDiff)/50, 0.4)
+                if math.abs(angleDiff) < 0.125 then
+                    angle_multi = math.max(math.abs(angleDiff)/0.125, 0.01)
                 end
                 
                 output.setNumber(4, angle_multi)
             
-                if angleDiff < 2 and angleDiff > -2 then -- go forwards
+                if angleDiff < 0.026 and angleDiff > -0.026 then -- go forwards
+                    output.setNumber(7, 2)
                     if canMove(rds_front, ds_safe_wall) then
                         ws(1*dist_multi)
-                        ad(0)
+                        if angleDiff < 0 then
+                            ad((tank_ts*angle_multi), true)
+                        else
+                            ad(-(tank_ts*angle_multi), true)
+                        end
                     end
-                elseif angleDiff > 178 and angelDiff < 182 or angleDiff < -178 and angleDiff > -182 then -- backup
+                elseif angleDiff > 0.485 and angleDiff < 0.51 or angleDiff < -0.485 and angleDiff > -0.51 then -- backup
+                    output.setNumber(7, 3)
                     if canMove(rds_front, ds_safe_wall) then
                         ws(-1*dist_multi)
-                        ad(0)
+                        local r_angle_multi = 1
+                        if math.abs(0.5-math.abs(angleDiff)) < 0.125 then
+                            r_angle_multi = math.max(math.abs(0.5-math.abs(angleDiff))/0.125, 0.01)
+                        end
+                        output.setNumber(8, r_angle_multi)
+                        if angleDiff < 0 then
+                            ad((tank_ts*r_angle_multi), true)
+                        else
+                            ad(-(tank_ts*r_angle_multi), true)
+                        end
                     end
-                elseif angleDiff < -2 and angleDiff >= -178 then
+                elseif angleDiff < -0.00555556 and angleDiff >= -0.49 then
+                    output.setNumber(7, 1)
                     if canMove(ds_safe_down, rds_front_left) and canMove(ds_safe_down, rds_rear_right) then -- if it can turn left
-                        ad(-tank_ts*angle_multi)
+                        ad(tank_ts*angle_multi, true)
                         if angle_multi == 1 then
                             ws(0)
                         else
@@ -255,8 +276,9 @@ function onTick()
                         end
                     end
                 else
+                    output.setNumber(7, 1)
                     if canMove(ds_safe_down, rds_front_right) and canMove(ds_safe_down, rds_rear_left) then -- if it can turn right
-                        ad(tank_ts*angle_multi)
+                        ad(-tank_ts*angle_multi, true)
                         if angle_multi == 1 then
                             ws(0)
                         else
