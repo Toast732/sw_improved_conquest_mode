@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.7.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.7.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
-local IS_DEVELOPMENT_VERSION = false
+local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -2191,7 +2191,7 @@ function addPath(vehicle_object, target_dest)
 			path_start_pos = vehicle_object.transform
 		end
 
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, 0, dest_z))
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 0, dest_z), "ocean_path", "land_path")
 		for path_index, path in pairs(path_list) do
 			table.insert(vehicle_object.path, { x =  path.x + math.random(-50, 50), y = 0, z = path.z + math.random(-50, 50), ui_id = s.getMapID() })
 		end
@@ -2209,7 +2209,7 @@ function addPath(vehicle_object, target_dest)
 
 		start_x, start_y, start_z = m.position(vehicle_object.transform)
  
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, 1000, dest_z))
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 1000, dest_z), "land_path", "ocean_path")
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
 			distance = m.distance(vehicle_object.transform, m.translation(path.x, veh_y, path.z))
