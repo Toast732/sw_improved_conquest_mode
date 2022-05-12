@@ -4,13 +4,13 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.7.2)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.7.3)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
+local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 local MAX_SQUAD_SIZE = 3
@@ -495,7 +495,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- set up remaining neutral islands
 			for flagZone_index, flagZone in pairs(flag_zones) do
-				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
+				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 				local new_island = {
 					name = flagZone.name,
 					index = flagZone_index,
@@ -646,9 +646,9 @@ function spawnTurret(island)
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
-		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
-		survivors = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
-		fires = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
+		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
+		survivors = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
+		fires = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
 	}
 
 	if spawned_objects.spawned_vehicle ~= nil then
@@ -943,9 +943,9 @@ function spawnAIVehicle(requested_prefab)
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
-		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
-		survivors = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
-		fires = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
+		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
+		survivors = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
+		fires = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
 	}
 	local vehX, vehY, vehZ = m.position(spawn_transform)
 	if selected_prefab.vehicle.display_name ~= nil then
@@ -954,7 +954,7 @@ function spawnAIVehicle(requested_prefab)
 		wpDLCDebug("the selected vehicle is nil", true, true)
 	end
 
-	wpDLCDebug("spawning army vehicle: "..selected_prefab.location.data.name.." / "..selected_prefab.location.playlist_index.." / "..selected_prefab.vehicle.display_name, true, false)
+	wpDLCDebug("spawning army vehicle: "..selected_prefab.location.data.name.." "..selected_prefab.vehicle.display_name, true, false)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -2133,7 +2133,7 @@ function onVehicleLoad(incoming_vehicle_id)
 						if g_savedata.terrain_scanner_links[vehicle_id] == nil then
 							local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
 							local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
-							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
+							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, s.getAddonIndex(), g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
 							if success then
 								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 							else
@@ -4035,12 +4035,18 @@ function build_locations(playlist_index, location_index)
             end
 			if tag_object == "type=dlc_weapons_terrain_scanner" then
 				if object_data.type == "vehicle" then
-					g_savedata.terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+					g_savedata.terrain_scanner_prefab = { 
+						location_index = location_index, 
+						object_index = object_index
+					}
 				end
 			end
 			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
-					flag_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+					flag_prefab = { 
+						location_index = location_index, 
+						object_index = object_index
+					}
 				end
             end
         end
@@ -4059,11 +4065,11 @@ function build_locations(playlist_index, location_index)
     end
 
     if is_valid_location then
-    	table.insert(built_locations, { playlist_index = playlist_index, location_index = location_index, data = location_data, objects = addon_components} )
+    	table.insert(built_locations, { location_index = location_index, data = location_data, objects = addon_components} )
     end
 end
 
-function spawnObjects(spawn_transform, playlist_index, location_index, object_descriptors, out_spawned_objects)
+function spawnObjects(spawn_transform, location_index, object_descriptors, out_spawned_objects)
 	local spawned_objects = {}
 
 	for _, object in pairs(object_descriptors) do
@@ -4078,16 +4084,16 @@ function spawnObjects(spawn_transform, playlist_index, location_index, object_de
 			end
 		end
 
-		spawnObject(spawn_transform, playlist_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+		spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	end
 
 	return spawned_objects
 end
 
-function spawnObject(spawn_transform, playlist_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = spawnObjectType(m.multiply(spawn_transform, object.transform), playlist_index, location_index, object, parent_vehicle_id)
+	local spawned_object_id = spawnObjectType(m.multiply(spawn_transform, object.transform), location_index, object, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
@@ -4138,8 +4144,8 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 end
 
 -- spawn an individual object descriptor from a playlist location
-function spawnObjectType(spawn_transform, playlist_index, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, playlist_index, location_index, object_descriptor.index, parent_vehicle_id)
+function spawnObjectType(spawn_transform, location_index, object_descriptor, parent_vehicle_id)
+	local component, is_success = s.spawnAddonComponent(spawn_transform, s.getAddonIndex(), location_index, object_descriptor.index, parent_vehicle_id)
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
