@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.7.4)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.7.5)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -2073,8 +2073,10 @@ function onVehicleLoad(incoming_vehicle_id)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
-			g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
-			g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			if player_vehicle_data and player_vehicle_data.voxels then
+				g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
+				g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			end
 		end
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2906,6 +2908,16 @@ end
 
 function killVehicle(squad_index, vehicle_id, instant, delete)
 
+	if not squad_index then
+		wpDLCDebug("(killVehicle) squad_index is nil!", true, true)
+		return
+	end
+
+	if not vehicle_id then
+		wpDLCDebug("(killVehicle) vehicle_id is nil!", true, true)
+		return
+	end
+
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	if vehicle_object.is_killed ~= true or instant then
@@ -3410,7 +3422,9 @@ function tickVision()
 				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
 					local player_vehicle_data = s.getVehicleData(player_vehicle_id)
 					player_vehicle.death_pos = nil
-					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					if player_vehicle_data and player_vehicle_data.voxels then
+						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					end
 				end
 			end
 
@@ -3627,7 +3641,7 @@ function tickVehicles()
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
 									ai_target = target.last_known_pos
 									local distance = m.distance(vehicle_object.transform, ai_target)
-									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfind(vehicle_object.transform, ai_target, "land_path", "ocean_path")
 									local is_better_pos = false
 									for path_index, path in pairs(possiblePaths) do
 										if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
@@ -4525,7 +4539,7 @@ function randChance(t)
 	local win_val = 0
 	for k, v in pairs(t) do
 		local chance = rand(0, v / total_mod)
-		wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
+		--wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
 		if chance > win_val then
 			win_val = chance
 			win_name = k
