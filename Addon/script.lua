@@ -4,14 +4,14 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.6)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.7)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
 -- "FULL_RELOAD" if this version will need to do a full reload to work properly
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "TRUE"
-local IS_DEVELOPMENT_VERSION = false
+local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 local MAX_SQUAD_SIZE = 3
 local MIN_ATTACKING_SQUADS = 2
@@ -495,7 +495,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- set up remaining neutral islands
 			for flagZone_index, flagZone in pairs(flag_zones) do
-				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), flag_prefab.playlist_index, flag_prefab.location_index, flag_prefab.object_index, 0)
+				local flag = s.spawnAddonComponent(m.multiply(flagZone.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 				local new_island = {
 					name = flagZone.name,
 					index = flagZone_index,
@@ -646,9 +646,9 @@ function spawnTurret(island)
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
-		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
-		survivors = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
-		fires = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
+		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
+		survivors = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
+		fires = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
 	}
 
 	if spawned_objects.spawned_vehicle ~= nil then
@@ -943,9 +943,9 @@ function spawnAIVehicle(requested_prefab)
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
-		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
-		survivors = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
-		fires = spawnObjects(spawn_transform, selected_prefab.location.playlist_index, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
+		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, all_addon_components),
+		survivors = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, all_addon_components),
+		fires = spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, all_addon_components),
 	}
 	local vehX, vehY, vehZ = m.position(spawn_transform)
 	if selected_prefab.vehicle.display_name ~= nil then
@@ -954,7 +954,7 @@ function spawnAIVehicle(requested_prefab)
 		wpDLCDebug("the selected vehicle is nil", true, true)
 	end
 
-	wpDLCDebug("spawning army vehicle: "..selected_prefab.location.data.name.." / "..selected_prefab.location.playlist_index.." / "..selected_prefab.vehicle.display_name, true, false)
+	wpDLCDebug("spawning army vehicle: "..selected_prefab.location.data.name.." "..selected_prefab.vehicle.display_name, true, false)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -2073,8 +2073,10 @@ function onVehicleLoad(incoming_vehicle_id)
 
 		if g_savedata.player_vehicles[incoming_vehicle_id] ~= nil then
 			local player_vehicle_data = s.getVehicleData(incoming_vehicle_id)
-			g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
-			g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			if player_vehicle_data and player_vehicle_data.voxels then
+				g_savedata.player_vehicles[incoming_vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
+				g_savedata.player_vehicles[incoming_vehicle_id].transform = s.getVehiclePos(incoming_vehicle_id)
+			end
 		end
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -2133,7 +2135,7 @@ function onVehicleLoad(incoming_vehicle_id)
 						if g_savedata.terrain_scanner_links[vehicle_id] == nil then
 							local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
 							local get_terrain_matrix = m.translation(vehicle_x, 1000, vehicle_z)
-							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, g_savedata.terrain_scanner_prefab.playlist_index, g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
+							local terrain_object, success = s.spawnAddonComponent(get_terrain_matrix, s.getAddonIndex(), g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
 							if success then
 								g_savedata.terrain_scanner_links[vehicle_id] = terrain_object.id
 							else
@@ -2191,7 +2193,7 @@ function addPath(vehicle_object, target_dest)
 			path_start_pos = vehicle_object.transform
 		end
 
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, 0, dest_z))
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 0, dest_z), "ocean_path", "land_path")
 		for path_index, path in pairs(path_list) do
 			table.insert(vehicle_object.path, { x =  path.x + math.random(-50, 50), y = 0, z = path.z + math.random(-50, 50), ui_id = s.getMapID() })
 		end
@@ -2209,7 +2211,7 @@ function addPath(vehicle_object, target_dest)
 
 		start_x, start_y, start_z = m.position(vehicle_object.transform)
  
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, 1000, dest_z))
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 1000, dest_z), "land_path", "ocean_path")
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
 			distance = m.distance(vehicle_object.transform, m.translation(path.x, veh_y, path.z))
@@ -2906,6 +2908,16 @@ end
 
 function killVehicle(squad_index, vehicle_id, instant, delete)
 
+	if not squad_index then
+		wpDLCDebug("(killVehicle) squad_index is nil!", true, true)
+		return
+	end
+
+	if not vehicle_id then
+		wpDLCDebug("(killVehicle) vehicle_id is nil!", true, true)
+		return
+	end
+
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	if vehicle_object.is_killed ~= true or instant then
@@ -3410,7 +3422,9 @@ function tickVision()
 				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
 					local player_vehicle_data = s.getVehicleData(player_vehicle_id)
 					player_vehicle.death_pos = nil
-					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					if player_vehicle_data and player_vehicle_data.voxels then
+						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
+					end
 				end
 			end
 
@@ -3627,7 +3641,7 @@ function tickVehicles()
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
 									ai_target = target.last_known_pos
 									local distance = m.distance(vehicle_object.transform, ai_target)
-									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfind(vehicle_object.transform, ai_target, "land_path", "ocean_path")
 									local is_better_pos = false
 									for path_index, path in pairs(possiblePaths) do
 										if m.distance(matrix.translation(path.x, path.y, path.z), ai_target) < distance then
@@ -4035,12 +4049,18 @@ function build_locations(playlist_index, location_index)
             end
 			if tag_object == "type=dlc_weapons_terrain_scanner" then
 				if object_data.type == "vehicle" then
-					g_savedata.terrain_scanner_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+					g_savedata.terrain_scanner_prefab = { 
+						location_index = location_index, 
+						object_index = object_index
+					}
 				end
 			end
 			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
-					flag_prefab = { playlist_index = playlist_index, location_index = location_index, object_index = object_index}
+					flag_prefab = { 
+						location_index = location_index, 
+						object_index = object_index
+					}
 				end
             end
         end
@@ -4059,11 +4079,11 @@ function build_locations(playlist_index, location_index)
     end
 
     if is_valid_location then
-    	table.insert(built_locations, { playlist_index = playlist_index, location_index = location_index, data = location_data, objects = addon_components} )
+    	table.insert(built_locations, { location_index = location_index, data = location_data, objects = addon_components} )
     end
 end
 
-function spawnObjects(spawn_transform, playlist_index, location_index, object_descriptors, out_spawned_objects)
+function spawnObjects(spawn_transform, location_index, object_descriptors, out_spawned_objects)
 	local spawned_objects = {}
 
 	for _, object in pairs(object_descriptors) do
@@ -4078,16 +4098,16 @@ function spawnObjects(spawn_transform, playlist_index, location_index, object_de
 			end
 		end
 
-		spawnObject(spawn_transform, playlist_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+		spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	end
 
 	return spawned_objects
 end
 
-function spawnObject(spawn_transform, playlist_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = spawnObjectType(m.multiply(spawn_transform, object.transform), playlist_index, location_index, object, parent_vehicle_id)
+	local spawned_object_id = spawnObjectType(m.multiply(spawn_transform, object.transform), location_index, object, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
@@ -4138,15 +4158,13 @@ function spawnObject(spawn_transform, playlist_index, location_index, object, pa
 end
 
 -- spawn an individual object descriptor from a playlist location
-function spawnObjectType(spawn_transform, playlist_index, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, playlist_index, location_index, object_descriptor.index, parent_vehicle_id)
+function spawnObjectType(spawn_transform, location_index, object_descriptor, parent_vehicle_id)
+	local component, is_success = s.spawnAddonComponent(spawn_transform, s.getAddonIndex(), location_index, object_descriptor.index, parent_vehicle_id)
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		wpDLCDebug("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, true)
-		wpDLCDebug("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, true)
-		is_dlc_weapons = false
+		wpDLCDebug("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..s.getAddonIndex().."\nlocation index: "..location_index, false, true)
 		return nil
 	end
 end
@@ -4521,7 +4539,7 @@ function randChance(t)
 	local win_val = 0
 	for k, v in pairs(t) do
 		local chance = rand(0, v / total_mod)
-		wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
+		--wpDLCDebug("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, false)
 		if chance > win_val then
 			win_val = chance
 			win_name = k
