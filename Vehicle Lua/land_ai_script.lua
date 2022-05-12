@@ -250,7 +250,7 @@ function onTick()
                             ad(-(tank_ts*angle_multi), true)
                         end
                     end
-                elseif angleDiff > 0.485 and angleDiff < 0.51 or angleDiff < -0.485 and angleDiff > -0.51 then -- backup
+                elseif angleDiff > 0.495 and angleDiff < 0.51 or angleDiff < -0.495 and angleDiff > -0.51 then -- backup
                     output.setNumber(7, 3)
                     if canMove(rds_front, ds_safe_wall) then
                         ws(-1*dist_multi)
