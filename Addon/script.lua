@@ -4,7 +4,7 @@ local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.7.3)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.7.4)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -4150,9 +4150,7 @@ function spawnObjectType(spawn_transform, location_index, object_descriptor, par
 		return component.id
 	else -- then it failed to spawn the addon component
 		-- print info for use in debugging
-		wpDLCDebug("Failed to spawn addon component! This is very likely due to you executing ?reload_scripts at some point, as of now theres a bug in stormworks and doing that will cause all of the workshop addon's data in scene.xml to be wiped, this is not a improved conquest mode specific issue, I'm so sorry for the inconvience, but the only fix at this time is to just create a new world. https://geometa.co.uk/support/stormworks/7077/", false, true)
-		wpDLCDebug("To Avoid a possible CTD, Improved Conquest Mode is now disabled in this world", false, true)
-		is_dlc_weapons = false
+		wpDLCDebug("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..s.getAddonIndex().."\nlocation index: "..location_index, false, true)
 		return nil
 	end
 end
