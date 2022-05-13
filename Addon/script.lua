@@ -20,7 +20,7 @@ local s = server
 local sm = spawnModifiers
 local v = Vehicles
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.47)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.48)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -842,7 +842,14 @@ function spawnTurret(island)
 			state = {
 				s = "stationary",
 				timer = math.fmod(spawned_objects.spawned_vehicle.id, 300),
-				is_simulating = false
+				is_simulating = false,
+				convoy = {
+					status = CONVOY.MOVING,
+					status_reason = "",
+					time_changed = -1,
+					ignore_wait = false,
+					waiting_for = 0
+				}
 			},
 			map_id = s.getMapID(),
 			ai_type = spawned_objects.spawned_vehicle.ai_type,
@@ -893,6 +900,7 @@ function spawnTurret(island)
 			},
 			is_aggressive = false,
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
+			can_offroad = hasTag(selected_prefab.vehicle.tags, "can_offroad"),
 			transform = spawn_transform,
 			target_player_id = nil,
 			target_vehicle_id = nil,
@@ -1224,7 +1232,8 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 				timer = math.fmod(spawned_objects.spawned_vehicle.id, 300),
 				is_simulating = false,
 				convoy = {
-					state = "",
+					status = CONVOY.MOVING,
+					status_reason = "",
 					time_changed = -1,
 					ignore_wait = false,
 					waiting_for = 0
@@ -1277,6 +1286,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			},
 			is_aggressive = false,
 			strategy = getTagValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
+			can_offroad = hasTag(selected_prefab.vehicle.tags, "can_offroad"),
 			is_resupply_on_load = false,
 			transform = spawn_transform,
 			target_vehicle_id = nil,
@@ -2705,7 +2715,14 @@ function addPath(vehicle_object, target_dest)
 			path_start_pos = vehicle_object.transform
 		end
 
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, 0, dest_z))
+		-- makes sure only small ships can take the tight areas
+		local exclude = ""
+		if vehicle_object.size ~= "small" then
+			exclude = exclude.."tight_area"
+		end
+
+		-- calculates route
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 0, dest_z), "ocean_path", exclude)
 
 		local path_offset = math.random(5, 8)
 
@@ -2726,7 +2743,25 @@ function addPath(vehicle_object, target_dest)
 
 		start_x, start_y, start_z = m.position(vehicle_object.transform)
  
-		local path_list = s.pathfindOcean(path_start_pos, m.translation(dest_x, veh_y, dest_z))
+		local exclude = ""
+
+		local exclude_offroad = false
+
+		local squad_index, squad = squads.getSquad(vehicle_object.id)
+		if squad.command == COMMAND_CARGO then
+			for c_vehicle_id, c_vehicle_object in pairs(squad.vehicles) do
+				if g_savedata.cargo_vehicles[c_vehicle_id] then
+					exclude_offroad = not g_savedata.cargo_vehicles[c_vehicle_id].route_data.can_offroad
+					break
+				end
+			end
+		end
+
+		if not vehicle_object.can_offroad or exclude_offroad then
+			exclude = exclude.."offroad"
+		end
+
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, veh_y, dest_z), "land_path", "")
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
 			distance = m.distance(vehicle_object.transform, m.translation(path.x, veh_y, path.z))
@@ -3776,7 +3811,7 @@ function tickSquadrons()
 
 			--* tick behaivour and exit conditions
 			if squad.command == COMMAND_CARGO then
-				local convoy = nil
+				local convoy = {}
 				for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 					if g_savedata.cargo_vehicles[vehicle_object.id] then
 						local n_vehicle_object, n_squad_index, n_squad = squads.getVehicle(vehicle_object.id)
@@ -3801,18 +3836,19 @@ function tickSquadrons()
 				--* handle and calculate the convoy's paths
 
 				-- get which path the cargo vehicle is currently on
-				d.print("old old path: "..convoy.path_data.current_path)
+				d.print("old old path: "..convoy.path_data.current_path, true, 0)
 				local old_path = convoy.path_data.current_path
 
 				--? check to see if we have any paths for the cargo vehicle
 				if #convoy.vehicle_data.path then
-					for i = convoy.path_data.current_path, #convoy.vehicle_data.path do
-						i = math.max(i, 1)
+					for i = convoy.path_data.current_path, #convoy.path_data.path do
 						d.print("i: "..i, true, 0)
+						i = math.max(i, 1)
 						local cargo_vehicle_node = g_savedata.ai_army.squadrons[squad_index].vehicles[convoy.vehicle_data.id].path[1]
 						local convoy_node = convoy.path_data.path[i]
 						d.print("c_v_n.x: "..cargo_vehicle_node.x.." c_n.x: "..convoy_node.x.."\nc_v_n.y: "..tostring(cargo_vehicle_node.y).." c_n.y: "..tostring(convoy_node.y).."\nc_v_n.z: "..cargo_vehicle_node.z.." c_n.z: "..convoy_node.z.."\n", true, 0)
 						if cargo_vehicle_node.x == convoy_node.x and cargo_vehicle_node.z == convoy_node.z then
+							d.print("current path: "..i, true, 0)
 							convoy.path_data.current_path = i
 							break
 						end
@@ -3832,6 +3868,16 @@ function tickSquadrons()
 						d.print("(escort) vehicle_object is nil!", true, 1)
 						break
 					end
+
+					--? if this is not the cargo vehicle
+					if vehicle_object.id ~= convoy.vehicle_data.id then
+						--? if the cargo vehicle is on a new path
+						if old_path ~= convoy.path_data.current_path then
+							--* reset the path
+							resetPath(vehicle_object)
+						end
+					end
+
 					d.print("convoy_index: "..convoy_index, true, 0)
 					if convoy.convoy[convoy_index - 1] then -- if theres a vehicle behind this one
 						d.print("there is a vehicle behind!", true, 0)
@@ -3839,50 +3885,112 @@ function tickSquadrons()
 						local behind_vehicle_object, behind_squad_index, behind_squad = squads.getVehicle(convoy.convoy[convoy_index - 1])
 						if not behind_vehicle_object then
 							d.print("(escort behind) vehicle_object is nil!", true, 1)
-							break
-						end
-						-- check if this vehicle is not waiting for the vehicle behind to catch up
-						if vehicle_object.state.convoy_status ~= CONVOY.WAITING then
+
+						--? if this vehicle is not waiting for the vehicle behind to catch up
+						elseif vehicle_object.state.convoy.status ~= CONVOY.WAITING then
 							--? check if the vehicle behind needs to catch up
 							d.print("vehicle_object.ai_type: "..tostring(vehicle_object.ai_type), true, 0)
-							if m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance then
-								if not behind_vehicle_object.state.convoy.ignore_wait then
-									-- set us to waiting
-									vehicle_object.state.convoy.status = CONVOY.WAITING
-									-- set the time that this occured
-									vehicle_object.state.convoy.changed_time = g_savedata.tick_counter
-									-- set which vehicle we are waiting for
-									vehicle_object.state.convoy.waiting_for = convoy_index - 1
-									-- set the vehicle's speed to be 0
-									vehicle_object.speed.convoy_modifier = -(v.getSpeed(vehicle_object, nil, nil, nil, nil, true))
+							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance then
+
+								--? if the vehicle behind is too far behind
+								local behind_too_far = (m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance)
+
+								--? if the vehicle behind is waiting
+								local behind_waiting = (behind_vehicle_object.state.convoy.status == CONVOY.WAITING and behind_vehicle_object.state.convoy.waiting_for ~= convoy_index)
+
+								if behind_too_far or behind_waiting then
+									--? if this vehicle behind us is not ignored for waiting
+									if not behind_vehicle_object.state.convoy.ignore_wait then
+										-- set us to waiting
+										vehicle_object.state.convoy.status = CONVOY.WAITING
+										-- set the time that this occured
+										vehicle_object.state.convoy.changed_time = g_savedata.tick_counter
+										-- set which vehicle we are waiting for
+										vehicle_object.state.convoy.waiting_for = convoy_index - 1
+										-- set the vehicle's speed to be 0
+										vehicle_object.speed.convoy_modifier = -(v.getSpeed(vehicle_object, nil, nil, nil, nil, true))
+										-- set why its waiting
+										local status_reason = behind_too_far and "waiting_for_behind" or "behind_is_waiting"
+										vehicle_object.state.convoy.status_reason = status_reason
+									end
 								end
 							end
 
-							if vehicle_object.state.convoy.status == CONVOY.MOVING then
+							d.print("Convoy Status: "..tostring(vehicle_object.state.convoy.status), true, 0)
 
+							if vehicle_object.state.convoy.status == CONVOY.MOVING then
+								--* make it speed up if its falling behind, and the vehicle behind is catching up
+
+								-- the last path this vehicle has
+								local last_path = vehicle_object.path[#vehicle_object.path]
+
+								if last_path then
+
+									d.print("vehicle_object.name: "..vehicle_object.name.."\nbehind_vehicle_object.name: "..behind_vehicle_object.name, true, 0)
+
+									-- the distance from this vehicle to its last path
+									local dist = m.xzDistance(vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
+
+									-- the distance from the vehicle behind to this vehicles last path
+									local behind_dist = m.xzDistance(behind_vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
+
+									d.print("dist: "..dist.."\nbehind_dist: "..behind_dist, true, 0)
+
+									local dist_speed_modifier = 1/math.clamp((behind_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance*2), 0.5, 1)
+									d.print("dist_speed_modifier: "..dist_speed_modifier, true, 0)
+
+									local vehicle_speed = v.getSpeed(vehicle_object, nil, nil, nil, nil, true)
+
+									vehicle_object.speed.convoy_modifier = (vehicle_speed * dist_speed_modifier) - vehicle_speed
+
+									d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
+								end
 							end
 						end
 					end
 
 					--? if this vehicle is currently waiting
-					if vehicle_object.state.convoy_status == CONVOY.WAITING then
+					if vehicle_object.state.convoy.status == CONVOY.WAITING then
 						d.print("vehicle is waiting", true, 0)
 						local max_wait_timer = RULES.LOGISTICS.CONVOY.base_wait_time
 						--? if we've waited over the max time, or that this vehicle should not be waited 
 						local waiting_vehicle_object, waiting_squad_index, waiting_squad = squads.getVehicle(convoy.convoy[vehicle_object.state.convoy.waiting_for])
-						if millisecondsSince(vehicle_object.state.convoy_status_changed)/1000 > max_wait_timer or waiting_vehicle_object.state.convoy.ignore_wait then
-							-- ignore the vehicle for waiting that we were waiting for
-							waiting_vehicle_object.state.convoy.ignore_wait = true
+						d.print("waiting for "..(ticksSince(vehicle_object.state.convoy.changed_time)).."t...", true, 0)
+
+						--? if we've waited too long for the vehicle behind us
+						local waited_too_long = (vehicle_object.state.convoy.status_reason == "waiting_for_behind" and (ticksSince(vehicle_object.state.convoy.changed_time) > max_wait_timer or waiting_vehicle_object.state.convoy.ignore_wait))
+
+						--? if the vehicle behind has caught up
+						local behind_vehicle_object, behind_squad_index, behind_squad = squads.getVehicle(convoy.convoy[convoy_index - 1])
+						local behind_caught_up = (vehicle_object.state.convoy.status_reason == "waiting_for_behind" and ((vehicle_object.state.convoy.waiting_for + 1) == convoy_index) and (not behind_vehicle_object or m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) <= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].target_distance))
+
+						--? if the vehicle behind is no longer waiting
+						local behind_no_longer_waiting = (vehicle_object.state.convoy.status_reason == "behind_is_waiting" and (not waiting_vehicle_object or waiting_vehicle_object.state.convoy.status ~= CONVOY.WAITING))
+
+						if waited_too_long or behind_caught_up or behind_no_longer_waiting then
+							if waited_too_long then
+								-- ignore the vehicle for waiting that we were waiting for
+								waiting_vehicle_object.state.convoy.ignore_wait = true
+							end
 							-- set us to moving
 							vehicle_object.state.convoy.status = CONVOY.MOVING
 							-- remove the time our status changed
 							vehicle_object.state.convoy.changed_time = -1
 							-- set that we aren't waiting for anybody
 							vehicle_object.state.convoy.waiting_for = 0
+							-- remove the speed modifier
+							vehicle_object.speed.convoy_modifier = 0
+							--? if its not the cargo vehicle
+							if vehicle_object.id ~= convoy.vehicle_data.id then
+								-- reset the vehicle's path
+								resetPath(vehicle_object)
+							end
+							-- reset the vehicle status reason
+							vehicle_object.state.convoy.status_reason = ""
 						end
 
-					--? if this vehicle has a new path
-					elseif old_path ~= convoy.path_data.current_path then
+					--? pathfind for the vehicle
+					elseif vehicle_object.ai_type ~= AI_TYPE_BOAT and #vehicle_object.path <= 1 or vehicle_object.ai_type == AI_TYPE_BOAT and #vehicle_object.path < 1 then
 						d.print("calculating new path!", true, 0)
 						--* this vehicle is currently moving
 
@@ -3895,62 +4003,98 @@ function tickSquadrons()
 
 							local target_dist = math.abs(cargo_vehicle_index - convoy_index) * RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].target_distance
 
-							local target_pos = nil
-							--? if this vehicle is infront of the cargo vehicle
-							if convoy_index > cargo_vehicle_index then
-							
-								--* find which node is the best node to target
-								local best_node = convoy.path_data.current_path
-								local total_dist = 0
-								for node = convoy.path_data.current_path, #convoy.path_data.path do
-									local p_node = convoy.path_data.path[node-1] -- previous node
-									local n_node = convoy.path_data.path[node] -- new node
+							d.print("target dist: "..target_dist, true, 0)
 
-									--? makes sure previous node and new nodes exist
-									if p_node and n_node then
+							local node_to_check = 1
 
-										total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z))
-
-										--? break if this is over the target distance
-										if total_dist >= target_dist then
-											break
-										end
-
-										best_node = node
-									end
-								end
-								local t_node = convoy.path_data.path[best_node] -- target node
-								target_pos = m.translation(t_node.x, t_node.y, t_node.z)
-							else --? if this vehicle is behind the cargo vehicle
-								
-								--* find which node is the best node to target
-								local best_node = convoy.path_data.current_path
-								local total_dist = 0
-								for node = convoy.path_data.current_path, convoy.path_data.current_path, -1 do
-									local p_node = convoy.path_data.path[node+1] -- previous node
-									local n_node = convoy.path_data.path[node] -- new node
-
-									--? makes sure previous node and new nodes exist
-									if p_node and n_node then
-
-										total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z))
-
-										--? break if this is over the target distance
-										if total_dist >= target_dist then
-											break
-										end
-
-										best_node = node
-									end
-								end
-								local t_node = convoy.path_data.path[best_node] -- target node
-								target_pos = m.translation(t_node.x, t_node.y, t_node.z)
+							--? if this vehicle is behind the cargo vehicle
+							if convoy_index <= cargo_vehicle_index then
+								node_to_check = -1
 							end
+							
+							--* find which node is the best node to target
+							local best_node = math.max(convoy.path_data.current_path, 1)
+							local next_node = nil
+							local total_dist = 0
+							local leftover_dist = 0
+							d.print("current_path: "..convoy.path_data.current_path.."\nnumber of paths: "..#convoy.path_data.path, true, 0)
+							for node = convoy.path_data.current_path, #convoy.path_data.path * node_to_check, node_to_check do
+								local p_node = convoy.path_data.path[node-node_to_check] -- last node
+								local n_node = convoy.path_data.path[node] -- next node
 
-							--! pathfind to the new destination
+
+								d.print("node: "..node, true, 0)
+								--? makes sure previous node and new nodes exist
+								if p_node and n_node then
+
+									total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z))
+
+									--? break if this is over the target distance
+									d.print("total dist: "..total_dist, true, 0)
+									if total_dist >= target_dist then
+										next_node = node
+										leftover_dist = target_dist - (total_dist - m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z)))
+										break
+									else
+										best_node = node
+									end
+
+									
+								end
+							end
+							local t_node = convoy.path_data.path[best_node] -- target node
+							local target_pos = m.translation(t_node.x, t_node.y, t_node.z)
+
+							
 							if target_pos then
 								d.print("adding path to destination!", true, 0)
+								--! pathfind to the new destination
+								resetPath(vehicle_object)
 								addPath(vehicle_object, target_pos)
+
+								--* for the leftover distance, go that far into the node
+								d.print("leftover dist: "..leftover_dist, true, 0)
+								if leftover_dist ~= 0 and next_node then
+									d.print("current node: "..convoy.path_data.current_path, true, 0)
+									d.print("best_node: "..best_node.." next_node: "..next_node, true, 0)
+									local n_node = convoy.path_data.path[next_node] -- the node we couldn't reach
+									d.print("n_node.x: "..n_node.x.." t_node.x: "..t_node.x, true, 0)
+									local angle = -math.atan(n_node.x - t_node.x, n_node.z - t_node.z) + math.pi/2
+									local target_x = t_node.x + (leftover_dist * math.cos(angle))
+									local target_z = t_node.z + (leftover_dist * math.sin(angle))
+
+									d.print("target x: "..target_x.."\ntarget z: "..target_z, true, 0)
+
+									table.insert(vehicle_object.path, #vehicle_object.path+1, {
+										x = target_x,
+										y = target_pos[14],
+										z = target_z
+									})
+								end
+
+								--* clean up the path
+								if #vehicle_object.path >= 2 then
+
+									local nodes_to_remove = {}
+
+									for node = 1, #vehicle_object.path - 1 do
+
+										-- if the vehicle is closer to the node after the next one than the next node
+										local node_is_junk = m.xzDistance(vehicle_object.transform, m.translation(vehicle_object.path[node].x, vehicle_object.path[node].y, vehicle_object.path[node].z)) > m.xzDistance(vehicle_object.transform, m.translation(vehicle_object.path[1 + node].x, vehicle_object.path[1 + node].y, vehicle_object.path[1 + node].z))
+
+										-- if the vehicle is closer to the node after the next node than the next node is closer to the node after
+										local node_goes_backwards = m.xzDistance(m.translation(vehicle_object.path[node].x, vehicle_object.path[node].y, vehicle_object.path[node].z), m.translation(vehicle_object.path[1 + node].x, vehicle_object.path[1 + node].y, vehicle_object.path[1 + node].z)) > m.xzDistance(vehicle_object.transform, m.translation(vehicle_object.path[1 + node].x, vehicle_object.path[1 + node].y, vehicle_object.path[1 + node].z))
+
+										if node_is_junk or node_goes_backwards then
+											table.insert(nodes_to_remove, node)
+										end
+									end
+
+									for node = #nodes_to_remove, 1, -1 do
+										table.remove(vehicle_object.path, nodes_to_remove[node])
+										d.print("removed node: "..node, true, 0)
+									end
+								end
 							end
 						end
 					end
@@ -4176,14 +4320,14 @@ function tickSquadrons()
 											local dist_in_front = 870
 											local engage_dist = 775
 											-- distance from <dist_in_front>m in front of the jet to target
-											local in_front_dist = m.xzDistance(target_pos, matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, dist_in_front)))
+											local in_front_dist = m.xzDistance(target_pos, m.multiply(vehicle_object.transform, m.translation(0, 0, dist_in_front)))
 
 											--[[ debug
 											if not g_savedata.temp_map_id then
 												g_savedata.temp_map_id = s.getMapID()
 											end
 
-											local in_front = matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, dist_in_front))
+											local in_front = m.multiply(vehicle_object.transform, m.translation(0, 0, dist_in_front))
 											s.removeMapObject(-1, g_savedata.temp_map_id)
 											s.addMapObject(-1, g_savedata.temp_map_id, 1, 11, in_front[13], in_front[15], 0, 0, 0, 0, "in front", 0, "in front", 255, 255, 0, 255)
 											]]
@@ -4193,7 +4337,7 @@ function tickSquadrons()
 
 											-- if in front of the jet is closer to the target than the jet is, and its within distance to start the strafe
 											if in_front_dist < jet_dist and jet_dist <= engage_dist then
-												addPath(vehicle_object, m.translation(target_pos[13], math.max(target_pos[14] + 5, 15), target_pos[15]))
+												addPath(vehicle_object, m.translation(target_pos[13], math.max(target_pos[14] + 5, 18), target_pos[15]))
 												--d.print("strafing")
 											else
 												--[[
@@ -4232,15 +4376,6 @@ function tickSquadrons()
 
 				if squad_vision:is_engage() == false then
 					setSquadCommand(squad, COMMAND_NONE)
-				end
-			elseif squad.command == COMMAND_CARGO then
-				for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-					local cargo_vehicle = g_savedata.cargo_vehicles[vehicle_object.id]
-					if cargo_vehicle and cargo_vehicle.route_status == 1 then
-						if #vehicle_object.path == 0 then
-							addPath(vehicle_object, squad.target_island.transform)
-						end
-					end
 				end
 			end
 			if squad.command ~= COMMAND_RETREAT then
@@ -4428,13 +4563,12 @@ function tickVehicles()
 					end
 				end
 
-				local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-				if vehicle_y <= explosion_depths[vehicle_object.ai_type] then
+				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.ai_type] then
 					killVehicle(squad_index, vehicle_id, true)
 					if vehicle_object.ai_type == AI_TYPE_BOAT then
 						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
 					else
-						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water!", true, 0)
+						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 					end
 					return
 				end
@@ -4547,7 +4681,7 @@ function tickVehicles()
 								if target and m.distance(m.translation(0, 0, 0), target.last_known_pos) > 5 then
 									ai_target = target.last_known_pos
 									local distance = m.distance(vehicle_object.transform, ai_target)
-									local possiblePaths = s.pathfindOcean(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfind(vehicle_object.transform, ai_target, "land_path", "")
 									local is_better_pos = false
 									for path_index, path in pairs(possiblePaths) do
 										if m.distance(m.translation(path.x, path.y, path.z), ai_target) < distance then
@@ -4629,20 +4763,28 @@ function tickVehicles()
 					
 					debug_data = debug_data.."Squad: "..squad_index .."\n"
 					debug_data = debug_data.."Command: "..squad.command .."\n"
-					debug_data = debug_data.."AI State: "..ai_state .. "\n\n"
+					debug_data = debug_data.."AI State: "..ai_state .. "\n"
 
 					-- cargo data
 					if vehicle_object.role == COMMAND_CARGO then
 						local cargo_data = g_savedata.cargo_vehicles[vehicle_object.id]
-						debug_data = debug_data.."Oil: "..vehicle_object.cargo.current.oil.."\n"
+						debug_data = debug_data.."\nOil: "..vehicle_object.cargo.current.oil.."\n"
 						debug_data = debug_data.."Diesel: "..vehicle_object.cargo.current.diesel.."\n"
 						debug_data = debug_data.."Jet Fuel: "..vehicle_object.cargo.current.jet_fuel.."\n"
 						if cargo_data then
-							debug_data = debug_data.."Cargo Route Status: "..cargo_data.route_status.."\n\n"
+							debug_data = debug_data.."Cargo Route Status: "..cargo_data.route_status.."\n"
 						end
 					end
 
-					debug_data = debug_data.."Home Island: "..vehicle_object.home_island.name.."\n"
+					if squad.command == COMMAND_CARGO then
+						debug_data = debug_data.."Convoy Status: "..tostring(vehicle_object.state.convoy.status)
+						if vehicle_object.state.convoy.status == CONVOY.WAITING then
+							debug_data = debug_data.." for: "..tostring(vehicle_object.state.convoy.waiting_for)
+							debug_data = debug_data.."\nReason: "..tostring(vehicle_object.state.convoy.status_reason).."\n"
+						end
+					end
+
+					debug_data = debug_data.."\nHome Island: "..vehicle_object.home_island.name.."\n"
 					if squad.target_island then 
 						debug_data = debug_data.."Target Island: "..squad.target_island.name.."\n" 
 					end
@@ -5058,9 +5200,10 @@ function tickCargo()
 								route_status = 0,
 								requested_cargo = requested_cargo,
 								path_data = {
-									current_path = 0,
+									current_path = 1,
 									path = {},
-									speed = nil
+									speed = nil,
+									can_offroad = true
 								},
 								convoy = {}
 							}
@@ -5068,13 +5211,19 @@ function tickCargo()
 							-- get escorts
 							Cargo.getEscorts(vehicle_data, resupplier_island)
 
-							-- get the slowest speed of all of them
+							-- get the slowest speed of all of them and if we can offroad
 							local squad_index, squad = squads.getSquad(vehicle_data.id)
 							for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+
+								-- getting slowest speed
 								local vehicle_speed = v.getSpeed(vehicle_object, true, true)
-								d.print("vehicle speed: "..tostring(vehicle_speed).." vehicle: "..vehicle_object.name, true, 0)
 								if not g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed or g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed > vehicle_speed then
 									g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed = vehicle_speed
+								end
+
+								-- checking if we can offroad
+								if not vehicle_object.can_offroad then
+									g_savedata.cargo_vehicles[vehicle_data.id].path_data.can_offroad = false
 								end
 							end
 						end
@@ -5111,6 +5260,11 @@ function tickCargoVehicles()
 							local squad_index, squad = squads.getSquad(cargo_vehicle.vehicle_data.id)
 							squad.target_island = island
 							addPath(cargo_vehicle.vehicle_data, island.transform)
+							table.insert(cargo_vehicle.vehicle_data.path, 1, {
+								x = cargo_vehicle.vehicle_data.transform[13],
+								y = cargo_vehicle.vehicle_data.transform[14],
+								z = cargo_vehicle.vehicle_data.transform[15]
+							})
 							cargo_vehicle.path_data.path = cargo_vehicle.vehicle_data.path
 							g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_object.id].path = cargo_vehicle.vehicle_data.path
 						else
@@ -5141,7 +5295,7 @@ function tickCargoVehicles()
 						local new_cargo_vehicle = nil
 						for next_cargo_vehicle_index, next_cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 							if next_cargo_vehicle.vehicle_data.name == cargo_vehicle.route_data[2].transport_method.name then
-								new_cargo_vehicle = next_cargo_vehicle
+								new_cargo_vehicle = g_savedata.cargo_vehicles[next_cargo_vehicle.vehicle_data.id]
 								break
 							end
 						end
@@ -5166,9 +5320,10 @@ function tickCargoVehicles()
 									route_status = 3, -- do nothing
 									requested_cargo = cargo_vehicle.requested_cargo,
 									path_data = {
-										current_path = 0,
+										current_path = 1,
 										path = {},
-										speed = nil
+										speed = nil,
+										can_offroad = true
 									},
 									convoy = {}
 								}
@@ -5176,12 +5331,19 @@ function tickCargoVehicles()
 								-- get escorts
 								Cargo.getEscorts(vehicle_data, island)
 
-								-- get the slowest speed of all of them
+								-- get the slowest speed of all of them and if we can offroad
 								local squad_index, squad = squads.getSquad(vehicle_data.id)
 								for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+
+									-- getting slowest speed
 									local vehicle_speed = v.getSpeed(vehicle_object, true, true)
 									if not g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed or g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed > vehicle_speed then
 										g_savedata.cargo_vehicles[vehicle_data.id].path_data.speed = vehicle_speed
+									end
+
+									-- checking if we can offroad
+									if not vehicle_object.can_offroad then
+										g_savedata.cargo_vehicles[vehicle_data.id].path_data.can_offroad = false
 									end
 								end
 							end
@@ -5881,6 +6043,8 @@ function Vehicles.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiv
 
 		local speed = 0
 
+		local ignore_me = false
+
 		if squad.command == COMMAND_CARGO then
 			-- return the slowest vehicle in the chain's speed
 			for vehicle_index, _ in pairs(squad.vehicles) do
@@ -5888,12 +6052,13 @@ function Vehicles.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiv
 					speed = g_savedata.cargo_vehicles[vehicle_index].path_data.speed or 0
 					if speed ~= 0 and not ignore_convoy_modifier then
 						speed = speed + (vehicle_object.speed.convoy_modifier or 0)
+						ignore_me = true
 					end
 				end
 			end
 		end
 
-		if speed == 0 then
+		if speed == 0 and not ignore_me then
 			if vehicle_object.ai_type ~= AI_TYPE_LAND then
 				-- return land vehicle speeds
 				speed = vehicle_object.speed.not_land.pseudo_speed
@@ -6367,6 +6532,7 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 		for cargo_type, amount in pairs(cargo_to_transfer) do
 			if amount > 0 then
 				recipient.cargo.current[cargo_type] = recipient.cargo.current[cargo_type] + amount
+				d.print("cargo type: "..cargo_type.." amount: "..amount, true, 0)
 			end
 		end
 
@@ -7252,7 +7418,7 @@ function Cargo.getIslandDistance(island1, island2)
 			local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
 			local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
 			if noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
-				local paths = s.pathfindOcean(ocean1_transform, ocean2_transform)
+				local paths = s.pathfind(ocean1_transform, ocean2_transform, "ocean_path", "tight_area")
 				for path_index, path in pairs(paths) do
 					if path_index ~= #paths then
 						distance.sea = distance.sea + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
@@ -7284,7 +7450,7 @@ function Cargo.getIslandDistance(island1, island2)
 					distance.land = 0
 					local start_transform = island1.zones.land[math.random(1, #island1.zones.land)].transform
 					if noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
-						local paths = s.pathfindOcean(start_transform, island2.transform)
+						local paths = s.pathfind(start_transform, island2.transform, "land_path", "")
 						for path_index, path in pairs(paths) do
 							if path_index ~= #paths then
 								distance.land = distance.land + (m.distance(m.translation(path.x, 0, path.z), m.translation(paths[path_index + 1].x, 0, paths[path_index + 1].z)))
