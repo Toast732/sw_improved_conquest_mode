@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="164" component_id_counter="3185">
+	<locations location_id_counter="164" component_id_counter="3187">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -27379,7 +27379,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="160" name="BOAT - SUPPLY" env_mod_spawn_num="1">
+			<l id="160" name="BOAT - A988-1 SUPPLY" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2918" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=cargo,visibility_range=1750,spawning_radius=50.25,pseudo_speed=6,health=5500,cargo_per_type=8437.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2918.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.839838" 31="4.56963" 32="0.039105"/>
