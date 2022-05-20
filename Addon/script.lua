@@ -20,7 +20,7 @@ local s = server
 local sm = spawnModifiers
 local v = Vehicles
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.49)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.50)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -282,7 +282,7 @@ function setupRules()
 				plane = { --? rules specific for planes
 					min_distance = 75, -- make the one in front have its target altitude be higher
 					target_distance = 250, -- + spawning distance of both vehicles 
-					max_distance = nil -- we dont care if they're too far behind, having them wait could cause further issues
+					max_distance = 1000 -- lots of buffer space, however, do not wait if one is falling behind
 				},
 				heli = { --? rules specific for helis
 					min_distance = 55, -- make the one behind stop moving so it gives it space
@@ -331,7 +331,8 @@ end
 local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
 local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs and transports resources to make more vehicles)", "true")
-local INTEL_REPORTS_BOX = property.checkbox("Intel Reports (no functionality yet)", "true")
+-- todo for future update
+-- local INTEL_REPORTS_BOX = property.checkbox("Intel Reports (no functionality yet)", "true")
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
 
@@ -344,7 +345,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			SINKING_MODE = SINKING_MODE_BOX,
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			CARGO_MODE = CARGO_MODE_BOX,
-			INTEL_REPORTS = INTEL_REPORTS_BOX,
+			--INTEL_REPORTS = INTEL_REPORTS_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5", 10, 600, 1, 60) * 60 * 60,
@@ -2205,9 +2206,9 @@ function captureIsland(island, override, peer_id)
 
 		if peer_id then
 			name = s.getPlayerName(peer_id)
-			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island. (set manually by "..name.." via command)", 3)
+			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured "..island.name..". (set manually by "..name.." via command)", 3)
 		else
-			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured an island.", 3)
+			s.notify(-1, "ISLAND CAPTURED", "The enemy has captured "..island.name..".", 3)
 		end
 
 		island.is_scouting = false
@@ -2230,9 +2231,9 @@ function captureIsland(island, override, peer_id)
 
 		if peer_id then
 			name = s.getPlayerName(peer_id)
-			s.notify(-1, "ISLAND CAPTURED", "Successfully captured an island. (set manually by "..name.." via command)", 4)
+			s.notify(-1, "ISLAND CAPTURED", "Successfully captured "..island.name..". (set manually by "..name.." via command)", 4)
 		else
-			s.notify(-1, "ISLAND CAPTURED", "Successfully captured an island.", 4)
+			s.notify(-1, "ISLAND CAPTURED", "Successfully captured "..island.name..".", 4)
 		end
 
 		g_savedata.ai_knowledge.scout[island.name].scouted = 0
@@ -2257,9 +2258,9 @@ function captureIsland(island, override, peer_id)
 
 		if peer_id then
 			name = s.getPlayerName(peer_id)
-			s.notify(-1, "ISLAND SET NEUTRAL", "Successfully set an island to neutral. (set manually by "..name.." via command)", 1)
+			s.notify(-1, "ISLAND SET NEUTRAL", "Successfully set "..island.name..". (set manually by "..name.." via command)", 1)
 		else
-			s.notify(-1, "ISLAND SET NEUTRAL", "Successfully set an island to neutral.", 1)
+			s.notify(-1, "ISLAND SET NEUTRAL", "Successfully set "..island.name..".", 1)
 		end
 
 		island.is_scouting = false
@@ -3839,7 +3840,6 @@ function tickSquadrons()
 				--* handle and calculate the convoy's paths
 
 				-- get which path the cargo vehicle is currently on
-				d.print("old old path: "..convoy.path_data.current_path, true, 0)
 				local old_path = convoy.path_data.current_path
 
 				--? check to see if we have any paths for the cargo vehicle
@@ -3883,17 +3883,14 @@ function tickSquadrons()
 
 					d.print("convoy_index: "..convoy_index, true, 0)
 					if convoy.convoy[convoy_index - 1] then -- if theres a vehicle behind this one
-						d.print("there is a vehicle behind!", true, 0)
 
 						local behind_vehicle_object, behind_squad_index, behind_squad = squads.getVehicle(convoy.convoy[convoy_index - 1])
-						if not behind_vehicle_object then
-							d.print("(escort behind) vehicle_object is nil!", true, 1)
 
-						--? if this vehicle is not waiting for the vehicle behind to catch up
-						elseif vehicle_object.state.convoy.status ~= CONVOY.WAITING then
-							--? check if the vehicle behind needs to catch up
-							d.print("vehicle_object.ai_type: "..tostring(vehicle_object.ai_type), true, 0)
-							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance then
+						--? if this vehicle is not waiting and the behind vehicle exists
+						if behind_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING  then
+						
+							--? check if the vehicle behind needs to catch up, and the vehicle behind is not a plane
+							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance and vehicle_object.ai_type ~= AI_TYPE_PLANE then
 
 								--? if the vehicle behind is too far behind
 								local behind_too_far = (m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance)
@@ -3919,8 +3916,6 @@ function tickSquadrons()
 								end
 							end
 
-							d.print("Convoy Status: "..tostring(vehicle_object.state.convoy.status), true, 0)
-
 							if vehicle_object.state.convoy.status == CONVOY.MOVING then
 								--* make it speed up if its falling behind, and the vehicle behind is catching up
 
@@ -3944,7 +3939,71 @@ function tickSquadrons()
 
 									local vehicle_speed = v.getSpeed(vehicle_object, nil, nil, nil, nil, true)
 
-									vehicle_object.speed.convoy_modifier = (vehicle_speed * dist_speed_modifier) - vehicle_speed
+									vehicle_object.speed.convoy_modifier = ((vehicle_speed * dist_speed_modifier) - vehicle_speed)/1.5
+
+									d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
+								end
+							end
+						end
+					end
+
+					if convoy.convoy[convoy_index + 1] then -- if theres a vehicle ahead of this one
+
+						local ahead_vehicle_object, ahead_squad_index, ahead_squad = squads.getVehicle(convoy.convoy[convoy_index - 1])
+
+						if ahead_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING then
+						
+							--? check if the vehicle ahead is getting too far behind
+							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance then
+
+								--? if the vehicle ahead is getting too far behind
+
+								local next_path = ahead_vehicle_object.path[1]
+
+								d.print("ai_type: "..vehicle_object.ai_type, true, 0)
+
+								local ahead_too_far = (m.xzDistance(vehicle_object.transform, ahead_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance) and (next_path and (m.xzDistance(ahead_vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z)) > m.xzDistance(vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z))))
+
+								--? if the vehicle ahead of us is waiting
+								local ahead_waiting = (ahead_vehicle_object.state.convoy.status == CONVOY.WAITING and ahead_vehicle_object.state.convoy.waiting_for ~= convoy_index)
+
+								if ahead_too_far or ahead_waiting then
+									--? if this vehicle ahead of us is not ignored for waiting
+									if not ahead_vehicle_object.state.convoy.ignore_wait then
+										-- set us to waiting
+										vehicle_object.state.convoy.status = CONVOY.WAITING
+										-- set the time that this occured
+										vehicle_object.state.convoy.changed_time = g_savedata.tick_counter
+										-- set which vehicle we are waiting for
+										vehicle_object.state.convoy.waiting_for = convoy_index + 1
+										-- set the vehicle's speed to be 0
+										vehicle_object.speed.convoy_modifier = -(v.getSpeed(vehicle_object, nil, nil, nil, nil, true))
+										-- set why its waiting
+										local status_reason = ahead_too_far and "waiting_for_ahead" or "ahead_is_waiting"
+										vehicle_object.state.convoy.status_reason = status_reason
+									end
+								end
+							end
+
+							if vehicle_object.state.convoy.status == CONVOY.MOVING then
+								--* make it slow down if the vehicle ahead falling behind, and speed up if its falling behind
+
+								-- the last path this vehicle has
+								local last_path = ahead_vehicle_object.path[#ahead_vehicle_object.path]
+
+								if last_path then
+
+									-- the distance from this vehicle to its last path
+									local dist = m.xzDistance(vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
+
+									-- the distance from the vehicle ahead of this vehicles last path
+									local ahead_dist = m.xzDistance(ahead_vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
+
+									local dist_speed_modifier = 1/math.clamp((ahead_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance/2), 0.5, 1)
+
+									local vehicle_speed = v.getSpeed(vehicle_object, nil, nil, nil, nil, true)
+
+									vehicle_object.speed.convoy_modifier = ((vehicle_speed * dist_speed_modifier) - vehicle_speed)/1.5
 
 									d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
 								end
@@ -5312,7 +5371,8 @@ function tickCargoVehicles()
 							else
 								-- add it to the cargo vehicles list
 
-								local best_route = table.remove(cargo_vehicle.route_data, 1)
+								local best_route = cargo_vehicle.best_route
+								table.remove(best_route, 1)
 
 
 								g_savedata.cargo_vehicles[vehicle_data.id] = {
@@ -6178,7 +6238,7 @@ end
 ---@param location g_savedata.cache[] where to check
 ---@return boolean exists if the data exists at the location
 function cache.exists(location)
-	if g_savedata.cache[location] or g_savedata.cache[location] == false then
+	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and type(g_savedata.cache[location] ~= "table" or tableLength(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
 		d.print("g_savedata.cache."..location.." exists", true, 0)
 		return true
 	end
@@ -6284,7 +6344,7 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 			local spawned_vehicle, vehicle_data = spawnAIVehicleRetry(nil, cargo_vehicle.ai_type, true, island, 15)
 			if spawned_vehicle then
 				table.insert(possible_escorts, vehicle_data)
-				d.print("Spawned escort vehicle", true, 0)
+				d.print("(Cargo.getEscorts) Spawned escort vehicle", true, 0)
 			end
 		end
 	elseif #possible_escorts > RULES.LOGISTICS.CONVOY.max_escorts then
@@ -6308,7 +6368,11 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 		local squad_index, squad = squads.getSquad(cargo_vehicle.id)
 		transferToSquadron(escort, squad_index, true)
 		resetPath(escort)
-		addPath(escort, cargo_vehicle.transform)
+		if cargo_vehicle.transform then
+			addPath(escort, cargo_vehicle.transform)
+		else
+			d.print("(Cargo.getEscorts) cargo_vehicle.transform is nil!", true, 0)
+		end
 
 		-- insert the escorts into the table for the convoy
 		if not math.isWhole(escort_index/2) then 
@@ -6509,6 +6573,8 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	if recipient.object_type == "island" then
 		-- the recipient is a island
 
+		d.print("island name: "..recipient.name, true, 0)
+
 		for cargo_type, amount in pairs(cargo_to_transfer) do
 			if amount > 0 then
 				recipient.cargo[cargo_type] = recipient.cargo[cargo_type] + amount
@@ -6529,6 +6595,7 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 		end
 
 	elseif recipient.object_type == "vehicle" then
+		d.print("test", true, 0)
 		-- the recipient is a vehicle
 
 		-- set the variables
@@ -7058,6 +7125,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 						end
 					end
 					if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
+						d.print("origin_island.tags: "..tostring(origin_island.tags), true, 0)
 						if hasTag(first_path_island.island.tags, "can_spawn=plane") and hasTag(origin_island.tags, "can_spawn=plane") then
 							--
 							total_travel_time[first_path_island_index].plane = 
@@ -7106,7 +7174,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 
 							if second_path_island.distance.air then
 								if transport_vehicle.heli.name ~= "none" and transport_vehicle.heli.name ~= "unknown" then
-									if hasTag(second_path_island.island.tags, "can_spawn=heli") and hasTag(first_path_island.tags, "can_spawn=heli") then
+									if hasTag(second_path_island.island.tags, "can_spawn=heli") and hasTag(first_path_island.island.tags, "can_spawn=heli") then
 										--
 										total_travel_time[first_path_island_index][second_path_island_index].heli = 
 										(total_travel_time[first_path_island_index].heli or 0) + 
@@ -7115,7 +7183,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 									end
 								end
 								if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
-									if hasTag(second_path_island.island.tags, "can_spawn=plane") and hasTag(first_path_island.tags, "can_spawn=plane") then
+									if hasTag(second_path_island.island.tags, "can_spawn=plane") and hasTag(first_path_island.island.tags, "can_spawn=plane") then
 										--
 										total_travel_time[first_path_island_index][second_path_island_index].plane = 
 										(total_travel_time[first_path_island_index].plane or 0) + 
@@ -7161,7 +7229,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 									if third_path_island.distance then
 										if third_path_island.distance.air then
 											if transport_vehicle.heli.name ~= "none" and transport_vehicle.heli.name ~= "unknown" then
-												if hasTag(third_path_island.island.tags, "can_spawn=heli") and hasTag(second_path_island.tags, "can_spawn=heli") then
+												if hasTag(third_path_island.island.tags, "can_spawn=heli") and hasTag(second_path_island.island.tags, "can_spawn=heli") then
 													--
 													total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].heli = 
 													(total_travel_time[first_path_island_index][second_path_island_index].heli or 0) + 
@@ -7170,7 +7238,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 												end
 											end
 											if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
-												if hasTag(third_path_island.island.tags, "can_spawn=plane") and hasTag(second_path_island.tags, "can_spawn=plane") then
+												if hasTag(third_path_island.island.tags, "can_spawn=plane") and hasTag(second_path_island.island.tags, "can_spawn=plane") then
 													--
 													total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].plane = 
 													(total_travel_time[first_path_island_index][second_path_island_index].plane or 0) + 
@@ -7387,6 +7455,8 @@ function Cargo.getIslandDistance(island1, island2)
 	------
 	-- get distance for air vehicles
 	------
+	d.print("island1.name: "..island1.name, true, 0)
+	d.print("island2.name: "..island2.name, true, 0)
 	if hasTag(island1.tags, "can_spawn=plane") and hasTag(island2.tags, "can_spawn=plane") or hasTag(island1.tags, "can_spawn=heli") and hasTag(island2.tags, "can_spawn=heli") then
 		if cache.exists("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]") then
 			
