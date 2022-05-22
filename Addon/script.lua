@@ -38,7 +38,7 @@ local s = server
 local sm = spawnModifiers
 local v = Vehicles
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.51)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.52)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -111,9 +111,6 @@ local explosion_depths = {
 	boat = -17,
 	turret = -999
 }
-local PLANE_EXPLOSION_DEPTH = -4
-local HELI_EXPLOSION_DEPTH = -4
-local BOAT_EXPLOSION_DEPTH = -17
 
 local DEFAULT_SPAWNING_DISTANCE = 10 -- the fallback option for how far a vehicle must be away from another in order to not collide, highly reccomended to set tag
 
@@ -363,7 +360,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			SINKING_MODE = SINKING_MODE_BOX,
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			CARGO_MODE = CARGO_MODE_BOX,
-			--INTEL_REPORTS = INTEL_REPORTS_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5", 10, 600, 1, 60) * 60 * 60,
@@ -2406,7 +2402,7 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 
 		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
 
-		if squad_index then
+		if vehicle_object and squad_index then
 			if body_id == 0 or body_id == vehicle_object.main_body then -- makes sure the damage was on the ai's main body
 				if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
 				local damage_prev = vehicle_object.current_damage
