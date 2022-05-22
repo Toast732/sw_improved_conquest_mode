@@ -1,6 +1,24 @@
+--[[
+	Improved Conquest Mode, Addon for Stormworks which adds new features, fixes bugs, improved performance and is more balanced over Default Conquest Mode.
+    Copyright (C) 2022 Toastery
+
+    Improved Conquest Mode is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Improved Conquest Mode is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Improved Conquest Mode.  If not, see <https://www.gnu.org/licenses/>.
+]]
+
 -- Author: Toastery
 -- GitHub: https://github.com/Toast732
--- Workshop: 
+-- Workshop: https://steamcommunity.com/id/Toastery7/myworkshopfiles/?appid=573090
 --
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
@@ -20,7 +38,7 @@ local s = server
 local sm = spawnModifiers
 local v = Vehicles
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.50)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.51)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1341,7 +1359,7 @@ local player_commands = {
 			args = "none",
 			example = "?impwep reset",
 		},
-		pseudo_speed = {
+		speed = {
 			short_desc = "lets you change ai's pseudo speed",
 			desc = "this allows you to change the multiplier of the ai's pseudo speed, with the arg being the amount to times it by",
 			args = "(multiplier)",
@@ -1469,7 +1487,7 @@ local player_commands = {
 		}
 	},
 	host = {
-		full_reload = {
+		fullreload = {
 			short_desc = "lets you fully reload the addon",
 			desc = "lets you fully reload the addon, basically making it think the world was just created, this command can and probably will break things, so dont use it unless you need to",
 			args = "none",
@@ -1478,13 +1496,31 @@ local player_commands = {
 	}
 }
 
+local command_aliases = {
+	pseudospeed = "speed",
+	spawnvehicle = "sv",
+	deletevehicle = "dv",
+	capturepoint = "cp",
+	capture = "cp",
+	captureisland = "cp",
+	spawnturret = "st",
+	scoutintel = "si",
+	setintel = "si",
+	vehiclelist = "vl",
+	listvehicles = "vl"
+}
+
 function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
 	if prefix == "?impwep" then
 		if is_dlc_weapons then
 			if command then
-				command = string.lower(command) -- makes the command friendly, removing underscores and captitals
+				command = string.friendly(command) -- makes the command friendly, removing underscores and captitals
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
+				--? if this command is an alias
+				if command_aliases[command] then
+					command = command_aliases[command]
+				end
 
 				-- 
 				-- commands all players can execute
@@ -1519,7 +1555,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						g_is_boats_ready = false
 						g_savedata.is_attack = false
 
-					elseif command == "pseudo_speed" then
+					elseif command == "speed" then
 						g_debug_speed_multiplier = arg[1]
 
 					elseif command == "vreset" then
@@ -1534,7 +1570,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 							end
 						end
 
-					elseif command == "vision_reset" then
+					elseif command == "visionreset" then
 						d.print("resetting all squad vision data", false, 0, peer_id)
 						for squad_index, squad in pairs(g_savedata.squadrons) do
 							squad.target_players = {}
@@ -1958,7 +1994,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 							d.print(arg[1].." is not a valid setting! do \"?impwep setting\" to get a list of all settings!", false, 1, peer_id)
 						end
 					
-					elseif command == "ai_knowledge" then
+					elseif command == "aiknowledge" then
 						local vehicles = sm.getStats()
 
 						if vehicles.best[1].mod == vehicles.worst[1].mod then
@@ -1974,7 +2010,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 							end
 						end
 					
-					elseif command == "reset_cargo" then
+					elseif command == "resetcargo" then
 						local was_reset, error = Cargo.reset(getIslandFromName(arg[1]), string.friendly(arg[2]))
 						if was_reset then
 							d.print("Reset the cargo storages for all islands", false, 0, peer_id)
@@ -1982,16 +2018,16 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 							d.print("Cargo failed to reset! error: "..error, false, 1, peer_id)
 						end
 					
-					elseif command == "debug_cache" then
+					elseif command == "debugcache" then
 						d.print("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, 0, peer_id)
-					elseif command == "debug_cargo1" then
+					elseif command == "debugcargo1" then
 						d.print("asking cargo to do things...(get island distance)", false, 0, peer_id)
 						for island_index, island in pairs(g_savedata.controllable_islands) do
 							if island.faction == FACTION_AI then
 								Cargo.getIslandDistance(g_savedata.ai_base_island, island)
 							end
 						end
-					elseif command == "debug_cargo2" then
+					elseif command == "debugcargo2" then
 						d.print("asking cargo to do things...(get best route)", false, 0, peer_id)
 						island_selected = g_savedata.controllable_islands[tonumber(arg[1])]
 						if island_selected then
@@ -2011,13 +2047,13 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						else
 							d.print("incorrect island id: "..arg[1], false, 0, peer_id)
 						end
-					elseif command == "clear_cache" then
+					elseif command == "clearcache" then
 
 						d.print("clearing cache", false, 0, peer_id)
 						cache.reset()
 						d.print("cache reset", false, 0, peer_id)
 
-					elseif command == "addon_info" then -- command for debugging things such as why the addon name is broken
+					elseif command == "addoninfo" then -- command for debugging things such as why the addon name is broken
 
 						d.print("---- addon info ----", false, 0, peer_id)
 
@@ -2047,7 +2083,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				-- host only commands
 				--
 				if peer_id == 0 and is_admin then
-					if command == "full_reload" and peer_id == 0 then
+					if command == "fullreload" and peer_id == 0 then
 						local steam_id = getSteamID(peer_id)
 						if arg[1] == "confirm" and g_savedata.player_data[steam_id].fully_reloading then
 							d.print(s.getPlayerName(peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, 0)
@@ -2405,6 +2441,14 @@ function onVehicleTeleport(vehicle_id, peer_id, x, y, z)
 	if is_dlc_weapons then
 		if g_savedata.player_vehicles[vehicle_id] ~= nil then
 			g_savedata.player_vehicles[vehicle_id].current_damage = 0
+		end
+
+		-- updates the vehicle's position
+		local vehicle_object, squad_index, squad = squads.getVehicle(vehicle_id)
+		if squad_index then
+			g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id].transform[13] = x
+			g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id].transform[14] = y
+			g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id].transform[15] = z
 		end
 	end
 end
@@ -2981,7 +3025,7 @@ function tickGamemode()
 					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
 				end
 			else -- if the player does own the point
-				if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
+				if island.ai_capturing == 0 and island.players_capturing == 0 or cap_percent == 100 then -- if nobody is capping the point or its at 100%
 					s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
 				elseif island.ai_capturing == 0 then -- if players are capping the point
 					s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
@@ -3649,18 +3693,20 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 					end
 				end
 
-				-- change ai spawning modifiers
-				if not delete then -- if the vehicle was not forcefully despawned
-					local ai_damaged = vehicle_object.current_damage or 0
-					local ai_damage_dealt = 1
-					for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
-						ai_damage_dealt = ai_damage_dealt + damage
-					end
+				
+				if vehicle_object.role ~= COMMAND_CARGO or delete then
+					-- change ai spawning modifiers
+					if not delete and vehicle_object.role ~= COMMAND_SCOUT and vehicle_object.role ~= COMMAND_CARGO then -- if the vehicle was not forcefully despawned, and its not a scout or cargo vehicle
 
-					local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+						local ai_damaged = vehicle_object.current_damage or 0
+						local ai_damage_dealt = 1
+						for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
+							ai_damage_dealt = ai_damage_dealt + damage
+						end
 
-					d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
-					if vehicle_object.role ~= "scout" and vehicle_object.role ~= "cargo" then -- makes sure the vehicle isnt a scout vehicle or a cargo vehicle
+						local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+
+						d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
 						if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
 							local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
 							sm.train(
@@ -3681,42 +3727,42 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 							)
 						end
 					end
-				end
 
-				if not vehicle_object.state.is_simulating then
-					instant = true
-					d.print("set instant to true as the vehicle is not simulating", true, 0)
-				end
-
-				if not instant and delete ~= true then
-					local fire_id = vehicle_object.fire_id
-					if fire_id ~= nil then
-						d.print("explosion fire enabled", true, 0)
-						s.setFireData(fire_id, true, true)
-					end
-				end
-
-				s.despawnVehicle(vehicle_id, instant)
-
-				for _, survivor in pairs(vehicle_object.survivors) do
-					s.despawnObject(survivor.id, instant)
-				end
-
-				if vehicle_object.fire_id ~= nil then
-					s.despawnObject(vehicle_object.fire_id, instant)
-				end
-
-				if instant == true and delete ~= true then
-					local explosion_size = 2
-					if vehicle_object.size == "small" then
-						explosion_size = 0.5
-					elseif vehicle_object.size == "medium" then
-						explosion_size = 1
+					if not vehicle_object.state.is_simulating then
+						instant = true
+						d.print("set instant to true as the vehicle is not simulating", true, 0)
 					end
 
-					d.print("explosion spawned", true, 0)
+					if not instant and delete ~= true then
+						local fire_id = vehicle_object.fire_id
+						if fire_id ~= nil then
+							d.print("explosion fire enabled", true, 0)
+							s.setFireData(fire_id, true, true)
+						end
+					end
 
-					s.spawnExplosion(vehicle_object.transform, explosion_size)
+					s.despawnVehicle(vehicle_id, instant)
+
+					for _, survivor in pairs(vehicle_object.survivors) do
+						s.despawnObject(survivor.id, instant)
+					end
+
+					if vehicle_object.fire_id ~= nil then
+						s.despawnObject(vehicle_object.fire_id, instant)
+					end
+
+					if instant == true and delete ~= true then
+						local explosion_size = 2
+						if vehicle_object.size == "small" then
+							explosion_size = 0.5
+						elseif vehicle_object.size == "medium" then
+							explosion_size = 1
+						end
+
+						d.print("explosion spawned", true, 0)
+
+						s.spawnExplosion(vehicle_object.transform, explosion_size)
+					end
 				end
 			end
 		else
@@ -3725,17 +3771,30 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 	end
 end
 
+local squadron_tick_rate = 60
+
 function tickSquadrons()
 	d.startProfiler("tickSquadrons()", true)
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-		if isTickID(squad_index, 60) then
+		if isTickID(squad_index, squadron_tick_rate) then
 			-- clean out-of-action vehicles
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 
 				if vehicle_object.is_killed and vehicle_object.death_timer ~= nil then
 					vehicle_object.death_timer = vehicle_object.death_timer + 1
-					if vehicle_object.death_timer >= 300 then
-						killVehicle(squad_index, vehicle_id, true)
+
+					if vehicle_object.role == COMMAND_CARGO then
+						if vehicle_object.death_timer >= time.hour/squadron_tick_rate then
+							killVehicle(squad_index, vehicle_id, true)
+						end
+					elseif vehicle_object.role == COMMAND_SCOUT then
+						if vehicle_object.death_timer >= (time.minute/4)/squadron_tick_rate then
+							killVehicle(squad_index, vehicle_id, true)
+						end
+					else
+						if vehicle_object.death_timer >= math.seededRandom(false, vehicle_id, 8, 90) then -- kill the vehicle after 8 - 90 seconds after dying
+							killVehicle(squad_index, vehicle_id, true)
+						end
 					end
 				end
 
@@ -3743,7 +3802,9 @@ function tickSquadrons()
 				local c = s.getCharacterData(vehicle_object.survivors[1].id)
 				if c ~= nil then
 					if c.incapacitated or c.dead then
-						killVehicle(squad_index, vehicle_id, false)
+						if vehicle_object.role ~= COMMAND_CARGO then -- doesn't kill the cargo vehicle if the driver is killed
+							killVehicle(squad_index, vehicle_id, false)
+						end
 					end
 				end
 			end
@@ -3954,7 +4015,7 @@ function tickSquadrons()
 						if ahead_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING then
 						
 							--? check if the vehicle ahead is getting too far behind
-							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance then
+							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance and vehicle_object.ai_type ~= AI_TYPE_PLANE then
 
 								--? if the vehicle ahead is getting too far behind
 
@@ -4058,7 +4119,7 @@ function tickSquadrons()
 
 						--* calculate where the vehicle should path to
 
-						cargo_vehicle_index = 1 + math.floor(#convoy.convoy/2)
+						cargo_vehicle_index = 1 + math.floor((#convoy.convoy - 1)/2)
 
 						--? this vehicle is not the cargo vehicle
 						if vehicle_object.id ~= convoy.vehicle_data.id then
@@ -4078,7 +4139,7 @@ function tickSquadrons()
 							local best_node = math.max(convoy.path_data.current_path, 1)
 							local next_node = nil
 							local total_dist = 0
-							local leftover_dist = 0
+							local leftover_dist = target_dist
 							d.print("current_path: "..convoy.path_data.current_path.."\nnumber of paths: "..#convoy.path_data.path, true, 0)
 							for node = convoy.path_data.current_path, #convoy.path_data.path * node_to_check, node_to_check do
 								local p_node = convoy.path_data.path[node-node_to_check] -- last node
@@ -4089,7 +4150,11 @@ function tickSquadrons()
 								--? makes sure previous node and new nodes exist
 								if p_node and n_node then
 
-									total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z))
+									if node == convoy.path_data.current_path then -- if this is the first path, calculate the distance from the cargo vehicle to its next path
+										total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), convoy.vehicle_data.transform)
+									else -- if tis is not the first path, calculate the distance between the paths
+										total_dist = total_dist + m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z))
+									end
 
 									--? break if this is over the target distance
 									d.print("total dist: "..total_dist, true, 0)
@@ -4593,6 +4658,11 @@ function tickVehicles()
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
 
+				-- make sure the vehicle isn't killed
+				if vehicle_object.is_killed then
+					break
+				end
+
 				-- scout vehicles
 				if vehicle_object.role == "scout" then
 					local target_island, origin_island = getObjectiveIsland(true)
@@ -4626,14 +4696,24 @@ function tickVehicles()
 				end
 
 				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.ai_type] then
-					killVehicle(squad_index, vehicle_id, true)
-					if vehicle_object.ai_type == AI_TYPE_BOAT then
-						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+					if vehicle_object.role ~= COMMAND_CARGO then
+						killVehicle(squad_index, vehicle_id, true)
+						if vehicle_object.ai_type == AI_TYPE_BOAT then
+							d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+						else
+							d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
+						end
 					else
-						d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
+						killVehicle(squad_index, vehicle_id, false)
+						if vehicle_object.ai_type == AI_TYPE_BOAT then
+							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+						else
+							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
+						end
 					end
-					return
+					break
 				end
+
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
 				local ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or AI_SPEED_PSEUDO_BOAT) * vehicle_update_tickrate / 60
@@ -4791,14 +4871,10 @@ function tickVehicles()
 							local movement_z = ts_z - vehicle_z
 							local length_xz = math.sqrt((movement_x * movement_x) + (movement_z * movement_z))
 
-							local function clamp(value, min, max)
-								return math.min(max, math.max(min, value))
-							end
-
 							local speed_pseudo = ai_speed_pseudo * g_debug_speed_multiplier
-							movement_x = clamp(movement_x * speed_pseudo / length_xz, -math.abs(movement_x), math.abs(movement_x))
+							movement_x = math.clamp(movement_x * speed_pseudo / length_xz, -math.abs(movement_x), math.abs(movement_x))
 							movement_y = math.min(speed_pseudo, math.max(movement_y, -speed_pseudo))
-							movement_z = clamp(movement_z * speed_pseudo / length_xz, -math.abs(movement_z), math.abs(movement_z))
+							movement_z = math.clamp(movement_z * speed_pseudo / length_xz, -math.abs(movement_z), math.abs(movement_z))
 
 							local rotation_matrix = m.rotationToFaceXZ(movement_x, movement_z)
 							local new_pos = m.multiply(m.translation(vehicle_x + movement_x, vehicle_y + movement_y, vehicle_z + movement_z), rotation_matrix)
@@ -5031,9 +5107,9 @@ function tickTerrainScanners()
 					end
 
 					-- check if the vehicle is too low
-					if real_vehicle_y < closest_player_transform[14] + 400 then
+					if real_vehicle_y < closest_player_transform[14] + 350 then
 						-- move it above the nearest player
-						s.setVehiclePos(scanner.vehicle.id, m.translation(closest_player_transform[13], closest_player_transform[14] + 500, closest_player_transform[15]))
+						s.setVehiclePos(scanner.vehicle.id, m.translation(closest_player_transform[13], closest_player_transform[14] + 450 + (#g_savedata.terrain_scanners * 30), closest_player_transform[15]))
 						local squad_index, squad = squads.getSquad(scanner.vehicle.id)
 						g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
 					end
@@ -5371,15 +5447,11 @@ function tickCargoVehicles()
 							else
 								-- add it to the cargo vehicles list
 
-								local best_route = cargo_vehicle.best_route
-								table.remove(best_route, 1)
-
-
 								g_savedata.cargo_vehicles[vehicle_data.id] = {
 									vehicle_data = vehicle_data,
 									resupplier_island = cargo_vehicle.resupplier_island,
 									resupply_island = cargo_vehicle.resupply_island,
-									route_data = best_route,
+									route_data = cargo_vehicle.route_data,
 									route_status = 3, -- do nothing
 									requested_cargo = cargo_vehicle.requested_cargo,
 									path_data = {
@@ -5390,6 +5462,9 @@ function tickCargoVehicles()
 									},
 									convoy = {}
 								}
+
+								table.remove(g_savedata.cargo_vehicles[vehicle_data.id].route_data, 1)
+									
 
 								-- get escorts
 								Cargo.getEscorts(vehicle_data, island)
@@ -5461,8 +5536,8 @@ function onTick()
 		tickAI()
 		tickSquadrons()
 		tickVehicles()
-		tickCargo()
 		tickCargoVehicles()
+		tickCargo()
 		tickModifiers()
 		tickTerrainScanners()
 		tickOther() -- not as important stuff
@@ -6018,10 +6093,6 @@ function tabulate(t,...) -- credit: woe | for this function
 	end
 end
 
-function rand(x, y)
-	return math.random()*(y-x)+x
-end
-
 function randChance(t)
 	local total_mod = 0
 	for k, v in pairs(t) do
@@ -6030,7 +6101,7 @@ function randChance(t)
 	local win_name = ""
 	local win_val = 0
 	for k, v in pairs(t) do
-		local chance = rand(0, v / total_mod)
+		local chance = math.randomDecimals(0, v / total_mod)
 		-- d.print("chance: "..chance.." chance to beat: "..win_val.." k: "..k, true, 0)
 		if chance > win_val then
 			win_val = chance
@@ -6595,7 +6666,6 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 		end
 
 	elseif recipient.object_type == "vehicle" then
-		d.print("test", true, 0)
 		-- the recipient is a vehicle
 
 		-- set the variables
@@ -8168,7 +8238,7 @@ function debugging.showProfilers(requires_debug)
 			local player_list = s.getPlayers()
 			for peer_index, peer in pairs(player_list) do
 				if d.getDebug(2, peer.id) then
-					s.setPopupScreen(peer.id, g_savedata.profiler.ui_id, "Profilers", true, debug_message, -0.92, 0.2)
+					s.setPopupScreen(peer.id, g_savedata.profiler.ui_id, "Profilers", true, debug_message, -0.92, 0)
 				end
 			end
 		end
@@ -8253,6 +8323,57 @@ function math.isWhole(x) -- returns wether x is a whole number or not
 	return math.tointeger(x)
 end
 
+---@param x number the number to clamp
+---@param min number the minimum value
+---@param max number the maximum value
+---@return number clamped_x the number clamped between the min and max
+function math.clamp(x, min, max)
+	return math.noNil(max<x and max or min>x and min or x)
+end
+
+--- if a number is nil, it sets it to 0
+--- @param x number the number to check if is nil
+--- @return number x the number, or 0 if it was nil
+function math.noNil(x)
+	return x ~= x and 0 or x
+end
+
+--- @param min number the min number
+--- @param max number the max number
+function math.randomDecimals(min, max)
+	return math.random()*(max-min)+min
+end
+
+--- Returns a number which is consistant if the params are all consistant
+--- @param use_decimals boolean true for if you want decimals, false for whole numbers
+--- @param seed number the seed for the random number generator
+--- @param min number the min number
+--- @param max number the max number
+--- @return number seeded_number the random seeded number
+function math.seededRandom(use_decimals, seed, min, max)
+	local seed = seed or 1
+	local min = min or 0
+	local max = max or 1
+
+	local seeded_number = 0
+
+	-- generate a random seed
+	math.randomseed(seed)
+
+	-- generate a random number with decimals
+	if use_decimals then
+		seeded_number = math.randomDecimals(min, max)
+	else -- generate a whole number
+		seeded_number = math.random(math.floor(min), math.ceil(max))
+	end
+
+	-- make the random numbers no longer consistant with the seed
+	math.randomseed(g_savedata.tick_counter)
+	
+	-- return the seeded number
+	return seeded_number
+end
+
 --------------------------------------------------------------------------------
 --
 -- Custom String Functions
@@ -8286,8 +8407,8 @@ end
 ---@param matrix1 Matrix the first matrix
 ---@param matrix2 Matrix the second matrix
 function matrix.xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
-	ox, oy, oz = m.position(matrix1)
-	tx, ty, tz = m.position(matrix2)
+	local ox, oy, oz = m.position(matrix1)
+	local tx, ty, tz = m.position(matrix2)
 	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
 end
 
@@ -8423,6 +8544,9 @@ function objectIDFromSteamID(steam_id)
 	return nil
 end
 
+-- returns the peer_id the closest player to the provided SWMatrix
+
+
 ---@param T table table to get the size of
 ---@return number count the size of the table
 function tableLength(T)
@@ -8433,18 +8557,6 @@ function tableLength(T)
 	else return 0 end
 end
 
----@param x number the number to clamp
----@param min number the minimum value
----@param max number the maximum value
----@return number clamped_x the number clamped between the min and max
-function math.clamp(x, min, max)
-	return max<x and max or min>x and min or x
-end
-
-function noNaN(x)
-	return x ~= x and 0 or x
-end
-
 -- returns true if the peer_id is a player id
 function isPlayer(peer_id)
 	return (peer_id and peer_id ~= -1 and peer_id ~= 65535)
@@ -8452,5 +8564,5 @@ end
 
 -- returns true if the peer_id is not a player id
 function notPlayer(peer_id)
-	return (peer_id == -1 or peer_id == 65535 or not peer_id)
+	return not isPlayer(peer_id)
 end
