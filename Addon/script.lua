@@ -1,20 +1,22 @@
---[[
-	Improved Conquest Mode, Addon for Stormworks which adds new features, fixes bugs, improved performance and is more balanced over Default Conquest Mode.
-    Copyright (C) 2022 Toastery
 
-    Improved Conquest Mode is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+--?	Improved Conquest Mode, Addon for Stormworks which adds new features, fixes bugs, improved performance and is more balanced over Default Conquest Mode.
+--? Copyright (C) 2022 Toastery
 
-    Improved Conquest Mode is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+--? Improved Conquest Mode is free software: you can redistribute it and/or modify
+--? it under the terms of the GNU General Public License as published by
+--? the Free Software Foundation, either version 3 of the License, or
+--? (at your option) any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with Improved Conquest Mode.  If not, see <https://www.gnu.org/licenses/>.
-]]
+--? Improved Conquest Mode is distributed in the hope that it will be useful,
+--? but WITHOUT ANY WARRANTY; without even the implied warranty of
+--? MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+--? GNU General Public License for more details.
+
+--? You should have received a copy of the GNU General Public License
+--? along with Improved Conquest Mode.  If not, see <https://www.gnu.org/licenses/>.
+
+--! (If gotten from Steam Workshop) LICENSE is in vehicle_0.xml
+--! (If gotten from anywhere else) LICENSE is in LICENSE and vehicle_0.xml
 
 -- Author: Toastery
 -- GitHub: https://github.com/Toast732
@@ -38,7 +40,7 @@ local s = server
 local sm = spawnModifiers
 local v = Vehicles
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.52)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.53)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -276,7 +278,7 @@ function setupRules()
 					spawn_time = time.hour / 60 -- how long after a cargo vehicle is killed can another be spawned
 				},
 				ISLANDS = { --? rules for the islands
-					max_capacity = 10000 *  g_savedata.settings.CARGO_CAPACITY_MULTIPLER, -- the max amount of each resource islands can hold
+					max_capacity = 10000 *  g_savedata.settings.CARGO_CAPACITY_MULTIPLIER, -- the max amount of each resource islands can hold
 					ai_base_generation = 350 -- the amount of cargo the ai's main base can generate per hour
 				}
 			},
@@ -304,6 +306,72 @@ function setupRules()
 					target_distance = 150, -- + spawning distance of both vehicles
 					max_distance = 450 -- have them wait for the one which is behind
 				}
+			}
+		},
+		SETTINGS = { --? for the settings command
+			--[[
+			EXAMPLE = { -- the setting variable itself
+				min = { -- set to nil to ignore
+					value = 0, -- if they're trying to set the setting below or at this value, it will warn them
+					message = "This can cause the ai to have 0 health, causing them to be instantly killed"
+				}, 
+				max = { -- set to nil to ignore
+					value = 100, -- if they're trying to set the setting above or at this value, it will warn them
+					message = "This can cause the ai to have infinite health, causing them to never be killed"
+				},
+				input_multiplier = time.minute -- the multiplier for the input, so they can enter in minutes instead of ticks, for example
+			}
+			]]
+			ENEMY_HP_MODIFIER = {
+				min = {
+					value = 0,
+					message = "the AI to have 0 health, causing them to be instantly killed without taking any damage."
+				},
+				max = nil,
+				input_multiplier = 1
+			},
+			AI_PRODUCTION_TIME_BASE = {
+				min = {
+					value = 0,
+					message = "the AI to produce vehicles instantly, causing a constant tps drop and possibly crashing your game."
+				},
+				max = nil,
+				input_multiplier = time.minute
+			},
+			CAPTURE_TIME = {
+				min = {
+					value = 0,
+					message = "all of the islands to constantly switch factions, creating a huge tps drop due to the amount of notifcation windows, or for no islands to be capturable, or for all islands to be suddenly given to the player."
+				},
+				max = nil,
+				input_multiplier = time.minute
+			},
+			ISLAND_COUNT = {
+				min = {
+					value = 1,
+					message = "the addon breaking completely and permanently. There needs to be at least 2 islands, 1 for ai's main base, 1 for your main base, this can cause issues."
+				},
+				max = {
+					value = 22,
+					message = "improper calculations and lower performance. There are currently only 21 islands which you can have, setting it above 21 can cause issues."
+				},
+				input_multiplier = 1
+			},
+			CARGO_GENERATION_MULTIPLIER = {
+				min = {
+					value = 0,
+					message = "no cargo being generated. If you want to disable cargo, do \"?impwep setting CARGO_MODE false\" instead."
+				},
+				max = nil,
+				input_multiplier = 1
+			},
+			CARGO_CAPACITY_MULTIPLIER = {
+				min = {
+					value = 0,
+					message = "no cargo being stored or generated at islands. If you want to disable cargo mode, do \"?impwep setting CARGO_MODE false\" instead."
+				},
+				max = nil,
+				input_multiplier = 1
 			}
 		}
 	}
@@ -372,7 +440,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Starting Amount of AI Bases (not including main bases)", 0, 19, 1, 4),
 			ISLAND_COUNT = property.slider("Island Count", 7, 21, 1, 21),
 			CARGO_GENERATION_MULTIPLIER = property.slider("Cargo Generation Multiplier (multiplies cargo generated by this)", 0.1, 5, 0.1, 1),
-			CARGO_CAPACITY_MULTIPLER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
+			CARGO_CAPACITY_MULTIPLIER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
 		}
 	end
 
@@ -1510,7 +1578,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	if prefix == "?impwep" then
 		if is_dlc_weapons then
 			if command then
-				command = string.friendly(command) -- makes the command friendly, removing underscores and captitals
+				command = string.friendly(command, true) -- makes the command friendly, removing underscores, spaces and captitals
 				local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
 				--? if this command is an alias
@@ -1525,7 +1593,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 					d.print("------ Improved Conquest Mode Info ------", false, 0, peer_id)
 					d.print("Version: "..IMPROVED_CONQUEST_VERSION, false, 0, peer_id)
 					if not g_savedata.info.has_ai_paths then
-						wpDLCDebug("AI Paths Disabled (will cause ship pathfinding issues)", false, true, peer_id)
+						d.print("AI Paths Disabled (will cause ship pathfinding issues)", false, 1, peer_id)
 					end
 					d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, peer_id)
 					d.print("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, 0, peer_id)
@@ -1961,13 +2029,76 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						elseif g_savedata.settings[arg[1]] ~= nil then -- makes sure the setting they selected exists
 							if not arg[2] then
 								-- print the current value of the setting they selected
-								d.print(arg[1].."'s current value: "..tostring(g_savedata.settings[arg[1]]), false, 0, peer_id)
+								local current_value = g_savedata.settings[arg[1]]
+
+								--? if this has a index in the rules for settings, if this is a number, and if the multiplier is not nil
+								if RULES.SETTINGS[arg[1]] and tonumber(current_value) and RULES.SETTINGS[arg[1]].input_multiplier then
+									current_value = math.noNil(current_value / RULES.SETTINGS[arg[1]].input_multiplier)
+								end
+
+								d.print(arg[1].."'s current value: "..tostring(current_value), false, 0, peer_id)
 							else
 								-- change the value of the setting they selected
 								if type(g_savedata.settings[arg[1]]) == "number" then
 									if tonumber(arg[2]) then
-										d.print(s.getPlayerName(peer_id).." has changed the setting "..arg[1].." from "..g_savedata.settings[arg[1]].." to "..arg[2], false, 0, -1)
-										g_savedata.settings[arg[1]] = tonumber(arg[2])
+
+										arg[2] = tonumber(arg[2])
+										
+										local input_multiplier = 1
+
+										if RULES.SETTINGS[arg[1]] then
+											--? if theres an input multiplier
+											if RULES.SETTINGS[arg[1]].input_multiplier then
+												input_multiplier = RULES.SETTINGS[arg[1]].input_multiplier
+												arg[2] = math.noNil(arg[2] * input_multiplier)
+											end
+											
+											--? if theres a set minimum, if this input is below the minimum and if the player did not yet acknowledge this
+											if RULES.SETTINGS[arg[1]].min and arg[2] <= RULES.SETTINGS[arg[1]].min.value and not g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] then
+												
+												--* set that they've acknowledged this
+												if not g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] then
+													g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] = {
+														min = true,
+														max = false
+													}
+												else
+													g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]].min = true
+												end
+
+												d.print("Warning: setting "..arg[1].." to or below "..RULES.SETTINGS[arg[1]].min.value.." can result in "..RULES.SETTINGS[arg[1]].min.message.." Re-enter the command to acknowledge this and proceed anyways.", false, 1, peer_id)
+												return
+											end
+
+											--? if theres a set maximum, if this input is above or equal to the maximum and if the player did not yet acknowledge this
+											if RULES.SETTINGS[arg[1]].max and arg[2] >= RULES.SETTINGS[arg[1]].max.value and not g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] then
+												
+												--* set that they've acknowledged this
+												if not g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] then
+													g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]] = {
+														min = false,
+														max = true
+													}
+												else
+													g_savedata.player_data[getSteamID(peer_id)].acknowledgements[arg[1]].max = true
+												end
+												d.print("Warning: setting a value to or above "..RULES.SETTINGS[arg[1]].max.value.." can result in "..RULES.SETTINGS[arg[1]].max.message.." Re-enter the command to acknowledge this and proceed anyways.", false, 1, peer_id)
+												return
+											end
+										end
+
+										settings = s.getGameSettings()
+
+										d.print(s.getPlayerName(peer_id).." has changed the setting "..arg[1].." from "..math.noNil(g_savedata.settings[arg[1]]/input_multiplier).." to "..(arg[2]/input_multiplier), false, 0, -1)
+
+										-- if this is changing the capture timer, then re-adjust all of the capture timers for each island
+										if arg[1] == "CAPTURE_TIME" and arg[2] ~= 0 and g_savedata.settings[arg[1]] ~= 0 then
+											for island_index, island in pairs(g_savedata.controllable_islands) do
+												island.capture_timer = island.capture_timer * (arg[2] / g_savedata.settings[arg[1]])
+											end
+										end
+
+										g_savedata.settings[arg[1]] = arg[2]
 									else
 										d.print(arg[2].." is not a valid value! it must be a number!", false, 1, peer_id)
 									end
@@ -2186,10 +2317,18 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 				-- if the command they entered exists
 				local is_command = false
-				for permission_level, command_list in pairs(player_commands) do
-					if command_list[command] then
-						is_command = true
-						break
+				if command_aliases[command] then
+					is_command = true
+				else
+					for permission_level, command_list in pairs(player_commands) do
+						if is_command then break end
+						for command_name, _ in pairs(command_list) do
+							if is_command then break end
+							if string.friendly(command_name, true) == command then
+								is_command = true
+								break
+							end
+						end
 					end
 				end
 
@@ -2330,11 +2469,12 @@ function onPlayerJoin(steam_id, name, peer_id)
 			},
 			timers = {
 				do_as_i_say = 0
-			}
+			},
+			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
-		-- if its toastey, and if this is a dev version, enable debug for toastery
-		-- this is because enabling debug every time I create a new world is annoying
-		if IS_DEVELOPMENT_VERSION and tostring(steam_id) == "76561198258457459" then 
+		-- if its toastey, enable debug for toastery
+		-- this is because enabling debug every time I create a new world is annoying, and sometimes theres debug I miss which is only when the world is first created
+		if tostring(steam_id) == "76561198258457459" then 
 			d.setDebug(0, peer_id) -- enable chat debug
 			d.setDebug(3, peer_id) -- enable map debug
 			d.print("Enabling debug automatically for you, "..name, false, 0, peer_id)
@@ -5380,6 +5520,15 @@ function tickCargoVehicles()
 	if g_savedata.settings.CARGO_MODE then -- if cargo mode is enabled
 		for cargo_vehicle_index, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 			if isTickID(cargo_vehicle_index, cargo_vehicle_tickrate) then
+
+				--* sync the script's cargo with the true cargo
+
+				--? if the cargo vehicle is simulating
+				if cargo_vehicle.vehicle_data.state.is_simulating then
+					Cargo.
+
+				--* tick cargo vehicle behaviour
+
 				-- if the vehicle is in the first stage (loading up with cargo)
 				local vehicle_object, squad_index, squad = squads.getVehicle(cargo_vehicle.vehicle_data.id)
 				cargo_vehicle.vehicle_data = vehicle_object
@@ -6476,6 +6625,10 @@ function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight
 	weight = weight - damage_weight
 
 	return weight
+end
+
+function Cargo.getTank(vehicle_id)
+
 end
 
 ---@param vehicle_id integer the id of the vehicle
@@ -7816,12 +7969,41 @@ end
 ---@param vehicle_name string the name of the vehicle
 ---@return integer vehicle_list_id the vehicle list id from the vehicle's name, returns nil if not found
 function spawnModifiers.getVehicleListID(vehicle_name)
+
+	local vehicle_type_prefixes = {
+		[1] = "BOAT %- ",
+		[2] = "HELI %- ",
+		[3] = "LAND %- ",
+		[4] = "TURRET %- ",
+		[5] = "PLANE %- "
+	}
+
+	-- replaces underscores with spaces
+	local vehicle_name = string.gsub(vehicle_name, "_", " ")
+
+	-- remove the vehicle type prefix from the entered vehicle name
+	for _, prefix in ipairs(vehicle_type_prefixes) do
+		vehicle_name = string.gsub(vehicle_name, prefix, "")
+	end
+
+	-- makes the string friendly
+	vehicle_name = string.friendly(vehicle_name, true)
+
 	local found_vehicle = nil
 	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
-		if vehicle_object.location.data.name == vehicle_name and not found_vehicle then
-			found_vehicle = vehicle_id
+		if found_vehicle then break end
+		-- go through all prefixes and remove them from the location name, also makes it friendly
+		for _, prefix in ipairs(vehicle_type_prefixes) do
+			if string.friendly(string.gsub(string.gsub(vehicle_object.location.data.name, "_", " "), prefix, ""), true) == vehicle_name and not found_vehicle then
+				found_vehicle = vehicle_id
+				break
+			elseif string.gsub(string.gsub(vehicle_object.location.data.name, "_", " "), prefix, "") ~= string.gsub(vehicle_object.location.data.name, "_", " ") then
+				-- if this vehicle had the correct prefix, but this is not the correct vehicle, break
+				break
+			end
 		end
 	end
+		
 	return found_vehicle
 end
 
@@ -8385,11 +8567,23 @@ function string.upperFirst(str)
 	return nil
 end
 
----@param str string the string the make friendly
----@return string friendly_string friendly string, nil if input_string was not a string
-function string.friendly(str) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
+--- @param str string the string the make friendly
+--- @param remove_spaces boolean true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
+--- @return string friendly_string friendly string, nil if input_string was not a string
+function string.friendly(str, remove_spaces) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
 	if type(str) == "string" then
-		return string.gsub(string.lower(str), "_", " ")
+		-- make all lowercase
+		local friendly_string = string.lower(str)
+
+		-- replace all underscores with spaces
+		friendly_string = string.gsub(friendly_string, "_", " ")
+
+		-- if remove_spaces is true, remove all spaces
+		if remove_spaces then
+			friendly_string = string.gsub(friendly_string, " ", "")
+		end
+
+		return friendly_string
 	end
 	return nil
 end

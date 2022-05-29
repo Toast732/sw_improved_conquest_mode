@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="164" component_id_counter="3187">
+	<locations location_id_counter="165" component_id_counter="3188">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -27547,6 +27547,19 @@
 							<l value="3182"/>
 							<l value="3179"/>
 						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="165" name="LICENSE" env_mod_spawn_num="1">
+				<components>
+					<c component_type="3" name="LICENSE" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_0.xml" vehicle_file_store="4">
+						<spawn_transform 30="-22.512417" 31="4.375004" 32="-11.289178"/>
+						<spawn_bounds>
+							<min x="-3.625" y="-2.625" z="0.125"/>
+							<max x="0.125" y="6.125" z="3.875"/>
+						</spawn_bounds>
+						<spawn_local_offset x="1.75" y="-1.75" z="-2"/>
+						<graph_links/>
 					</c>
 				</components>
 			</l>
