@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="165" component_id_counter="3215">
+	<locations location_id_counter="165" component_id_counter="3218">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -3769,6 +3769,30 @@
 							<l value="3085"/>
 							<l value="3086"/>
 						</graph_links>
+					</c>
+					<c component_type="10" id="3216" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.303717" 02="-0.952762" 20="0.952762" 22="0.303717" 30="-219.357712" 31="4.999999" 32="210.906555"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="3217" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-400.259827" 31="4.999999" 32="325.583954"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="3218" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.34113" 02="-0.940016" 20="0.940016" 22="0.34113" 30="182.384247" 31="5.000002" 32="335.357758"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
 					</c>
 				</components>
 			</l>
