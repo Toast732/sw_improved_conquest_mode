@@ -5637,19 +5637,6 @@
 					</c>
 				</components>
 			</l>
-			<l id="27" name="Terrain Height Scanner" env_mod_spawn_num="1">
-				<components>
-					<c component_type="3" id="594" name="type=dlc_weapons_terrain_scanner" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_594.xml" vehicle_file_store="4" vehicle_is_static="true" vehicle_is_no_sleep="true" vehicle_is_invulnerable="true">
-						<spawn_transform 30="0.004956" 31="0.49856" 32="-0.000991"/>
-						<spawn_bounds>
-							<min x="-0.125" y="-1.125" z="-0.375"/>
-							<max x="0.125" y="0.375" z="0.375"/>
-						</spawn_bounds>
-						<spawn_local_offset y="0.375"/>
-						<graph_links/>
-					</c>
-				</components>
-			</l>
 			<l id="28" name="PLANE - O-2 SKYMASTER" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="597" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8,pseudo_speed=87,health=425" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">

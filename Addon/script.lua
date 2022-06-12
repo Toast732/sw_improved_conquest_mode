@@ -31,17 +31,19 @@ Cargo = {} -- functions relating to the Transport AI
 Cache = {} -- functions relating to the custom Cache
 Squad = {} -- functions for squads
 Debugging = {} -- functions related to debugging
-Vehicles = {} -- functions related to vehicles, and parsing data on them
+Vehicle = {} -- functions related to vehicles, and parsing data on them
 AI = {} -- functions related to their AI
+Island = {} -- functions relating to islands
 
 -- shortened library names
 local d = Debugging
 local m = matrix
 local s = server
 local sm = SpawnModifiers
-local v = Vehicles
+local v = Vehicle
+local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.56)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.57)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -197,7 +199,6 @@ local g_count_attack = 0
 local g_count_patrol = 0
 
 g_savedata = {
-	exists = true, -- means that the savedata does exist, used for checking if the savedata exists
 	ai_base_island = nil,
 	player_base_island = nil,
 	islands = {},
@@ -205,7 +206,7 @@ g_savedata = {
 		squadrons = { 
 			[RESUPPLY_SQUAD_INDEX] = { 
 				command = SQUAD.COMMAND.RESUPPLY, 
-				ai_type = "", 
+				vehicle_type = "", 
 				role = "", 
 				vehicles = {}, 
 				target_island = nil 
@@ -217,8 +218,7 @@ g_savedata = {
 	cargo_vehicles = {},
 	constructable_vehicles = {},
 	vehicle_list = {},
-	terrain_scanner_prefab = {},
-	terrain_scanners = {},
+	prefabs = {}, 
 	is_attack = false,
 	info = {
 		creation_version = nil,
@@ -278,6 +278,10 @@ g_savedata = {
 	},
 	tick_extensions = {
 		cargo_vehicle_spawn = 0
+	},
+	graph_nodes = {
+		init = false,
+		nodes = {}
 	}
 }
 
@@ -326,6 +330,13 @@ function setupRules()
 					min_distance = 55, -- make the one behind stop moving so it gives it space
 					target_distance = 150, -- + spawning distance of both vehicles
 					max_distance = 450 -- have them wait for the one which is behind
+				}
+			},
+			COSTS = {
+				RESOURCE_VALUES = { -- how much each litre of resource is worth
+					oil = 10, -- non jet or diesel vehicles (turrets, electric vehicles, etc)
+					diesel = 10, -- diesel vehicles
+					jet_fuel = 10 -- jet vehicles
 				}
 			}
 		},
@@ -491,6 +502,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
 
 		setupRules()
+		
+		updatePathfinding()
 
 		if is_world_create then
 
@@ -503,8 +516,9 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					-- removes vehicle icons and paths
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							s.removeMapObject(-1,vehicle_object.map_id)
-							s.removeMapLine(-1,vehicle_object.map_id)
+							s.removeMapObject(-1, vehicle_object.map_id)
+							s.removeMapLabel(-1, vehicle_object.map_id)
+							s.removeMapLine(-1, vehicle_object.map_id)
 							for i = 1, #vehicle_object.path - 1 do
 								local waypoint = vehicle_object.path[i]
 								s.removeMapLine(-1, waypoint.ui_id)
@@ -557,6 +571,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			end
 
 			d.print("setting up world...", true, 0)
+
+			d.print("getting y level of all graph nodes...", true, 0)
+			-- cause createPathY to execute, which will get the y level of all graph nodes
+			-- otherwise the game would freeze for a bit after the player loaded in, looking like the game froze
+			-- instead it looks like its taking a bit longer to create the world.
+			s.pathfind(m.translation(0, 0, 0), m.translation(0, 0, 0), "", "") 
 
 			d.print("setting up spawn zones...", true, 0)
 
@@ -805,7 +825,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				d.print("spawning initial ai vehicles...", true, 0)
 				
 				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.ceil(math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1)/2) do
-					local spawned, vehicle_data = spawnAIVehicleRetry(nil, nil, true, nil, 5) -- spawn initial ai
+					local spawned, vehicle_data = spawnAIVehicleRetry(nil, nil, true, nil, nil, 5) -- spawn initial ai
 				end
 				d.print("all initial ai vehicles spawned!")
 			else -- say we're ready to reload scripts
@@ -817,6 +837,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					s.removeMapObject(-1, vehicle_object.map_id)
+					s.removeMapLabel(-1, vehicle_object.map_id)
 					s.removeMapLine(-1, vehicle_object.map_id)
 					for i = 1, #vehicle_object.path - 1 do
 						local waypoint = vehicle_object.path[i]
@@ -881,12 +902,18 @@ function buildPrefabs(location_index)
 end
 
 ---@param island island[] the island to spawn the turret at
+---@param purchase_type integer the way you want to purchase the vehicle 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@return boolean spawned if the turret successfully spawned
 ---@return vehicle_data[] vehicle_data the vehicle data of the turret, if it did not successfully spawn, then it returns the error code
-function spawnTurret(island)
+function spawnTurret(island, purchase_type)
 
 	if (#island.zones.turrets < 1) then
 		return false, "theres no turret zones on this island!\nisland: "..island.name 
+	end
+
+	if not g_savedata.settings.CARGO_MODE or not purchase_type then
+		-- buy the vehicle for free
+		purchase_type = 0
 	end
 
 	local turret_count = 0
@@ -918,6 +945,9 @@ function spawnTurret(island)
 	island.zones.turrets[spawnbox_index].is_spawned = true
 	local spawn_transform = island.zones.turrets[spawnbox_index].transform
 
+	-- check if we can afford the vehicle
+	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(v.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
+
 	-- spawn objects
 	local all_addon_components = {}
 	local spawned_objects = {
@@ -937,7 +967,7 @@ function spawnTurret(island)
 		end
 
 		local home_x, home_y, home_z = m.position(spawn_transform)
-		---@class vehicle_object
+		---@class turret_object
 		local vehicle_data = {
 			id = spawned_objects.spawned_vehicle.id,
 			name = selected_prefab.location.data.name,
@@ -962,12 +992,16 @@ function spawnTurret(island)
 				}
 			},
 			map_id = s.getMapID(),
-			ai_type = spawned_objects.spawned_vehicle.ai_type,
+			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
 			role = getTagValue(selected_prefab.vehicle.tags, "role") or "turret",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			holding_target = m.translation(home_x, home_y, home_z),
 			main_body = getTagValue(selected_prefab.vehicle.tags, "main_body") or 0, -- used for saying an alternate main body, such as the large turret on the sam turret
+			costs = {
+				buy_on_load = not cost_existed,
+				purchase_type = purchase_type
+			},
 			vision = {
 				radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
@@ -1021,7 +1055,6 @@ function spawnTurret(island)
 			damage_dealt = {},
 			fire_id = nil,
 			spawnbox_index = spawnbox_index,
-			just_teleported = false,
 			object_type = "vehicle"
 		}
 
@@ -1031,6 +1064,19 @@ function spawnTurret(island)
 		
 		local squad = addToSquadron(vehicle_data)
 		setSquadCommand(squad, SQUAD.COMMAND.TURRET)
+
+		local prefab, got_prefab = v.getPrefab(selected_prefab.location.data.name)
+
+		if not got_prefab then
+			v.createPrefab(spawned_objects.spawned_vehicle.id)
+		end
+
+		if cost_existed then
+			local cost, cost_existed, was_purchased = v.purchaseVehicle(v.removePrefix(selected_prefab.location.data.name), island.name, purchase_type)
+			if not was_purchased then
+				vehicle_data.costs.buy_on_load = true
+			end
+		end
 
 		d.print("spawned turret at island "..island.name, true, 0)
 		return true, vehicle_data
@@ -1049,14 +1095,16 @@ end
 ---@param vehicle_type string the vehicle type you want to spawn, such as boat, leave nil to ignore
 ---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
 ---@param specified_island island[] the island you want it to spawn at
+---@param purchase_type integer the way you want to purchase the vehicle 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@param retry_count integer how many times to retry spawning the vehicle if it fails
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_data[] vehicle_data the vehicle's data if the the vehicle successfully spawned, otherwise its nil
-function spawnAIVehicleRetry(requested_prefab, vehicle_type, force_spawn, specified_island, retry_count) -- spawns a ai vehicle, if it fails then it tries again, the amount of times it retrys is how ever many was given)
+function spawnAIVehicleRetry(requested_prefab, vehicle_type, force_spawn, specified_island, purchase_type, retry_count) -- spawns a ai vehicle, if it fails then it tries again, the amount of times it retrys is how ever many was given)
 	local spawned = nil
 	local vehicle_data = nil
+	d.print("(spawnAIVehicleRetry) attempting to spawn vehicle...", true, 0)
 	for i = 1, retry_count do
-		spawned, vehicle_data = spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_island)
+		spawned, vehicle_data = spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_island, purchase_type)
 		if spawned then
 			return spawned, vehicle_data
 		else
@@ -1070,22 +1118,28 @@ end
 ---@param vehicle_type string the vehicle type you want to spawn, such as boat, leave nil to ignore
 ---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
 ---@param specified_island island[] the island you want it to spawn at
+---@param purchase_type integer 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_object vehicle_object the vehicle's data if the the vehicle successfully spawned, otherwise its returns the error code
-function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_island)
+function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_island, purchase_type)
 	local plane_count = 0
 	local heli_count = 0
 	local army_count = 0
 	local land_count = 0
 	local boat_count = 0
+
+	if not g_savedata.settings.CARGO_MODE or not purchase_type then
+		-- buy the vehicle for free
+		purchase_type = 1
+	end
 	
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-			if vehicle_object.ai_type ~= VEHICLE.TYPE.TURRET then army_count = army_count + 1 end
-			if vehicle_object.ai_type == VEHICLE.TYPE.PLANE then plane_count = plane_count + 1 end
-			if vehicle_object.ai_type == VEHICLE.TYPE.HELI then heli_count = heli_count + 1 end
-			if vehicle_object.ai_type == VEHICLE.TYPE.LAND then land_count = land_count + 1 end
-			if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then boat_count = boat_count + 1 end
+			if vehicle_object.vehicle_type ~= VEHICLE.TYPE.TURRET then army_count = army_count + 1 end
+			if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then plane_count = plane_count + 1 end
+			if vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then heli_count = heli_count + 1 end
+			if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then land_count = land_count + 1 end
+			if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then boat_count = boat_count + 1 end
 		end
 	end
 	
@@ -1101,6 +1155,8 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		d.print("Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
+
+	d.print("(spawnAIVehicle) selected vehicle: "..selected_prefab.location.data.name, true, 0)
 
 	if not requested_prefab then
 		if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
@@ -1128,6 +1184,8 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 
 	local min_player_dist = 2500
 
+	d.print("Getting island to spawn vehicle at...", true, 0)
+
 	if not specified_island then
 		-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
 		if getTagValue(selected_prefab.vehicle.tags, "role", true) == "attack" or getTagValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
@@ -1135,19 +1193,13 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			if not target then
 				sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
 				sm.train(PUNISH, attack, 5)
-				spawnAIVehicle()
+				spawnAIVehicle(nil, nil, nil, nil, purchase_type)
 				return false, "no islands to attack! cancelling spawning of attack vehicle"
 			end
 			for island_index, island in pairs(g_savedata.islands) do
-				if island.faction == ISLAND.FACTION.AI then
-					if selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform) then
-						if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-							if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-								selected_spawn_transform = island.transform
-								selected_spawn = island_index
-							end
-						end
-					end
+				if is.canSpawn(island, selected_prefab) and (selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform)) then
+					selected_spawn_transform = island.transform
+					selected_spawn = island_index
 				end
 			end
 		-- (A) if the vehicle we want to spawn is a defensive vehicle, we want to spawn it on the island that has the least amount of defence
@@ -1157,54 +1209,41 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			local lowest_defenders = nil
 			local check_last_seen = false
 			local islands_needing_checked = {}
+
 			for island_index, island in pairs(g_savedata.islands) do
-				if island.faction == ISLAND.FACTION.AI then
-					if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-							if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
-								lowest_defenders = island.defenders -- set the new lowest defender amount on an island
-								selected_spawn_transform = island.transform
-								selected_spawn = island_index
-								check_last_seen = false -- say that we dont need to do a tie breaker
-								islands_needing_checked = {}
-							elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
-								islands_needing_checked[selected_spawn] = selected_spawn_transform
-								islands_needing_checked[island_index] = island.transform
-								check_last_seen = true -- we need a tie breaker
-							end
-						end
-					end
+				if is.canSpawn(island, selected_prefab) and (not lowest_defenders or island.defenders < lowest_defenders) then -- choose the island with the least amount of defence (A)
+					lowest_defenders = island.defenders -- set the new lowest defender amount on an island
+					selected_spawn_transform = island.transform
+					selected_spawn = island_index
+					check_last_seen = false -- say that we dont need to do a tie breaker
+					islands_needing_checked = {}
+				elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
+					islands_needing_checked[selected_spawn] = selected_spawn_transform
+					islands_needing_checked[island_index] = island.transform
+					check_last_seen = true -- we need a tie breaker
 				end
 			end
+
 			if check_last_seen then -- do a tie breaker (B)
 				local closest_player_pos = nil
 				for player_steam_id, player_transform in pairs(g_savedata.ai_knowledge.last_seen_positions) do
 					for island_index, island_transform in pairs(islands_needing_checked) do
 						local player_to_island_dist = m.xzDistance(player_transform, island_transform)
-						if player_to_island_dist < 6000 then
-							if not closest_player_pos or player_to_island_dist < closest_player_pos then
-								if playersNotNearby(player_list, island_transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-									if hasTag(g_savedata.islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-										closest_player_pos = player_to_island_dist
-										selected_spawn_transform = island_transform
-										selected_spawn = island_index
-									end
-								end
-							end
+						if not closest_player_pos or player_to_island_dist < closest_player_pos then
+							closest_player_pos = player_to_island_dist
+							selected_spawn_transform = island_transform
+							selected_spawn = island_index
 						end
 					end
 				end
+
 				if not closest_player_pos then -- if no players were seen this game, spawn closest to the closest player island (C)
 					for island_index, island_transform in pairs(islands_needing_checked) do
 						for player_island_index, player_island in pairs(g_savedata.islands) do
 							if player_island.faction == ISLAND.FACTION.PLAYER then
 								if m.xzDistance(selected_spawn_transform, island_transform) > m.xzDistance(player_island.transform, island_transform) then
-									if playersNotNearby(player_list, island_transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-										if hasTag(g_savedata.islands[island_index].tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-											selected_spawn_transform = island_transform
-											selected_spawn = island_index
-										end
-									end
+									selected_spawn_transform = island_transform
+									selected_spawn = island_index
 								end
 							end
 						end
@@ -1216,13 +1255,9 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			local valid_islands = {}
 			local valid_island_index = {}
 			for island_index, island in pairs(g_savedata.islands) do
-				if island.faction == ISLAND.FACTION.AI then
-					if playersNotNearby(player_list, island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-						if hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
-							table.insert(valid_islands, island)
-							table.insert(valid_island_index, island_index)
-						end
-					end
+				if is.canSpawn(island, selected_prefab) then
+					table.insert(valid_islands, island)
+					table.insert(valid_island_index, island_index)
 				end
 			end
 			if #valid_islands > 0 then
@@ -1235,14 +1270,12 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		-- if they specified the island they want it to spawn at
 		if not force_spawn then
 			-- if they did not force the vehicle to spawn
-			if hasTag(specified_island.tags, "can_spawn"..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) or hasTag(selected_prefab.vehicle.tags, "role=scout") then
-				if playersNotNearby(player_list, specified_island.transform, min_player_dist, true) then -- makes sure no player is within min_player_dist
-					selected_spawn_transform = specified_island.transform
-					selected_spawn = specified_island.index
-				end
+			if is.canSpawn(specified_island, selected_prefab) then
+				selected_spawn_transform = specified_island.transform
+				selected_spawn = specified_island.index
 			end
 		else
-			d.print("forcing vehicle to spawn at "..specified_island.index, true, 0)
+			--d.print("forcing vehicle to spawn at "..specified_island.index, true, 0)
 			-- if they forced the vehicle to spawn
 			selected_spawn_transform = specified_island.transform
 			selected_spawn = specified_island.index
@@ -1271,17 +1304,17 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		end
 	end
 
+	local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.islands[selected_spawn]
+
+	d.print("(spawnAIVehicle) island: "..island.name, true, 0)
+
 	local spawn_transform = selected_spawn_transform
 	if hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
-		local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.islands[selected_spawn]
-		if island then
-			d.print("island: "..island.name, true, 0)
-		else
+		if not island then
 			return false, "unable to find island to spawn sea vehicle at!"
 		end
 		spawn_transform = island.zones.sea[math.random(1, #island.zones.sea)].transform
 	elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_land") then
-		local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.islands[selected_spawn]
 		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	else
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 400, math.random(-500, 500)))
@@ -1294,6 +1327,16 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 				return false, "spawn location was too close to vehicle "..vehicle_id
 			end
 		end
+	end
+
+	d.print("calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
+	-- check if we can afford the vehicle
+	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(v.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
+
+	d.print("cost: "..tostring(cost), true, 0)
+
+	if not was_purchased then
+		return false, "was unable to afford vehicle"
 	end
 
 	-- spawn objects
@@ -1320,6 +1363,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		d.print("setting vehicle data...", true, 0)
 		d.print("selected_spawn: "..selected_spawn, true, 0)
 
+		---@class vehicle_object
 		local vehicle_data = { 
 			id = spawned_objects.spawned_vehicle.id,
 			name = selected_prefab.location.data.name,
@@ -1334,7 +1378,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			},
 			state = { 
 				s = VEHICLE.STATE.HOLDING, 
-				timer = math.fmod(spawned_objects.spawned_vehicle.id, 300),
+				timer = math.floor(math.fmod(spawned_objects.spawned_vehicle.id, 300 * stats_multiplier)),
 				is_simulating = false,
 				convoy = {
 					status = CONVOY.MOVING,
@@ -1343,13 +1387,17 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 					ignore_wait = false,
 					waiting_for = 0
 				}
-			}, 
+			},
 			map_id = s.getMapID(),
-			ai_type = spawned_objects.spawned_vehicle.ai_type,
+			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
 			role = getTagValue(selected_prefab.vehicle.tags, "role", true) or "general",
 			size = spawned_objects.spawned_vehicle.size,
 			holding_index = 1,
 			holding_target = m.translation(home_x, home_y, home_z),
+			costs = {
+				buy_on_load = not cost_existed,
+				purchase_type = purchase_type
+			},
 			vision = { 
 				radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
 				base_radius = getTagValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
@@ -1362,18 +1410,18 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			speed = {
 				land = {
 					normal = {
-						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed"),
-						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed"),
-						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
+						road = (getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier,
+						bridge = (getTagValue(selected_prefab.vehicle.tags, "bridge_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier,
+						offroad = (getTagValue(selected_prefab.vehicle.tags, "offroad_speed_normal") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier
 					},
 					aggressive = {
-						road = getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed"),
-						bridge = getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed"),
-						offroad = getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
+						road = (getTagValue(selected_prefab.vehicle.tags, "road_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier,
+						bridge = (getTagValue(selected_prefab.vehicle.tags, "bridge_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier,
+						offroad = (getTagValue(selected_prefab.vehicle.tags, "offroad_speed_aggressive") or getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")) * stats_multiplier
 					}
 				},
 				not_land = {
-					pseudo_speed = getTagValue(selected_prefab.vehicle.tags, "pseudo_speed")
+					pseudo_speed = (getTagValue(selected_prefab.vehicle.tags, "pseudo_speed") or 0) * stats_multiplier
 				},
 				uses_terrain_type_detection = (getTagValue(selected_prefab.vehicle.tags, "road_speed_normal") ~= nil)
 			},
@@ -1398,10 +1446,9 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 			target_vehicle_id = nil,
 			target_player_id = nil,
 			current_damage = 0,
-			health = getTagValue(selected_prefab.vehicle.tags, "health", false) or 1,
+			health = (getTagValue(selected_prefab.vehicle.tags, "health", false) or 1) * stats_multiplier,
 			damage_dealt = {},
 			fire_id = nil,
-			just_teleported = false,
 			object_type = "vehicle"
 		}
 
@@ -1419,6 +1466,20 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		elseif getTagValue(selected_prefab.vehicle.tags, "role", true) == "cargo" then
 			setSquadCommand(squad, SQUAD.COMMAND.CARGO)
 		end
+
+		local prefab, got_prefab = v.getPrefab(selected_prefab.location.data.name)
+
+		if not got_prefab then
+			v.createPrefab(spawned_objects.spawned_vehicle.id)
+		end
+
+		if cost_existed then
+			local cost, cost_existed, was_purchased = v.purchaseVehicle(v.removePrefix(selected_prefab.location.data.name), (g_savedata.islands[selected_spawn].name or g_savedata.ai_base_island.name), purchase_type)
+			if not was_purchased then
+				vehicle_data.costs.buy_on_load = true
+			end
+		end
+
 		return true, vehicle_data
 	end
 	return false, "spawned_objects.spawned_vehicle was nil"
@@ -1628,6 +1689,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 					end
 				end
 
+
 				--
 				-- admin only commands
 				--
@@ -1667,9 +1729,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						
 					elseif command == "sv" then --spawn vehicle
 						if arg[1] then
-							vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
+							local vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
 							if vehicle_id or arg[1] == "scout" or arg[1] == "cargo" then
-								valid_vehicle = true
 								d.print("Spawning \""..arg[1].."\"", false, 0, peer_id)
 								if arg[1] ~= "scout" and arg[1] ~= "cargo" then
 									successfully_spawned, vehicle_data = spawnAIVehicle(vehicle_id, nil, true)
@@ -1678,7 +1739,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 											if arg[2] == "near" then -- the player selected to spawn it in a range
 												if tonumber(arg[3]) >= 150 then -- makes sure the min range is equal or greater than 150
 													if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
-														if vehicle_data.ai_type == VEHICLE.TYPE.BOAT then
+														if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
 															local player_pos = s.getPlayerPos(peer_id)
 															local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 															if found_new_location then
@@ -1697,7 +1758,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 																	end
 																end
 															end
-														elseif vehicle_data.ai_type == VEHICLE.TYPE.LAND then
+														elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
 															--[[
 															local possible_islands = {}
 															for island_index, island in pairs(g_savedata.islands) do
@@ -1750,12 +1811,12 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 											else
 												if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
 													if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
-														if vehicle_data.ai_type == VEHICLE.TYPE.BOAT then
+														if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
 															local new_pos = m.translation(arg[2], 0, arg[3])
 															s.setVehiclePos(vehicle_data.id, new_pos)
 															vehicle_data.transform = new_pos
 															d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
-														elseif vehicle_data.ai_type == VEHICLE.TYPE.LAND then
+														elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
 															d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
 															for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 																for vehicle_index, vehicle_object in pairs(squad.vehicles) do
@@ -2154,7 +2215,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						local vehicles = sm.getStats()
 
 						if vehicles.best[1].mod == vehicles.worst[1].mod then
-							d.print("the adaptive AI doesn't know anything about you! all vehicles currently have the same chance to spawn!", false, 0, peer_id)
+							d.print("the adaptive AI doesn't know anything about you! all vehicles currently have the same chance to spawn.", false, 0, peer_id)
 						else
 							d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 							for _, vehicle_data in ipairs(vehicles.best) do
@@ -2225,7 +2286,6 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						local true_addon_data = s.getAddonData(true_addon_index)
 						local addon_data = s.getAddonData(addon_index)
 						d.print("file_store: "..tostring(addon_data.file_store).." | "..tostring(true_addon_data.file_store).."\nlocation_count: "..tostring(addon_data.location_count).." | "..tostring(true_addon_data.location_count).."\naddon_name: "..tostring(addon_data.name).." | "..tostring(true_addon_data.name).."\npath_id: "..tostring(addon_data.path_id).." | "..tostring(true_addon_data.path_id), false, 0, peer_id)
-
 					end
 				else
 					for command_name, command_info in pairs(player_commands.admin) do
@@ -2580,11 +2640,11 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 				local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
 				if g_savedata.settings.SINKING_MODE then
-					if vehicle_object.ai_type == VEHICLE.TYPE.TURRET or vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET or vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 						enemy_hp = enemy_hp * 2.5
 					else
 						enemy_hp = enemy_hp * 8
-						if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
 							enemy_hp = enemy_hp * 10
 						end
 					end
@@ -2619,17 +2679,19 @@ function onVehicleTeleport(vehicle_id, peer_id, x, y, z)
 end
 
 function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
-	if is_dlc_weapons then
-		if isPlayer(peer_id) then
-			d.print("Player Spawned Vehicle "..vehicle_id, true, 0)
-			-- player spawned vehicle
-			g_savedata.player_vehicles[vehicle_id] = {
-				current_damage = 0, 
-				damage_threshold = 100, 
-				death_pos = nil, 
-				map_id = s.getMapID()
-			}
-		end
+	if not is_dlc_weapons then
+		return
+	end
+
+	if isPlayer(peer_id) then
+		d.print("Player Spawned Vehicle "..vehicle_id, true, 0)
+		-- player spawned vehicle
+		g_savedata.player_vehicles[vehicle_id] = {
+			current_damage = 0, 
+			damage_threshold = 100, 
+			death_pos = nil, 
+			map_id = s.getMapID()
+		}
 	end
 end
 
@@ -2659,6 +2721,7 @@ function cleanVehicle(squad_index, vehicle_id)
 			local steam_id = getSteamID(peer.id)
 			if g_savedata.player_data[steam_id].debug.map then
 				s.removeMapObject(peer.id ,vehicle_object.map_id)
+				s.removeMapLabel(peer.id, vehicle_object.map_id)
 				s.removeMapLine(peer.id ,vehicle_object.map_id)
 				for i = 1, #vehicle_object.path - 1 do
 					local waypoint = vehicle_object.path[i]
@@ -2671,7 +2734,7 @@ function cleanVehicle(squad_index, vehicle_id)
 	-- remove it from the sweep and prune pairs
 	g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
 
-	if vehicle_object.ai_type == VEHICLE.TYPE.TURRET and vehicle_object.spawnbox_index ~= nil then
+	if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET and vehicle_object.spawnbox_index ~= nil then
 		for island_index, island in pairs(g_savedata.islands) do		
 			if island.name == vehicle_object.home_island.name then
 				island.zones.turrets[vehicle_object.spawnbox_index].is_spawned = false
@@ -2703,13 +2766,6 @@ function cleanVehicle(squad_index, vehicle_id)
 					island.assigned_squad_index = -1
 				end
 			end
-		end
-	end
-
-	-- removes it from the terrain scanner data
-	for scanner_index, scanner in pairs(g_savedata.terrain_scanners) do
-		if scanner.vehicle.id == vehicle_id then
-			g_savedata.terrain_scanners[scanner_index] = nil
 		end
 	end
 end
@@ -2796,138 +2852,127 @@ function onObjectLoad(object_id)
 end]]
 
 function onVehicleLoad(vehicle_id)
-	if is_dlc_weapons then
+	if not is_dlc_weapons then
+		return
+	end
 
-		if g_savedata.player_vehicles[vehicle_id] ~= nil then
-			local player_vehicle_data = s.getVehicleData(vehicle_id)
-			if player_vehicle_data.voxels then
-				g_savedata.player_vehicles[vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
-				g_savedata.player_vehicles[vehicle_id].transform = s.getVehiclePos(vehicle_id)
-			end
+	if g_savedata.player_vehicles[vehicle_id] ~= nil then
+		local player_vehicle_data = s.getVehicleData(vehicle_id)
+		if player_vehicle_data.voxels then
+			g_savedata.player_vehicles[vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
+			g_savedata.player_vehicles[vehicle_id].transform = s.getVehiclePos(vehicle_id)
+		end
+	end
+
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	if vehicle_object then
+		d.print("(onVehicleLoad) AI Vehicle Loaded: "..tostring(vehicle_object.name), true, 0)
+		local prefab, got_prefab = v.getPrefab(vehicle_object.name)
+
+		if not got_prefab or not prefab.fully_created then
+			v.createPrefab(vehicle_id)
 		end
 
-		local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+		if vehicle_object.costs.buy_on_load then
+			local cost, cost_existed, was_purchased = v.purchaseVehicle(vehicle_object.name, vehicle_object.home_island.name, vehicle_object.costs.purchase_type)
+			if was_purchased then
+				vehicle_object.costs.buy_on_load = false
+			else
+				d.print("(onVehicleLoad) unable to afford "..vehicle_object.name..", killing vehicle "..vehicle_id, true, 0)
+				killVehicle(squad_index, vehicle_id, true, true)
+			end
+		end
+	end
 
-		if squad_index then
-			d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
-			if not vehicle_object.name then vehicle_object.name = "nil" end
-			d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
-			vehicle_object.state.is_simulating = true
-			-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
-			if not vehicle_object.just_teleported then
-				for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
-					for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
-						if checking_vehicle_object.id ~= vehicle_id then
-							if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
-								if not vehicle_object.path[2] then
-									d.print("cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
+	if squad_index then
+		d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
+		if not vehicle_object.name then vehicle_object.name = "nil" end
+		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
+		vehicle_object.state.is_simulating = true
+		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
+		for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
+			for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
+				if checking_vehicle_object.id ~= vehicle_id then
+					if m.distance(vehicle_object.transform, checking_vehicle_object.transform) < (vehicle_object.spawning_transform.distance or DEFAULT_SPAWNING_DISTANCE) + checking_vehicle_object.spawning_transform.distance then
+						if not vehicle_object.path[2] then
+							d.print("(onVehicleLoad) cancelling spawning vehicle, due to its proximity to vehicle "..vehicle_id, true, 1)
 
-									-- refund the cargo to the island which was sending the cargo
-									Cargo.refund(vehicle_id)
+							-- refund the cargo to the island which was sending the cargo
+							Cargo.refund(vehicle_id)
 
-									killVehicle(squad_index, vehicle_id, true, true)
-									return
-								else
-									s.setVehiclePos(vehicle_id, m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z))
-									break
-								end
-							end
+							killVehicle(squad_index, vehicle_id, true, true)
+							return
+						else
+							s.setVehiclePos(vehicle_id, m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z))
+							break
 						end
 					end
 				end
 			end
+		end
 
-			--? check if this is a cargo vehicle, if so then set the cargo in its tanks
-			if g_savedata.cargo_vehicles[vehicle_id] then
-				--* set the cargo in its tanks
+		--? check if this is a cargo vehicle, if so then set the cargo in its tanks
+		if g_savedata.cargo_vehicles[vehicle_id] then
+			--* set the cargo in its tanks
 
-				local large_tank_capacity = 703.125
+			local large_tank_capacity = 703.125
 
-				for tank_set = 1, 3 do
-					for tank_id = 0, (vehicle_object.cargo.capacity/large_tank_capacity) - 1 do
+			for tank_set = 1, 3 do
+				for tank_id = 0, (vehicle_object.cargo.capacity/large_tank_capacity) - 1 do
 
-						Cargo.setTank(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1).."_"..tank_id, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].amount/(vehicle_object.cargo.capacity/large_tank_capacity), true)
-					end
-					Cargo.setKeypad(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1), g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type)
+					Cargo.setTank(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1).."_"..tank_id, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].amount/(vehicle_object.cargo.capacity/large_tank_capacity), true)
 				end
+				Cargo.setKeypad(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1), g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type)
 			end
+		end
 
-			if vehicle_object.is_resupply_on_load then
-				vehicle_object.is_resupply_on_load = false
-				reload(vehicle_id)
-			end
+		if vehicle_object.is_resupply_on_load then
+			vehicle_object.is_resupply_on_load = false
+			reload(vehicle_id)
+		end
 
-			d.print("#of survivors: "..tostring(#vehicle_object.survivors), true, 0)
+		d.print("(onVehicleLoad) #of survivors: "..tostring(#vehicle_object.survivors), true, 0)
 
-			for i, char in pairs(vehicle_object.survivors) do
-				if vehicle_object.ai_type == VEHICLE.TYPE.TURRET then
-					--Gunners
-					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
+		for i, char in pairs(vehicle_object.survivors) do
+			if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
+				--Gunners
+				s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
+				local c = s.getCharacterData(char.id)
+				if c then
+					s.setCharacterData(char.id, c.hp, true, true)
+				end
+			else
+				if i == 1 then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT or vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
+						s.setCharacterSeated(char.id, vehicle_id, "Captain")
+					else
+						s.setCharacterSeated(char.id, vehicle_id, "Pilot")
+					end
 					local c = s.getCharacterData(char.id)
 					if c then
 						s.setCharacterData(char.id, c.hp, true, true)
+					else
+						d.print("(onVehicleLoad) (Non Gunner) Failed to get character data for "..tostring(char.id), true, 1)
 					end
 				else
-					if i == 1 then
-						if vehicle_object.ai_type == VEHICLE.TYPE.BOAT or vehicle_object.ai_type == VEHICLE.TYPE.LAND then
-							s.setCharacterSeated(char.id, vehicle_id, "Captain")
-						else
-							s.setCharacterSeated(char.id, vehicle_id, "Pilot")
-						end
-						local c = s.getCharacterData(char.id)
-						if c then
-							s.setCharacterData(char.id, c.hp, true, true)
-						else
-							d.print("(onVehicleLoad) (Non Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-						end
+					--Gunners
+					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
+					local c = s.getCharacterData(char.id)
+					if c then
+						s.setCharacterData(char.id, c.hp, true, true)
 					else
-						--Gunners
-						s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
-						local c = s.getCharacterData(char.id)
-						if c then
-							s.setCharacterData(char.id, c.hp, true, true)
-						else
-							d.print("(onVehicleLoad) (Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-						end
+						d.print("(onVehicleLoad) (Gunner) Failed to get character data for "..tostring(char.id), true, 1)
 					end
 				end
 			end
-			if vehicle_object.ai_type == VEHICLE.TYPE.LAND then
-				if(#vehicle_object.path >= 1) then
-					setLandTarget(vehicle_id, vehicle_object)
-				end
-
-				-- add it to the terrain scanner table to spawn it at the correct height
-				if vehicle_object.transform[14] < 200 and not vehicle_object.just_teleported then -- makes sure its not already having its terrain height scanned
-					d.print("adding "..vehicle_object.name.." to have its terrain height scanned!", true, 1)
-					table.insert(g_savedata.terrain_scanners, {
-						vehicle = vehicle_object,
-						transform = vehicle_object.transform,
-						data = {},
-						result = {}
-					})
-				elseif vehicle_object.just_teleported then
-					vehicle_object.just_teleported = false
-				end
-			elseif vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
-				local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
-
-				-- add it to the terrain scanner table to make sure its not spawning in the air or is spawning in terrain
-				if vehicle_object.transform[14] < 200 and not vehicle_object.just_teleported then -- makes sure its not already having its terrain height scanned
-					d.print("adding "..vehicle_object.name.." to have its terrain height scanned!", true, 1)
-					table.insert(g_savedata.terrain_scanners, {
-						vehicle = vehicle_object,
-						transform = vehicle_object.transform,
-						data = {},
-						result = {}
-					})
-				elseif vehicle_object.just_teleported then
-					vehicle_object.just_teleported = false
-				end
-			end
-			refuel(vehicle_id)
-			return
 		end
+		if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
+			if(#vehicle_object.path >= 1) then
+				setLandTarget(vehicle_id, vehicle_object)
+			end
+		end
+		refuel(vehicle_id)
 	end
 end
 
@@ -2942,11 +2987,11 @@ end
 ---@param vehicle_object vehicle_object[] the vehicle you want to add the path for
 ---@param target_dest SWMatrix the destination for the path
 function addPath(vehicle_object, target_dest)
-	if vehicle_object.ai_type == VEHICLE.TYPE.TURRET then 
+	if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then 
 		AI.setState(vehicle_object, VEHICLE.STATE.STATIONARY)
 		return
 
-	elseif vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
+	elseif vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
 		local dest_x, dest_y, dest_z = m.position(target_dest)
 
 		local path_start_pos = nil
@@ -2967,12 +3012,21 @@ function addPath(vehicle_object, target_dest)
 		-- calculates route
 		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 0, dest_z), "ocean_path", exclude)
 
-		local path_offset = math.random(5, 8)
-
 		for path_index, path in pairs(path_list) do
-			table.insert(vehicle_object.path, { x =  path.x + math.random(-path_offset, path_offset), y = 0, z = path.z + math.random(-path_offset, path_offset), ui_id = s.getMapID() })
+			if not path.y then
+				path.y = 0
+			end
+			if path.y > 1 then
+				break
+			end 
+			table.insert(vehicle_object.path, { 
+				x = path.x, 
+				y = path.y, 
+				z = path.z, 
+				ui_id = s.getMapID() 
+			})
 		end
-	elseif vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+	elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 		local dest_x, dest_y, dest_z = m.position(target_dest)
 
 		local path_start_pos = nil
@@ -3004,17 +3058,37 @@ function addPath(vehicle_object, target_dest)
 			exclude = exclude.."offroad"
 		end
 
-		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, veh_y, dest_z), "land_path", "")
+		local vehicle_list_id = sm.getVehicleListID(vehicle_object.name)
+		local y_modifier = g_savedata.vehicle_list[vehicle_list_id].vehicle.transform[14]
+
+		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, veh_y, dest_z), "land_path", exclude)
 		for path_index, path in pairs(path_list) do
 			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
-			distance = m.distance(vehicle_object.transform, m.translation(path.x, veh_y, path.z))
-			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)) > m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, veh_y, path.z)) and distance >= 7 then
-				table.insert(vehicle_object.path, { x =  path.x, y = path.y, z = path.z, ui_id = s.getMapID() })
+			distance = m.distance(vehicle_object.transform, m.translation(path.x, path.y, path.z))
+
+
+
+			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)) > m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, path.y, path.z)) and distance >= 7 then
+				
+				if not path.y then
+					break
+				end
+				table.insert(vehicle_object.path, { 
+					x =  path.x, 
+					y = (path.y + y_modifier), 
+					z = path.z, 
+					ui_id = s.getMapID() 
+				})
 			end
 		end
 		setLandTarget(vehicle_id, vehicle_object)
 	else
-		table.insert(vehicle_object.path, { x = target_dest[13], y = target_dest[14], z = target_dest[15], ui_id = s.getMapID() })
+		table.insert(vehicle_object.path, { 
+			x = target_dest[13], 
+			y = target_dest[14], 
+			z = target_dest[15], 
+			ui_id = s.getMapID() 
+		})
 	end
 
 	AI.setState(vehicle_object, VEHICLE.STATE.PATHING)
@@ -3167,7 +3241,7 @@ function tickGamemode()
 				d.print("failed to spawn turret at "..g_savedata.ai_base_island.name.."\nError:\n"..vehicle_data, true, 1)
 			end
 			
-			local spawned, vehicle_data = spawnAIVehicle()
+			local spawned, vehicle_data = spawnAIVehicle(nil, nil, false, nil, 0)
 			if not spawned then
 				d.print("failed to spawn vehicle\nError:\n"..vehicle_data, true, 1)
 			end
@@ -3253,12 +3327,12 @@ function tickGamemode()
 		
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type ~= VEHICLE.TYPE.TURRET then army_count = army_count + 1 end
-					if vehicle_object.ai_type == VEHICLE.TYPE.TURRET then turret_count = turret_count + 1 end
-					if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then boat_count = boat_count + 1 end
-					if vehicle_object.ai_type == VEHICLE.TYPE.PLANE then plane_count = plane_count + 1 end
-					if vehicle_object.ai_type == VEHICLE.TYPE.HELI then heli_count = heli_count + 1 end
-					if vehicle_object.ai_type == VEHICLE.TYPE.LAND then land_count = land_count + 1 end
+					if vehicle_object.vehicle_type ~= VEHICLE.TYPE.TURRET then army_count = army_count + 1 end
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then turret_count = turret_count + 1 end
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then boat_count = boat_count + 1 end
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then plane_count = plane_count + 1 end
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then heli_count = heli_count + 1 end
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then land_count = land_count + 1 end
 				end
 			end
 
@@ -3384,7 +3458,7 @@ function getSquadLeader(squad)
 	for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 		return vehicle_id, vehicle_object
 	end
-	d.print("warning: empty squad "..squad.ai_type.." detected", true, 1)
+	d.print("warning: empty squad "..squad.vehicle_type.." detected", true, 1)
 	return nil
 end
 
@@ -3475,7 +3549,7 @@ function tickAI()
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
-				if squad.command ~= SQUAD.COMMAND.DEFEND and squad.ai_type ~= VEHICLE.TYPE.TURRET then
+				if squad.command ~= SQUAD.COMMAND.DEFEND and squad.vehicle_type ~= VEHICLE.TYPE.TURRET then
 					g_count_squads = g_count_squads + 1
 				end
 	
@@ -3508,7 +3582,7 @@ function tickAI()
 								local _, squad_leader = getSquadLeader(squad)
 								local squad_leader_transform = squad_leader.transform
 
-								if squad.ai_type == VEHICLE.TYPE.BOAT then
+								if squad.vehicle_type == VEHICLE.TYPE.BOAT then
 									boats_total = boats_total + 1
 
 									local air_dist = m.distance(objective_island.transform, ally_island.transform)
@@ -3518,7 +3592,7 @@ function tickAI()
 									if dist < air_dist * air_sea_speed_factor then
 										boats_ready = boats_ready + 1
 									end
-								elseif squad.ai_type == VEHICLE.TYPE.LAND then
+								elseif squad.vehicle_type == VEHICLE.TYPE.LAND then
 									land_total = land_total + 1
 
 									local air_dist = m.distance(objective_island.transform, ally_island.transform)
@@ -3542,9 +3616,9 @@ function tickAI()
 						-- add more vehicles if we didn't hit the limit
 						if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == SQUAD.COMMAND.PATROL or squad.command == SQUAD.COMMAND.DEFEND and squad.ai_type ~= VEHICLE.TYPE.TURRET and squad.role ~= "defend" then
+								if squad.command == SQUAD.COMMAND.PATROL or squad.command == SQUAD.COMMAND.DEFEND and squad.vehicle_type ~= VEHICLE.TYPE.TURRET and squad.role ~= "defend" then
 									if (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-										if squad.ai_type == VEHICLE.TYPE.BOAT then
+										if squad.vehicle_type == VEHICLE.TYPE.BOAT then
 											if not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") then
 												boats_total = boats_total + 1
 												setSquadCommandStage(squad, objective_island)
@@ -3568,7 +3642,7 @@ function tickAI()
 			
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 								if squad.command == SQUAD.COMMAND.STAGE then
-									if not hasTag(objective_island.tags, "no-access=boat") and squad.ai_type == VEHICLE.TYPE.BOAT or squad.ai_type ~= VEHICLE.TYPE.BOAT then -- makes sure boats can attack that island
+									if not hasTag(objective_island.tags, "no-access=boat") and squad.vehicle_type == VEHICLE.TYPE.BOAT or squad.vehicle_type ~= VEHICLE.TYPE.BOAT then -- makes sure boats can attack that island
 										setSquadCommandAttack(squad, objective_island)
 									end
 								elseif squad.command == SQUAD.COMMAND.ATTACK then
@@ -3580,8 +3654,8 @@ function tickAI()
 							end
 						else
 							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-								if squad.command == SQUAD.COMMAND.NONE and squad.ai_type ~= VEHICLE.TYPE.TURRET and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
-									if squad.ai_type == VEHICLE.TYPE.BOAT then -- send boats ahead since they are slow
+								if squad.command == SQUAD.COMMAND.NONE and squad.vehicle_type ~= VEHICLE.TYPE.TURRET and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+									if squad.vehicle_type == VEHICLE.TYPE.BOAT then -- send boats ahead since they are slow
 										if not hasTag(objective_island.tags, "no-access=boat") then -- if boats can attack that island
 											setSquadCommandStage(squad, objective_island)
 											boats_total = boats_total + 1
@@ -3590,7 +3664,7 @@ function tickAI()
 										setSquadCommandStage(squad, ally_island)
 										air_total = air_total + 1
 									end
-								elseif squad.command == SQUAD.COMMAND.STAGE and squad.ai_type == VEHICLE.TYPE.BOAT and not hasTag(objective_island.tags, "no-access=boat") and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
+								elseif squad.command == SQUAD.COMMAND.STAGE and squad.vehicle_type == VEHICLE.TYPE.BOAT and not hasTag(objective_island.tags, "no-access=boat") and (air_total + boats_total) < MAX_ATTACKING_SQUADS then
 									setSquadCommandStage(squad, objective_island)
 									squad.target_island = objective_island
 								end
@@ -3613,7 +3687,7 @@ function tickAI()
 								-- then we want to spawn one, unless its been less than 30 minutes since it was killed
 								if g_savedata.ai_history.scout_death == -1 or g_savedata.ai_history.scout_death ~= 0 and g_savedata.tick_counter - g_savedata.ai_history.scout_death >= time.hour / 2 then
 									d.print("attempting to spawn scout vehicle...", true, 0)
-									local spawned = spawnAIVehicle("scout")
+									local spawned = spawnAIVehicle("scout", nil, nil, nil, 3)
 									if spawned then
 										if g_savedata.ai_history.scout_death == -1 then
 											g_savedata.ai_history.scout_death = 0
@@ -3654,7 +3728,7 @@ function tickAI()
 	
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						if squad.command == SQUAD.COMMAND.ATTACK then
-							if squad.ai_type == VEHICLE.TYPE.BOAT and not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") or squad.ai_type ~= VEHICLE.TYPE.BOAT then
+							if squad.vehicle_type == VEHICLE.TYPE.BOAT and not hasTag(objective_island.tags, "no-access=boat") and not hasTag(ally_island.tags, "no-access=boat") or squad.vehicle_type ~= VEHICLE.TYPE.BOAT then
 								setSquadCommandStage(squad, ally_island)
 							end
 						end
@@ -3816,9 +3890,9 @@ function addToSquadron(vehicle_object)
 
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				if squad_index ~= RESUPPLY_SQUAD_INDEX then -- do not automatically add to resupply squadron
-					if squad.ai_type == vehicle_object.ai_type then
+					if squad.vehicle_type == vehicle_object.vehicle_type then
 						local _, squad_leader = getSquadLeader(squad)
-						if squad.ai_type ~= VEHICLE.TYPE.TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
+						if squad.vehicle_type ~= VEHICLE.TYPE.TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
 							if vehicle_object.role ~= "scout" and squad.role ~= "scout" and vehicle_object.role ~= "cargo" and squad.role ~= "cargo" then
 								if tableLength(squad.vehicles) < MAX_SQUAD_SIZE then
 									squad.vehicles[vehicle_object.id] = vehicle_object
@@ -3837,7 +3911,7 @@ function addToSquadron(vehicle_object)
 				new_squad = { 
 					command = SQUAD.COMMAND.NONE,
 					index = new_squad_index,
-					ai_type = vehicle_object.ai_type,
+					vehicle_type = vehicle_object.vehicle_type,
 					role = vehicle_object.role,
 					vehicles = {},
 					target_island = nil,
@@ -3898,7 +3972,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 							ai_damage_dealt = ai_damage_dealt + damage
 						end
 
-						local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.ai_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+						local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.vehicle_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
 
 						d.print("ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
 						if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
@@ -3906,7 +3980,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 							sm.train(
 								REWARD, 
 								vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
-								vehicle_object.ai_type, math.clamp(ai_reward_ratio, 1, 3), 
+								vehicle_object.vehicle_type, math.clamp(ai_reward_ratio, 1, 3), 
 								vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
 								constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
 							)
@@ -3915,7 +3989,7 @@ function killVehicle(squad_index, vehicle_id, instant, delete)
 							sm.train(
 								PUNISH, 
 								vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
-								vehicle_object.ai_type, math.clamp(ai_punish_ratio, 1, 3),
+								vehicle_object.vehicle_type, math.clamp(ai_punish_ratio, 1, 3),
 								vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
 								constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
 							)
@@ -4007,7 +4081,7 @@ function tickSquadrons()
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if isVehicleNeedsResupply(vehicle_id, "Resupply") then
-						if vehicle_object.ai_type == VEHICLE.TYPE.TURRET then
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
 							reload(vehicle_id)
 						else
 							g_savedata.ai_army.squadrons[RESUPPLY_SQUAD_INDEX].vehicles[vehicle_id] = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
@@ -4105,30 +4179,31 @@ function tickSquadrons()
 				--? check to see if we have any paths for the cargo vehicle
 				if #convoy.vehicle_data.path then
 					for i = convoy.path_data.current_path, #convoy.path_data.path do
-						d.print("i: "..i, true, 0)
+						--d.print("i: "..i, true, 0)
 						i = math.max(i, 1)
 						local cargo_vehicle_node = g_savedata.ai_army.squadrons[squad_index].vehicles[convoy.vehicle_data.id].path[1]
 						local convoy_node = convoy.path_data.path[i]
-						d.print("c_v_n.x: "..cargo_vehicle_node.x.." c_n.x: "..convoy_node.x.."\nc_v_n.y: "..tostring(cargo_vehicle_node.y).." c_n.y: "..tostring(convoy_node.y).."\nc_v_n.z: "..cargo_vehicle_node.z.." c_n.z: "..convoy_node.z.."\n", true, 0)
+						--d.print("c_v_n.x: "..cargo_vehicle_node.x.." c_n.x: "..convoy_node.x.."\nc_v_n.y: "..tostring(cargo_vehicle_node.y).." c_n.y: "..tostring(convoy_node.y).."\nc_v_n.z: "..cargo_vehicle_node.z.." c_n.z: "..convoy_node.z.."\n", true, 0)
 						if cargo_vehicle_node.x == convoy_node.x and cargo_vehicle_node.z == convoy_node.z then
-							d.print("current path: "..i, true, 0)
+							--d.print("current path: "..i, true, 0)
 							convoy.path_data.current_path = i
 							break
 						end
 					end
 				else
-					d.print("there are no convoy paths!", true, 1)
+					--d.print("there are no convoy paths!", true, 1)
 				end
 
-				d.print("old path: "..old_path, true, 0)
-				d.print("new path: "..convoy.path_data.current_path, true, 0)
+				--d.print("old path: "..old_path, true, 0)
+				--d.print("new path: "..convoy.path_data.current_path, true, 0)
 
 				--* check and update the convoy's path for all vehicles in the convoy
-				d.print("going through all escorts...", true, 0)
+				--d.print("going through all escorts...", true, 0)
 				for convoy_index, vehicle_id in ipairs(convoy.convoy) do
 					local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+					d.print("convoy_index: "..tostring(convoy_index).." vehicle_id: "..tostring(vehicle_id), true, 0)
 					if not vehicle_object then
-						d.print("(escort) vehicle_object is nil!", true, 1)
+						--d.print("(escort) vehicle_object is nil!", true, 1)
 						goto break_cargo_vehicle
 					end
 
@@ -4141,7 +4216,7 @@ function tickSquadrons()
 						end
 					end
 
-					d.print("convoy_index: "..convoy_index, true, 0)
+					--d.print("convoy_index: "..convoy_index, true, 0)
 					if convoy.convoy[convoy_index - 1] then -- if theres a vehicle behind this one
 
 						local behind_vehicle_object, behind_squad_index, behind_squad = Squad.getVehicle(convoy.convoy[convoy_index - 1])
@@ -4150,10 +4225,10 @@ function tickSquadrons()
 						if behind_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING  then
 						
 							--? check if the vehicle behind needs to catch up, and the vehicle behind is not a plane
-							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance and vehicle_object.ai_type ~= VEHICLE.TYPE.PLANE then
+							if RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].max_distance and vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE then
 
 								--? if the vehicle behind is too far behind
-								local behind_too_far = (m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance)
+								local behind_too_far = (m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].max_distance)
 
 								--? if the vehicle behind is waiting
 								local behind_waiting = (behind_vehicle_object.state.convoy.status == CONVOY.WAITING and behind_vehicle_object.state.convoy.waiting_for ~= convoy_index)
@@ -4184,7 +4259,7 @@ function tickSquadrons()
 
 								if last_path then
 
-									d.print("vehicle_object.name: "..vehicle_object.name.."\nbehind_vehicle_object.name: "..behind_vehicle_object.name, true, 0)
+									--d.print("vehicle_object.name: "..vehicle_object.name.."\nbehind_vehicle_object.name: "..behind_vehicle_object.name, true, 0)
 
 									-- the distance from this vehicle to its last path
 									local dist = m.xzDistance(vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
@@ -4192,16 +4267,16 @@ function tickSquadrons()
 									-- the distance from the vehicle behind to this vehicles last path
 									local behind_dist = m.xzDistance(behind_vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
 
-									d.print("dist: "..dist.."\nbehind_dist: "..behind_dist, true, 0)
+									--d.print("dist: "..dist.."\nbehind_dist: "..behind_dist, true, 0)
 
-									local dist_speed_modifier = 1/math.clamp((behind_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance*2), 0.5, 1)
-									d.print("dist_speed_modifier: "..dist_speed_modifier, true, 0)
+									local dist_speed_modifier = 1/math.clamp((behind_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].min_distance*2), 0.5, 1)
+									--d.print("dist_speed_modifier: "..dist_speed_modifier, true, 0)
 
 									local vehicle_speed = v.getSpeed(vehicle_object, nil, nil, nil, nil, true)
 
 									vehicle_object.speed.convoy_modifier = ((vehicle_speed * dist_speed_modifier) - vehicle_speed)/1.5
 
-									d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
+									--d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
 								end
 							end
 						end
@@ -4214,15 +4289,15 @@ function tickSquadrons()
 						if ahead_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING then
 						
 							--? check if the vehicle ahead is getting too far behind
-							if RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].min_distance and vehicle_object.ai_type ~= VEHICLE.TYPE.PLANE then
+							if RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].min_distance and vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE then
 
 								--? if the vehicle ahead is getting too far behind
 
 								local next_path = ahead_vehicle_object.path[1]
 
-								d.print("ai_type: "..vehicle_object.ai_type, true, 0)
+								--d.print("vehicle_type: "..vehicle_object.vehicle_type, true, 0)
 
-								local ahead_too_far = (m.xzDistance(vehicle_object.transform, ahead_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance) and (next_path and (m.xzDistance(ahead_vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z)) > m.xzDistance(vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z))))
+								local ahead_too_far = (m.xzDistance(vehicle_object.transform, ahead_vehicle_object.transform) >= RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].max_distance) and (next_path and (m.xzDistance(ahead_vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z)) > m.xzDistance(vehicle_object.transform, m.translation(next_path.x, next_path.y, next_path.z))))
 
 								--? if the vehicle ahead of us is waiting
 								local ahead_waiting = (ahead_vehicle_object.state.convoy.status == CONVOY.WAITING and ahead_vehicle_object.state.convoy.waiting_for ~= convoy_index)
@@ -4259,13 +4334,13 @@ function tickSquadrons()
 									-- the distance from the vehicle ahead of this vehicles last path
 									local ahead_dist = m.xzDistance(ahead_vehicle_object.transform, m.translation(last_path.x, last_path.y, last_path.z))
 
-									local dist_speed_modifier = 1/math.clamp((ahead_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].max_distance/2), 0.5, 1)
+									local dist_speed_modifier = 1/math.clamp((ahead_dist - dist)/(RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].max_distance/2), 0.5, 1)
 
 									local vehicle_speed = v.getSpeed(vehicle_object, nil, nil, nil, nil, true)
 
 									vehicle_object.speed.convoy_modifier = ((vehicle_speed * dist_speed_modifier) - vehicle_speed)/1.5
 
-									d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
+									--d.print("speed: "..(vehicle_object.speed.convoy_modifier), true, 0)
 								end
 							end
 						end
@@ -4273,18 +4348,18 @@ function tickSquadrons()
 
 					--? if this vehicle is currently waiting
 					if vehicle_object.state.convoy.status == CONVOY.WAITING then
-						d.print("vehicle is waiting", true, 0)
+						--d.print("vehicle is waiting", true, 0)
 						local max_wait_timer = RULES.LOGISTICS.CONVOY.base_wait_time
 						--? if we've waited over the max time, or that this vehicle should not be waited 
 						local waiting_vehicle_object, waiting_squad_index, waiting_squad = Squad.getVehicle(convoy.convoy[vehicle_object.state.convoy.waiting_for])
-						d.print("waiting for "..(ticksSince(vehicle_object.state.convoy.changed_time)).."t...", true, 0)
+						--d.print("waiting for "..(ticksSince(vehicle_object.state.convoy.changed_time)).."t...", true, 0)
 
 						--? if we've waited too long for the vehicle behind us
 						local waited_too_long = (vehicle_object.state.convoy.status_reason == "waiting_for_behind" and (ticksSince(vehicle_object.state.convoy.changed_time) > max_wait_timer or waiting_vehicle_object.state.convoy.ignore_wait))
 
 						--? if the vehicle behind has caught up
 						local behind_vehicle_object, behind_squad_index, behind_squad = Squad.getVehicle(convoy.convoy[convoy_index - 1])
-						local behind_caught_up = (vehicle_object.state.convoy.status_reason == "waiting_for_behind" and ((vehicle_object.state.convoy.waiting_for + 1) == convoy_index) and (not behind_vehicle_object or m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) <= RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].target_distance))
+						local behind_caught_up = (vehicle_object.state.convoy.status_reason == "waiting_for_behind" and ((vehicle_object.state.convoy.waiting_for + 1) == convoy_index) and (not behind_vehicle_object or m.xzDistance(vehicle_object.transform, behind_vehicle_object.transform) <= RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].target_distance))
 
 						--? if the vehicle behind is no longer waiting
 						local behind_no_longer_waiting = (vehicle_object.state.convoy.status_reason == "behind_is_waiting" and (not waiting_vehicle_object or waiting_vehicle_object.state.convoy.status ~= CONVOY.WAITING))
@@ -4312,8 +4387,8 @@ function tickSquadrons()
 						end
 
 					--? pathfind for the vehicle
-					elseif vehicle_object.ai_type ~= VEHICLE.TYPE.BOAT and #vehicle_object.path <= 1 or vehicle_object.ai_type == VEHICLE.TYPE.BOAT and #vehicle_object.path < 1 then
-						d.print("calculating new path!", true, 0)
+					elseif vehicle_object.vehicle_type ~= VEHICLE.TYPE.BOAT and #vehicle_object.path <= 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT and #vehicle_object.path < 1 then
+						--d.print("calculating new path!", true, 0)
 						--* this vehicle is currently moving
 
 						--* calculate where the vehicle should path to
@@ -4323,9 +4398,9 @@ function tickSquadrons()
 						--? this vehicle is not the cargo vehicle
 						if vehicle_object.id ~= convoy.vehicle_data.id then
 
-							local target_dist = math.abs(cargo_vehicle_index - convoy_index) * RULES.LOGISTICS.CONVOY[vehicle_object.ai_type].target_distance
+							local target_dist = math.abs(cargo_vehicle_index - convoy_index) * RULES.LOGISTICS.CONVOY[vehicle_object.vehicle_type].target_distance
 
-							d.print("target dist: "..target_dist, true, 0)
+							--d.print("target dist: "..target_dist, true, 0)
 
 							local node_to_check = 1
 
@@ -4339,13 +4414,13 @@ function tickSquadrons()
 							local next_node = nil
 							local total_dist = 0
 							local leftover_dist = target_dist
-							d.print("current_path: "..convoy.path_data.current_path.."\nnumber of paths: "..#convoy.path_data.path, true, 0)
+							--d.print("current_path: "..convoy.path_data.current_path.."\nnumber of paths: "..#convoy.path_data.path, true, 0)
 							for node = convoy.path_data.current_path, #convoy.path_data.path * node_to_check, node_to_check do
 								local p_node = convoy.path_data.path[node-node_to_check] -- last node
 								local n_node = convoy.path_data.path[node] -- next node
 
 
-								d.print("node: "..node, true, 0)
+								--d.print("node: "..node, true, 0)
 								--? makes sure previous node and new nodes exist
 								if p_node and n_node then
 
@@ -4356,7 +4431,7 @@ function tickSquadrons()
 									end
 
 									--? break if this is over the target distance
-									d.print("total dist: "..total_dist, true, 0)
+									--d.print("total dist: "..total_dist, true, 0)
 									if total_dist >= target_dist then
 										next_node = node
 										leftover_dist = target_dist - (total_dist - m.xzDistance(m.translation(n_node.x, n_node.y, n_node.z), m.translation(p_node.x, p_node.y, p_node.z)))
@@ -4376,23 +4451,23 @@ function tickSquadrons()
 
 							
 							if target_pos then
-								d.print("adding path to destination!", true, 0)
+								--d.print("adding path to destination!", true, 0)
 								--! pathfind to the new destination
 								resetPath(vehicle_object)
 								addPath(vehicle_object, target_pos)
 
 								--* for the leftover distance, go that far into the node
-								d.print("leftover dist: "..leftover_dist, true, 0)
+								--d.print("leftover dist: "..leftover_dist, true, 0)
 								if leftover_dist ~= 0 and next_node then
-									d.print("current node: "..convoy.path_data.current_path, true, 0)
-									d.print("best_node: "..best_node.." next_node: "..next_node, true, 0)
+									--d.print("current node: "..convoy.path_data.current_path, true, 0)
+									--d.print("best_node: "..best_node.." next_node: "..next_node, true, 0)
 									local n_node = convoy.path_data.path[next_node] -- the node we couldn't reach
-									d.print("n_node.x: "..n_node.x.." t_node.x: "..t_node.x, true, 0)
+									--d.print("n_node.x: "..n_node.x.." t_node.x: "..t_node.x, true, 0)
 									local angle = -math.atan(n_node.x - t_node.x, n_node.z - t_node.z) + math.pi/2
 									local target_x = n_node.x + (-node_to_check)*(leftover_dist * math.cos(angle))
 									local target_z = n_node.z + (-node_to_check)*(leftover_dist * math.sin(angle))
 
-									d.print("target x: "..target_x.."\ntarget z: "..target_z, true, 0)
+									--d.print("target x: "..target_x.."\ntarget z: "..target_z, true, 0)
 
 									table.insert(vehicle_object.path, #vehicle_object.path+1, {
 										x = target_x,
@@ -4421,7 +4496,7 @@ function tickSquadrons()
 
 									for node = #nodes_to_remove, 1, -1 do
 										table.remove(vehicle_object.path, nodes_to_remove[node])
-										d.print("removed node: "..node, true, 0)
+										--d.print("removed node: "..node, true, 0)
 									end
 								end
 							end
@@ -4446,19 +4521,19 @@ function tickSquadrons()
 				end
 			elseif squad.command == SQUAD.COMMAND.STAGE then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
 						squadInitVehicleCommand(squad, vehicle_object)
 					end
 				end
 			elseif squad.command == SQUAD.COMMAND.ATTACK then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
 						squadInitVehicleCommand(squad, vehicle_object)
 					end
 				end
 			elseif squad.command == SQUAD.COMMAND.DEFEND then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if vehicle_object.ai_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT and vehicle_object.state.s == VEHICLE.STATE.HOLDING then
 						squadInitVehicleCommand(squad, vehicle_object)
 					end
 				end
@@ -4645,7 +4720,7 @@ function tickSquadrons()
 								-- reset its path
 								resetPath(vehicle_object)
 
-								if vehicle_object.ai_type == VEHICLE.TYPE.PLANE then -- if this vehicle is a plane
+								if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then -- if this vehicle is a plane
 									if vehicle_object.strategy == "strafing" then -- if the plane has a strategy of strafing
 										if target_pos[14] <= 50 and vehicle_object.state.is_simulating then -- if the target's y is below the threshold for detecting its a air vehicle
 											local dist_in_front = 870
@@ -4685,7 +4760,7 @@ function tickSquadrons()
 										end
 									end
 									-- to write: dive bombing
-								elseif vehicle_object.ai_type ~= VEHICLE.TYPE.LAND then
+								elseif vehicle_object.vehicle_type ~= VEHICLE.TYPE.LAND then
 									addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] + math.max(target_pos[14] + (vehicle_object.id % 5) + 25, 75), target_pos[15]))
 								end
 							end
@@ -4697,7 +4772,7 @@ function tickSquadrons()
 									s.setAITargetVehicle(char.id, target_id)
 								end
 	
-								if i ~= 1 or vehicle_object.ai_type == VEHICLE.TYPE.TURRET then
+								if i ~= 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
 									s.setAIState(char.id, 1)
 								end
 							end
@@ -4903,17 +4978,17 @@ function tickVehicles()
 				local modifier = 1
 				local tile, got_tile = s.getTile(vehicle_object.transform)
 				-- if its not on the ocean tile, make its explosion depth 3x lower, if its a boat
-				if got_tile and tile.name ~= "" and vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
+				if got_tile and tile.name ~= "" and vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
 					modifier = 3
 				end
 
-				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.ai_type]/modifier then
+				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.vehicle_type]/modifier then
 					if vehicle_object.role ~= SQUAD.COMMAND.CARGO then
 						killVehicle(squad_index, vehicle_id, true)
-						if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
-							d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
+							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
 						else
-							d.print("Killed "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
+							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					else
 
@@ -4921,10 +4996,10 @@ function tickVehicles()
 						Cargo.refund(vehicle_id)
 
 						killVehicle(squad_index, vehicle_id, false)
-						if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
-							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.ai_type).." as it sank!", true, 0)
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
+							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
 						else
-							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.ai_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
+							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					end
 					break
@@ -4934,7 +5009,7 @@ function tickVehicles()
 				if ai_state ~= 2 then ai_state = 1 end
 				local ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or VEHICLE.SPEED.BOAT) * vehicle_update_tickrate / 60
 
-				if(vehicle_object.ai_type ~= VEHICLE.TYPE.TURRET) then
+				if(vehicle_object.vehicle_type ~= VEHICLE.TYPE.TURRET) then
 
 					if vehicle_object.state.s == VEHICLE.STATE.PATHING then
 
@@ -4944,25 +5019,28 @@ function tickVehicles()
 							AI.setState(vehicle_object, VEHICLE.STATE.HOLDING)
 						else
 							if ai_state ~= 2 then ai_state = 1 end
-							if vehicle_object.ai_type ~= VEHICLE.TYPE.LAND then 
+							if vehicle_object.vehicle_type ~= VEHICLE.TYPE.LAND then 
 								ai_target = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
 							else
-								local veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
-								ai_target = m.translation(vehicle_object.path[1].x, veh_y, vehicle_object.path[1].z)
+								ai_target = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
 								setLandTarget(vehicle_id, vehicle_object)
 							end
-							if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then ai_target[14] = 0 end
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then ai_target[14] = 0 end
 	
 							local vehicle_pos = vehicle_object.transform
 							local distance = m.distance(ai_target, vehicle_pos)
 	
-							if vehicle_object.ai_type == VEHICLE.TYPE.PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == VEHICLE.TYPE.PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.ai_type == VEHICLE.TYPE.HELI or vehicle_object.ai_type == VEHICLE.TYPE.LAND and distance < 7 then
-								if #vehicle_object.path > 1 then
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.vehicle_type == VEHICLE.TYPE.HELI or vehicle_object.vehicle_type == VEHICLE.TYPE.LAND and distance < 7 then
+								if #vehicle_object.path > 0 then
 									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
 
+									if #vehicle_object.path > 0 then
+										ai_target = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
+									end
+
 									-- set new coordinates for land vehicles
-									if vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+									if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 										setLandTarget(vehicle_id, vehicle_object)
 									end
 
@@ -4982,12 +5060,12 @@ function tickVehicles()
 										addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[3].x, CRUISE_HEIGHT * 2, holding_route[3].z)))
 										addPath(vehicle_object, m.multiply(target_island.transform, m.translation(holding_route[4].x, CRUISE_HEIGHT * 2, holding_route[4].z)))
 									end
-								elseif vehicle_object.ai_type ~= VEHICLE.TYPE.LAND then
+								elseif vehicle_object.vehicle_type ~= VEHICLE.TYPE.LAND then
 									-- if we have reached last waypoint start holding there
 									--d.print("set plane "..vehicle_id.." to holding", true, 0)
 									AI.setState(vehicle_object, VEHICLE.STATE.HOLDING)
 								end
-							elseif vehicle_object.ai_type == VEHICLE.TYPE.BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
+							elseif vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT and distance < WAYPOINT_CONSUME_DISTANCE then
 								if #vehicle_object.path > 0 then
 									s.removeMapID(-1, vehicle_object.path[1].ui_id)
 									table.remove(vehicle_object.path, 1)
@@ -5000,9 +5078,9 @@ function tickVehicles()
 						end
 
 						if squad.command == SQUAD.COMMAND.ENGAGE then 
-							if vehicle_object.ai_type == VEHICLE.TYPE.HELI then
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
 								ai_state = 3
-							elseif vehicle_object.ai_type == VEHICLE.TYPE.PLANE then
+							elseif vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then
 								target_pos = nil
 								if isPlayer(vehicle_object.target_player_id) then
 									target_pos = s.getPlayerPos(g_savedata.player_data[vehicle_object.target_player_id].peer_id)
@@ -5025,9 +5103,9 @@ function tickVehicles()
 
 						ai_speed_pseudo = (vehicle_object.speed.not_land.pseudo_speed or VEHICLE.SPEED.PLANE) * vehicle_update_tickrate / 60
 
-						if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
 							ai_state = 0
-						elseif vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+						elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 							local target = nil
 							if squad_index ~= RESUPPLY_SQUAD_INDEX then -- makes sure its not resupplying
 								local squad_vision = squadGetVisionData(squad)
@@ -5080,37 +5158,59 @@ function tickVehicles()
 							s.setAITarget(vehicle_object.survivors[1].id, ai_target)
 							s.setAIState(vehicle_object.survivors[1].id, ai_state)
 						else
-							local ts_x, ts_y, ts_z = m.position(ai_target)
-							local vehicle_pos = vehicle_object.transform
-							local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_pos)
-							local movement_x = ts_x - vehicle_x
-							local movement_y = ts_y - vehicle_y
-							local movement_z = ts_z - vehicle_z
-							local length_xz = math.sqrt((movement_x * movement_x) + (movement_z * movement_z))
+							local exhausted_movement = false
+							local pseudo_speed_modifier = 0
 
-							local speed_pseudo = ai_speed_pseudo * g_debug_speed_multiplier
-							movement_x = math.clamp(movement_x * speed_pseudo / length_xz, -math.abs(movement_x), math.abs(movement_x))
-							movement_y = math.min(speed_pseudo, math.max(movement_y, -speed_pseudo))
-							movement_z = math.clamp(movement_z * speed_pseudo / length_xz, -math.abs(movement_z), math.abs(movement_z))
+							local current_pos = vehicle_object.transform
 
-							local rotation_matrix = m.rotationToFaceXZ(movement_x, movement_z)
-							local new_pos = m.multiply(m.translation(vehicle_x + movement_x, vehicle_y + movement_y, vehicle_z + movement_z), rotation_matrix)
+							while not exhausted_movement do
+								local movement_x = ai_target[13] - current_pos[13]
+								local movement_y = ai_target[14] - current_pos[14]
+								local movement_z = ai_target[15] - current_pos[15]
 
-							if s.getVehicleLocal(vehicle_id) == false then
-								s.setVehiclePos(vehicle_id, new_pos)
-								vehicle_object.transform = new_pos
+								local length_xz = math.sqrt((movement_x * movement_x) + (movement_z * movement_z))
 
-								for npc_index, npc_object in pairs(vehicle_object.survivors) do
-									s.setObjectPos(npc_object.id, new_pos)
+								local speed_pseudo = (ai_speed_pseudo * g_debug_speed_multiplier) - pseudo_speed_modifier
+
+								if math.noNil(math.abs(movement_x * speed_pseudo / length_xz)) <= math.noNil(math.abs(movement_x)) and math.noNil(math.abs(movement_z * speed_pseudo / length_xz)) <= math.noNil(math.abs(movement_z)) or not vehicle_object.path[2] then
+									exhausted_movement = true
 								end
 
-								if vehicle_object.fire_id ~= nil then
-									s.setObjectPos(vehicle_object.fire_id, new_pos)
+								movement_x = math.clamp(movement_x * speed_pseudo / length_xz, -math.abs(movement_x), math.abs(movement_x))
+								movement_y = math.clamp(movement_y * speed_pseudo / length_xz, -math.abs(movement_y), math.abs(movement_y))
+								movement_z = math.clamp(movement_z * speed_pseudo / length_xz, -math.abs(movement_z), math.abs(movement_z))
+
+								local rotation_matrix = m.rotationToFaceXZ(movement_x, movement_z)
+								local new_pos = m.multiply(m.translation(current_pos[13] + movement_x, current_pos[14] + movement_y, current_pos[15] + movement_z), rotation_matrix)
+
+								if s.getVehicleLocal(vehicle_id) == false then
+									s.setVehiclePos(vehicle_id, new_pos)
+									vehicle_object.transform = new_pos
+
+									for npc_index, npc_object in pairs(vehicle_object.survivors) do
+										s.setObjectPos(npc_object.id, new_pos)
+									end
+
+									if vehicle_object.fire_id ~= nil then
+										s.setObjectPos(vehicle_object.fire_id, new_pos)
+									end
+								end
+
+								if not exhausted_movement then
+									s.removeMapID(-1, vehicle_object.path[1].ui_id)
+									table.remove(vehicle_object.path, 1)
+
+									ai_target = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
+
+									pseudo_speed_modifier = math.abs(movement_x) + math.abs(movement_y) + math.abs(movement_z)
+
+									current_pos = new_pos
 								end
 							end
 						end
 					end
 				end
+
 				if d.getDebug(3) then
 					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
 					local debug_data = ""
@@ -5158,11 +5258,11 @@ function tickVehicles()
 					local hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
 					if g_savedata.settings.SINKING_MODE then
-						if vehicle_object.ai_type == VEHICLE.TYPE.TURRET or vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET or vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 							hp = hp * 2.5
 						else
 							hp = hp * 8
-							if vehicle_object.ai_type == VEHICLE.TYPE.BOAT then
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
 								hp = hp * 10
 							end
 						end
@@ -5185,7 +5285,7 @@ function tickVehicles()
 
 					debug_data = debug_data.."Pseudo Speed: "..ai_speed_pseudo.." m/s\n"
 					
-					if vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 						debug_data = debug_data.."Is Agressive: "..tostring(vehicle_object.is_aggressive).."\n"
 						debug_data = debug_data.."Terrain Type: "..tostring(vehicle_object.terrain_type).."\n"
 					end
@@ -5223,20 +5323,20 @@ function tickVehicles()
 					local g = 0
 					local b = 225
 					local vehicle_icon = debug_mode_blinker and 16 or state_icons[squad.command]
-					if vehicle_object.ai_type == VEHICLE.TYPE.LAND then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 						r = 55
 						g = 255
 						b = 125
 						vehicle_icon = debug_mode_blinker and 12 or state_icons[squad.command]
-					elseif vehicle_object.ai_type == VEHICLE.TYPE.HELI then
+					elseif vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
 						r = 255
 						b = 200
 						vehicle_icon = debug_mode_blinker and 15 or state_icons[squad.command]
-					elseif vehicle_object.ai_type == VEHICLE.TYPE.PLANE then
+					elseif vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then
 						r = 55
 						g = 200
 						vehicle_icon = debug_mode_blinker and 13 or state_icons[squad.command]
-					elseif vehicle_object.ai_type == VEHICLE.TYPE.TURRET then
+					elseif vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
 						r = 131
 						g = 101
 						b = 57
@@ -5260,7 +5360,7 @@ function tickVehicles()
 					for peer_index, peer in pairs(player_list) do
 						if d.getDebug(3, peer.id) then
 							
-							s.addMapObject(peer.id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, vehicle_object.name.."\nVehicle ID: "..vehicle_id.."\nVehicle Type: "..vehicle_object.ai_type, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							s.addMapObject(peer.id, vehicle_object.map_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, vehicle_object.name.."\nVehicle ID: "..vehicle_id.."\nVehicle Type: "..vehicle_object.vehicle_type, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
 							if(#vehicle_object.path >= 1) then
 
@@ -5333,130 +5433,6 @@ function tickUpdateVehicleData()
 		end
 	end
 	d.stopProfiler("tickUpdateVehicleData()", true, "onTick()")
-end
-
-function tickTerrainScanners()
-	d.startProfiler("tickTerrainScanners()", true)
-	for scanner_index, scanner in pairs(g_savedata.terrain_scanners) do
-		if isTickID(scanner.vehicle.id, 15) then
-
-			-- makes sure the scanner has not been read yet
-			if not scanner.result.time then 
-				if scanner.vehicle.id then -- if theres going to be a vehicle in the way
-					local vehicle_x, vehicle_y, vehicle_z = m.position(scanner.vehicle.transform)
-					local real_vehicle_pos = s.getVehiclePos(scanner.vehicle.id)
-					local real_vehicle_x, real_vehicle_y, real_vehicle_z = m.position(real_vehicle_pos)
-
-					local player_list = s.getPlayers()
-					local closest_player_transform = m.translation(0, 0, 0)
-					local closest_distance = nil
-					for player_index, player in pairs(player_list) do
-						local player_transform = s.getPlayerPos(player.id)
-						local player_distance = m.distance(real_vehicle_pos, player_transform)
-						if not closest_distance or player_distance < closest_distance then
-							closest_player_transform = player_transform
-							closest_distance = player_distance
-						end
-					end
-
-					-- check if the vehicle is too low
-					if real_vehicle_y < closest_player_transform[14] + 350 then
-						-- move it above the nearest player
-						s.setVehiclePos(scanner.vehicle.id, m.translation(closest_player_transform[13] + (scanner_index * 150), closest_player_transform[14] + 450 + (scanner_index * 150), closest_player_transform[15] + (scanner_index * 150)))
-						local squad_index, squad = Squad.getSquad(scanner.vehicle.id)
-						g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
-					end
-				end
-
-				
-				if not scanner.data.id then -- if its not been spawned yet
-					-- spawn the terrain scanner
-					local scan_position_x, scan_position_y, scan_position_z = m.position(scanner.transform)
-					local scan_position = m.translation(scan_position_x, 1000, scan_position_z)
-					local terrain_scanner, spawned = s.spawnAddonComponent(scan_position, s.getAddonIndex(), g_savedata.terrain_scanner_prefab.location_index, g_savedata.terrain_scanner_prefab.object_index, 0)
-					if spawned then -- if it was spawned
-						scanner.data = terrain_scanner
-					else -- it failed to spawn
-						d.print("(Terrain Scanner) Failed to spawn terrain scanner!", true, 1)
-					end
-				else -- if it has already been spawned
-					local _, scanner_exists = s.getVehicleData(scanner.data.id)
-					if scanner_exists then -- makes sure the vehicle actually exists
-						local terrain_height_data, dial_read = s.getVehicleDial(scanner.data.id, "MEASURED_DISTANCE")
-						if dial_read and terrain_height_data.value ~= 0 then -- if the dial was read
-							scanner.result = {
-								height = 1000 - terrain_height_data.value,
-								time = g_savedata.tick_counter
-							}
-							s.despawnVehicle(scanner.data.id, true) -- despawn the scanner
-						end
-					end
-				end
-			else
-				-- debug for if something goes wrong
-				local time_since = ticksSince(scanner.result.time)
-				if time_since % time.minute == 0 and time_since ~= 0 then -- if its been longer than a minute since the data was written, every 1 minute
-					d.print("(Terrain Scanner) Its been "..time_since/time.minute.." minute"..(time_since/time.minute ~= 1 and "s " or " ").."since the scanner data was written for scanner "..scanner_index.." maybe the scanner was never deleted from the table?", true, 1)
-				end
-
-				-- do something with the result
-				if scanner.vehicle.ai_type then -- makes sure a vehicle exists
-					if scanner.vehicle.ai_type == VEHICLE.TYPE.BOAT then -- if we're scanning terrain for a boat
-						if scanner.result.height <= -2 then -- checks for if theres water there
-							-- set it to y 0
-							s.setVehiclePos(scanner.vehicle.id, m.translation(scanner.transform[13], 0.5, scanner.transform[15]))
-
-							local squad_index, squad = Squad.getSquad(scanner.vehicle.id)
-							g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
-
-							-- delete the scanner data
-							g_savedata.terrain_scanners[scanner_index] = nil
-							d.print("(Terrain Scanner) "..scanner.vehicle.name.."( "..scanner.vehicle.id..") has been detected that it is in water", true, 0)
-						else -- if its not water
-
-							-- refund the cargo to the island which was sending the cargo
-							Cargo.refund(scanner.vehicle.id)
-
-							-- delete the vehicle
-							local squad_index, squad = Squad.getSquad(scanner.vehicle.id)
-							killVehicle(squad_index, scanner.vehicle.id, true, true)
-							-- delete scanner data
-							g_savedata.terrain_scanners[scanner_index] = nil
-							d.print("(Terrain Scanner) Deleted vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") because it was not in water", true, 0)
-						end
-					elseif scanner.vehicle.ai_type == VEHICLE.TYPE.LAND then -- if we're scanning terrain for a land vehicle
-						if scanner.result.height >= 0 then -- makes sure theres land there
-							-- set it to the scanned height
-							s.setVehiclePos(scanner.vehicle.id, m.translation(scanner.transform[13], scanner.result.height + 1.5, scanner.transform[15]))
-
-							local squad_index, squad = Squad.getSquad(scanner.vehicle.id)
-							g_savedata.ai_army.squadrons[squad_index].vehicles[scanner.vehicle.id].just_teleported = true
-
-							-- delete the scanner data
-							g_savedata.terrain_scanners[scanner_index] = nil
-							d.print("(Terrain Scanner) set vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") to "..scanner.result.height.."m", true, 0)
-						else -- if its not on land
-
-							-- refund the cargo to the island which was sending the cargo
-							Cargo.refund(scanner.vehicle.id)
-
-							-- delete the vehicle
-							local squad_index, squad = Squad.getSquad(scanner.vehicle.id)
-							killVehicle(squad_index, scanner.vehicle.id, true, true)
-							-- delete scanner data
-							g_savedata.terrain_scanners[scanner_index] = nil
-							d.print("(Terrain Scanner) Deleted vehicle "..scanner.vehicle.name.." ("..scanner.vehicle.id..") because it was not on land", true, 0)
-						end
-					else
-						d.print("(Terrain Scanner) I'm told to scan terrain for a vehicle that I dont know how to handle! vehicle type: "..scanner.vehicle.ai_type, true, 1)
-					end
-				else
-					d.print("(Terrain Scanner) the scanner "..scanner_index.." has no vehicle!", true, 1)
-				end
-			end
-		end
-	end
-	d.stopProfiler("tickTerrainScanners()", true, "onTick()")
 end
 
 function tickModifiers()
@@ -5577,7 +5553,8 @@ function tickCargo()
 								return
 							end
 						end
-						local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(best_route[1].transport_method.name), nil, true, resupplier_island, 20)
+						d.print("spawning cargo vehicle...", true, 0)
+						local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(best_route[1].transport_method.name), nil, true, resupplier_island, 1, 20)
 						if not was_spawned then
 							d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
 						else
@@ -5704,7 +5681,7 @@ function tickCargoVehicles()
 						land = 150
 					}
 
-					if distance < distance_thresholds[(cargo_vehicle.vehicle_data.ai_type)] and #cargo_vehicle.vehicle_data.path >= 1 then
+					if distance < distance_thresholds[(cargo_vehicle.vehicle_data.vehicle_type)] and #cargo_vehicle.vehicle_data.path >= 1 then
 						cargo_vehicle.route_status = 2 -- make it unload the cargo
 						d.print("transfering cargo", true, 0)
 					end
@@ -5724,7 +5701,7 @@ function tickCargoVehicles()
 						if not new_cargo_vehicle then
 							-- spawn it as it doesnt exist
 							local found_island, island = getIslandFromIndex(cargo_vehicle.route_data[1].island_index)
-							local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(cargo_vehicle.route_data[2].transport_method.name), nil, true, island, 20)
+							local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(cargo_vehicle.route_data[2].transport_method.name), nil, true, island, 1, 20)
 							if not was_spawned then
 								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
 							else
@@ -5823,7 +5800,6 @@ function onTick()
 		tickCargoVehicles()
 		tickCargo()
 		tickModifiers()
-		tickTerrainScanners()
 		tickOther() -- not as important stuff
 
 		d.stopProfiler("onTick()", true, "onTick()")
@@ -5896,11 +5872,6 @@ function build_locations(addon_index, location_index)
 			if tag_object == "type=dlc_weapons" then
 				is_valid_location = true
 			end
-			if tag_object == "type=dlc_weapons_terrain_scanner" then
-				if object_data.type == "vehicle" then
-					g_savedata.terrain_scanner_prefab = { location_index = location_index, object_index = object_index}
-				end
-			end
 			if tag_object == "type=dlc_weapons_flag" then
 				if object_data.type == "vehicle" then
 					flag_prefab = { location_index = location_index, object_index = object_index}
@@ -5956,24 +5927,21 @@ function spawnObject(spawn_transform, location_index, object, parent_vehicle_id,
 
 	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
 
-		local l_ai_type = VEHICLE.TYPE.HELI
+		local l_vehicle_type = VEHICLE.TYPE.HELI
 		if hasTag(object.tags, "vehicle_type=wep_plane") then
-			l_ai_type = VEHICLE.TYPE.PLANE
+			l_vehicle_type = VEHICLE.TYPE.PLANE
 		end
 		if hasTag(object.tags, "vehicle_type=wep_boat") then
-			l_ai_type = VEHICLE.TYPE.BOAT
+			l_vehicle_type = VEHICLE.TYPE.BOAT
 		end
 		if hasTag(object.tags, "vehicle_type=wep_land") then
-			l_ai_type = VEHICLE.TYPE.LAND
+			l_vehicle_type = VEHICLE.TYPE.LAND
 		end
 		if hasTag(object.tags, "vehicle_type=wep_turret") then
-			l_ai_type = VEHICLE.TYPE.TURRET
+			l_vehicle_type = VEHICLE.TYPE.TURRET
 		end
 		if hasTag(object.tags, "type=dlc_weapons_flag") then
-			l_ai_type = "flag"
-		end
-		if hasTag(object.tags, "type=dlc_weapons_terrain_scanner") then
-			l_ai_type = "terrain_scanner"
+			l_vehicle_type = "flag"
 		end
 
 		local l_size = "small"
@@ -5983,7 +5951,7 @@ function spawnObject(spawn_transform, location_index, object, parent_vehicle_id,
 			end
 		end
 
-		local object_data = { name = object.display_name, type = object.type, id = spawned_object_id, component_id = object.id, ai_type = l_ai_type, size = l_size }
+		local object_data = { name = object.display_name, type = object.type, id = spawned_object_id, component_id = object.id, vehicle_type = l_vehicle_type, size = l_size }
 
 		if spawned_objects ~= nil then
 			table.insert(spawned_objects, object_data)
@@ -6395,6 +6363,78 @@ function randChance(t)
 	return win_name
 end
 
+-- Credit to woe
+function updatePathfinding()
+    local old_pathfind = server.pathfind --temporarily remember what the old function did
+    local old_pathfindOcean = server.pathfindOcean
+    function server.pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --permanantly do this new function using the old name.
+        local path = old_pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --do the normal old function
+        return getPathY(path) --add y to all of the paths.
+    end
+    function server.pathfindOcean(matrix_start, matrix_end)
+        local path = old_pathfindOcean(matrix_start, matrix_end)
+        return getPathY(path)
+    end
+end
+
+-- Credit to woe
+function getPathY(path)
+    if not g_savedata.graph_nodes.init then --if it has never built the node's table
+        createPathsY() --build the table this one time
+        g_savedata.graph_nodes.init = true --never build the table again unless you run traverse() manually
+    end
+    for each in pairs(path) do
+        if g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)] and
+			g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)][("%0.2f"):format(path[each].z)]
+        then --if y exists
+            path[each].y = g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)][("%0.2f"):format(path[each].z)] --add it to the table that already contains x and z
+        end
+    end
+    return path --return the path with the added, or not, y values.
+end
+
+-- Credit to woe
+function createPathsY() --this looks through all env mods to see if there is a "zone" then makes a table of y values based on x and z as keys.
+	local start_time = s.getTimeMillisec()
+	d.print("Creating Path Y...", true, 0)
+	local count = server.getAddonCount()
+	for i = 1, count do
+		local addon_index = i-1
+		local ADDON_DATA = server.getAddonData(addon_index)
+		if ADDON_DATA.location_count and ADDON_DATA.location_count>0 then
+			for ii = 1, ADDON_DATA.location_count do
+				local location_index = ii-1
+				local LOCATION_DATA, gotLocationData = server.getLocationData(addon_index, location_index)
+				if LOCATION_DATA.component_count>0 and LOCATION_DATA.env_mod then
+					for iii = 1, LOCATION_DATA.component_count do
+						local component_index = iii-1
+						local COMPONENT_DATA, getLocationComponentData = server.getLocationComponentData(
+							addon_index, location_index, component_index
+						)
+						if COMPONENT_DATA.type=="zone" then
+							local transform_matrix, gotTileTransform = server.getTileTransform(
+								matrix.translation(0, 0, 0), LOCATION_DATA.tile, 300000
+							)
+							if gotTileTransform then
+								local real_transform = matrix.multiply(COMPONENT_DATA.transform, transform_matrix)
+								g_savedata.graph_nodes.nodes = g_savedata.graph_nodes.nodes or {}
+								g_savedata.graph_nodes.nodes[("%0.2f"):format(real_transform[13])] =
+									g_savedata.graph_nodes.nodes[("%0.2f"):format(real_transform[13])] or {}
+								g_savedata.graph_nodes.nodes[
+									("%0.2f"):format(real_transform[13])
+								][
+									("%0.2f"):format(real_transform[15])
+								] = real_transform[14]
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	d.print("Got all Path Y! Time taken: "..millisecondsSince(start_time).."ms", true, 0)
+end
+
 --------------------------------------------------------------------------------
 --
 -- Squad Functions
@@ -6454,7 +6494,7 @@ end
 ---@param aggressiveness_override string \"normal" to override the speed as always normal, "aggressive" to override the speed as always aggressive (only applicable to land vehicles)
 ---@return number speed the speed of the vehicle, 0 if not found
 ---@return boolean got_speed if the speed was found
-function Vehicles.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiveness, terrain_type_override, aggressiveness_override, ignore_convoy_modifier)
+function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiveness, terrain_type_override, aggressiveness_override, ignore_convoy_modifier)
 	if vehicle_object then
 
 		local squad_index, squad = Squad.getSquad(vehicle_object.id)
@@ -6477,7 +6517,7 @@ function Vehicles.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiv
 		end
 
 		if speed == 0 and not ignore_me then
-			if vehicle_object.ai_type ~= VEHICLE.TYPE.LAND then
+			if vehicle_object.vehicle_type ~= VEHICLE.TYPE.LAND then
 				-- return land vehicle speeds
 				speed = vehicle_object.speed.not_land.pseudo_speed
 			else
@@ -6498,7 +6538,7 @@ function Vehicles.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiv
 
 		return speed, true
 	else
-		d.print("(Vehicles.getSpeed) vehicle_object is nil!", true, 1)
+		d.print("(Vehicle.getSpeed) vehicle_object is nil!", true, 1)
 	end
 	return 0, false
 end
@@ -6506,7 +6546,7 @@ end
 ---@param transform SWMatrix the transform of where you want to check
 ---@return string terrain_type the terrain type the transform is on
 ---@return boolean found_terrain_type if the terrain type was found
-function Vehicles.getTerrainType(transform)
+function Vehicle.getTerrainType(transform)
 	local found_terrain_type = false
 	local terrain_type = "offroad"
 	
@@ -6518,10 +6558,295 @@ function Vehicles.getTerrainType(transform)
 			terrain_type = "road"
 		end
 	else
-		d.print("(Vehicles.getTerrainType) vehicle_object is nil!", true, 1)
+		d.print("(Vehicle.getTerrainType) vehicle_object is nil!", true, 1)
 	end
 
 	return terrain_type, found_terrain_type
+end
+
+---@param vehicle_id integer the id of the vehicle
+---@return prefab prefab the prefab of the vehicle if it was created
+---@return boolean was_created if the prefab was created
+function Vehicle.createPrefab(vehicle_id)
+	if not vehicle_id then
+		d.print("(Vehicle.createPrefab) vehicle_id is nil!", true, 1)
+		return nil, false
+	end
+
+	local vehicle_data, got_vehicle_data = s.getVehicleData(vehicle_id)
+
+	if not got_vehicle_data then
+		d.print("(Vehicle.createPrefab) failed to get vehicle data! vehicle_id: "..tostring(vehicle_id), true, 1)
+		return nil, false
+	end
+
+	local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+
+	if not vehicle_object then
+		d.print("(Vehicle.createPrefab) failed to get vehicle_object! vehicle_id: "..tostring(vehicle_id), true, 1)
+		return nil, false
+	end
+
+	---@class prefab
+	local prefab = {
+		voxels = vehicle_data.voxels,
+		mass = vehicle_data.mass,
+		powertrain_types = v.getPowertrainTypes(vehicle_object),
+		role = vehicle_object.role,
+		vehicle_type = vehicle_object.vehicle_type,
+		strategy = vehicle_object.strategy,
+		fully_created = (vehicle_data.mass ~= 0) -- requires to be loaded
+	}
+
+	g_savedata.prefabs[v.removePrefix(vehicle_object.name)] = prefab
+
+	return prefab, true
+end
+
+---@param vehicle_name string the name of the vehicle
+---@return prefab prefab the prefab data of the vehicle
+---@return got_prefab boolean if the prefab data was found
+function Vehicle.getPrefab(vehicle_name)
+	if not vehicle_name then
+		d.print("(Vehicle.getPrefab) vehicle_name is nil!", true, 1)
+		return nil, false
+	end
+
+	vehicle_name = v.removePrefix(vehicle_name)
+
+	if not g_savedata.prefabs[vehicle_name] then
+		return nil, false
+	end
+
+	return g_savedata.prefabs[vehicle_name], true
+end
+
+---@param vehicle_name string the name you want to remove the prefix of
+---@return string vehicle_name the vehicle name without its vehicle type prefix
+function Vehicle.removePrefix(vehicle_name)
+
+	if not vehicle_name then
+		d.print("(Vehicle.removePrefix) vehicle_name is nil!", true, 1)
+		return vehicle_name
+	end
+
+	local vehicle_type_prefixes = {
+		"BOAT %- ",
+		"HELI %- ",
+		"LAND %- ",
+		"TURRET %- ",
+		"PLANE %- "
+	}
+
+	-- replaces underscores with spaces
+	local vehicle_name = string.gsub(vehicle_name, "_", " ")
+
+	-- remove the vehicle type prefix from the entered vehicle name
+	for _, prefix in ipairs(vehicle_type_prefixes) do
+		vehicle_name = string.gsub(vehicle_name, prefix, "")
+	end
+
+	-- makes the string friendly
+	vehicle_name = string.friendly(vehicle_name, true)
+
+	return vehicle_name
+end
+
+---@param vehicle_name string the vehicle's name that you want to purchase
+---@param island_name string the island that this vehicle is being bought under
+---@param fallback_type integer the type of fallback to do if it cannot be afforded, 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
+---@param just_check boolean if you just want to check if the vehicle can be afforded, not actually buy it
+---@return integer cost the cost of the vehicle
+---@return boolean cost_existed if the cost has been calculated yet
+---@return boolean was_purchased if the vehicle was purchased
+---@return number stat_multiplier the amount to multiply the stats by 
+function Vehicle.purchaseVehicle(vehicle_name, island_name, fallback_type, just_check)
+
+	if not g_savedata.settings.CARGO_MODE then
+		d.print("(Vehicle.purchaseVehicle) Cargo Mode is disabled!", true, 1)
+		return 0, nil, true, 0
+	end
+
+	if not vehicle_name then
+		d.print("(Vehicle.purchaseVehicle) vehicle_name is nil!", true, 1)
+		return nil, nil, false, 0
+	end
+
+	if not island_name then
+		d.print("(Vehicle.purchaseVehicle) island_name is nil!", true, 1)
+		return nil, nil, false, 0
+	end
+
+	local island, found_island = getIslandFromName(island_name)
+
+	if not found_island then
+		d.print("(Vehicle.purchaseVehicle) island not found! island_name: "..tostring(island_name), true, 1)
+		return nil, nil, false, 0
+	end
+
+	vehicle_name = v.removePrefix(vehicle_name)
+
+	fallback_type = fallback_type or 0
+
+	if fallback_type == 1 then -- buy it for free
+		return 0, nil, true, 1
+	end
+
+	local cost, cost_existed, got_cost = v.getCost(vehicle_name)
+
+	if not got_cost then
+		d.print("(Vehicle.purchaseVehicle) failed to get cost of vehicle "..tostring(vehicle_name), true, 1)
+		return nil, nil, false, 0
+	end
+
+	if cost == 0 then
+		return cost, cost_existed, true, 1
+	end
+
+	local prefab, got_prefab = v.getPrefab(vehicle_name)
+
+	if not got_prefab then
+		d.print("(Vehicle.purchaseVehicle) failed to get prefab of vehicle "..tostring(vehicle_name), true, 1)
+		return nil, cost_existed, false, 0
+	end
+
+	local total_spent = 0
+
+	for powertrain_type, is_used in pairs(prefab.powertrain_types) do
+		if is_used then
+
+			local resource_price = math.max(cost/RULES.LOGISTICS.COSTS.RESOURCE_VALUES[powertrain_type], island.cargo[powertrain_type])
+			total_spent = total_spent + resource_price
+
+			cost = resource_price - island.cargo[powertrain_type]
+
+			if not just_check then
+				island.cargo[powertrain_type] = island.cargo[powertrain_type] - resource_price
+			end
+
+			cost = cost * RULES.LOGISTICS.COSTS.RESOURCE_VALUES[powertrain_type]
+		end
+
+		if cost == 0 then
+			break
+		end
+	end
+
+	local stat_multiplier = 1
+	if cost ~= 0 then
+		if fallback_type == 2 then
+			stat_multiplier = total_spent ~= cost and 0.5 or 1
+		elseif fallback_type == 3 then
+			stat_multiplier = math.max(total_spent/cost, 0.5)
+		end
+	end
+
+	return total_spent, cost_existed, cost == 0, stat_multiplier
+end
+
+---@param vehicle_name string the vehicle's name you want to get the cost of
+---@return cost cost the cost of the vehicle
+---@return boolean cost_existed if the cost existed before hand
+---@return boolean got_cost if the cost was calculated
+function Vehicle.getCost(vehicle_name)
+	
+	--TODO: Rewrite to use vehicle_name instead of vehicle_object
+	if not g_savedata.settings.CARGO_MODE then
+		d.print("(Vehicle.getCost) Cargo Mode is disabled!", true, 1)
+		return nil, false
+	end
+
+	if not vehicle_name then
+		d.print("(Vehicle.getCost) vehicle_name is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	vehicle_name = v.removePrefix(vehicle_name)
+
+	local prefab, got_prefab = v.getPrefab(vehicle_name)
+
+	if not got_prefab then
+		return 0, false, true
+	end
+
+	if not prefab.fully_created then
+		-- pretend we can afford it for now, whenever its loaded then we check
+		return 0, false, true
+	end
+
+	--* calculate cost
+
+	if not got_vehicle_data then
+		d.print("(Vehicle.getCost) failed to get vehicle data! name: "..tostring(vehicle_name), true, 1)
+		return nil, cost_existed, false
+	end
+
+	local cost = (prefab.voxels^0.8*1.35+prefab.mass^0.75)/2
+	d.print("(Vehicle.getCost) name: "..tostring(vehicle_name).."\nmass: "..tostring(prefab.mass).."\nvoxels: "..tostring(prefab.voxels).."\ncost: "..tostring(cost), true, 0)
+
+	return cost, cost_existed, true
+end
+
+---@param vehicle_object vehicle_object the vehicle_object of the vehicle you want to get the powertrain type of
+---@return powertrain_types powertrain_types the powertrain type(s) of the vehicle
+---@return boolean got_powertrain_type if the powertrain type was found
+function Vehicle.getPowertrainTypes(vehicle_object)
+
+	if not vehicle_object then
+		d.print("(Vehicle.getPowertrainType) vehicle_object is nil!", true, 1)
+		return nil, false
+	end
+
+	local vehicle_data, got_vehicle_data = s.getVehicleData(vehicle_object.id)
+
+	if not got_vehicle_data then
+		d.print("(Vehicle.getPowertrainType) failed to get vehicle data! name: "..tostring(vehicle_object.name).."\nid: "..tostring(vehicle_object.id), true, 1)
+		return nil, false
+	end
+
+	local _, is_jet = s.getVehicleTank(vehicle_object.id, "Jet 1")
+
+	local _, is_diesel = s.getVehicleTank(vehicle_object.id, "Diesel 1")
+
+	---@class powertrain_types
+	local powertrain_types = {
+		jet = is_jet,
+		diesel = is_diesel,
+		oil = (not is_jet and not is_diesel)
+	}
+
+	return powertrain_types, true	
+end
+
+--------------------------------------------------------------------------------
+--
+-- Island Functions
+--
+--------------------------------------------------------------------------------
+
+---@param island ISLAND the island you want to check if AI can spawn there
+---@param selected_prefab selected_prefab[] the selected_prefab you want to check with the island
+---@return boolean can_spawn if the AI can spawn there
+function Island.canSpawn(island, selected_prefab) -- checks if this island can spawn an Enemy AI vehicle
+
+	-- if this island is owned by the AI
+	if island.faction ~= ISLAND.FACTION.AI then
+		return false
+	end
+
+	local player_list = s.getPlayers()
+
+	-- theres no players nearby
+	if not playersNotNearby(player_list, island.transform, 2500, true) then
+		return false
+	end
+
+	-- this island can spawn this specific vehicle
+	if not hasTag(island.tags, "can_spawn="..string.gsub(getTagValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not hasTag(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+		return false
+	end
+
+	return true
 end
 
 --------------------------------------------------------------------------------
@@ -6714,7 +7039,7 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		--? if their vehicle type is the same as we're requesting
-		if squad.ai_type == cargo_vehicle.ai_type then
+		if squad.vehicle_type == cargo_vehicle.vehicle_type then
 			--? check if they have a command which we can take from
 			local valid_command = false
 			for _, command in ipairs(transferrable_commands) do
@@ -6740,7 +7065,7 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 		--* attempt to spawn more escorts
 		local escorts_to_spawn = RULES.LOGISTICS.CONVOY.min_escorts - #possible_escorts
 		for i = 1, escorts_to_spawn do
-			local spawned_vehicle, vehicle_data = spawnAIVehicleRetry(nil, cargo_vehicle.ai_type, true, island, 5)
+			local spawned_vehicle, vehicle_data = spawnAIVehicleRetry(nil, cargo_vehicle.vehicle_type, true, island, 2, 5)
 			if spawned_vehicle then
 				table.insert(possible_escorts, vehicle_data)
 				d.print("(Cargo.getEscorts) Spawned escort vehicle", true, 0)
@@ -7614,7 +7939,6 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 						end
 					end
 					if transport_vehicle.plane.name ~= "none" and transport_vehicle.plane.name ~= "unknown" then
-						d.print("origin_island.tags: "..tostring(origin_island.tags), true, 0)
 						if hasTag(first_path_island.island.tags, "can_spawn=plane") and hasTag(origin_island.tags, "can_spawn=plane") then
 							--
 							total_travel_time[first_path_island_index].plane = 
@@ -8166,7 +8490,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		d.print("selected vehicle: "..sel_vehicle, true, 0)
 	else
 		if g_savedata.constructable_vehicles then
-			d.print("unknown arguments for choosing which ai vehicle to spawn!", true, 1)
+			d.print("unknown arguments for choosing which ai vehicle to spawn.", true, 1)
 		else
 			d.print("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, 1)
 		end
@@ -8189,19 +8513,7 @@ function SpawnModifiers.getConstructableVehicleID(role, vehicle_type, strategy, 
 			end
 		end
 	else
-		if noneNil(role, vehicle_type, strategy) then
-			d.print("(sm.getContstructableVehicleID) Failed to get constructable vehicle id, role: "..role..", type: "..vehicle_type..", strategy: "..strategy..", vehicle_list_id: "..vehicle_list_id, true, 1)
-		else
-			if noneNil(role, vehicle_type) then
-				d.print("(sm.getContstructableVehicleID) strategy is nil! role: "..role..", type: "..vehicle_type..", vehicle_list_id: "..vehicle_list_id, true, 1)
-			else
-				if noneNil(role) then
-					d.print("(sm.getContstructableVehicleID) vehicle_type is nil! role: "..role..", vehicle_list_id: "..vehicle_list_id, true, 1)
-				else
-					d.print("(sm.getContstructableVehicleID) role is nil!", true, 1)
-				end
-			end
-		end
+		d.print("(sm.getContstructableVehicleID) Failed to get constructable vehicle id, role: "..tostring(role)..", type: "..tostring(vehicle_type)..", strategy: "..tostring(strategy)..", vehicle_list_id: "..tostring(vehicle_list_id), true, 1)
 	end
 	return constructable_vehicle_id -- returns the constructable_vehicle_id, if not found then it returns nil
 end
@@ -8210,41 +8522,19 @@ end
 ---@return integer vehicle_list_id the vehicle list id from the vehicle's name, returns nil if not found
 function SpawnModifiers.getVehicleListID(vehicle_name)
 
-	local vehicle_type_prefixes = {
-		[1] = "BOAT %- ",
-		[2] = "HELI %- ",
-		[3] = "LAND %- ",
-		[4] = "TURRET %- ",
-		[5] = "PLANE %- "
-	}
-
-	-- replaces underscores with spaces
-	local vehicle_name = string.gsub(vehicle_name, "_", " ")
-
-	-- remove the vehicle type prefix from the entered vehicle name
-	for _, prefix in ipairs(vehicle_type_prefixes) do
-		vehicle_name = string.gsub(vehicle_name, prefix, "")
+	if not vehicle_name then
+		d.print("(SpawnModifiers.getVehicleListID) vehicle_name is nil!", true, 1)
+		return nil
 	end
 
-	-- makes the string friendly
-	vehicle_name = string.friendly(vehicle_name, true)
+	vehicle_name = v.removePrefix(vehicle_name)
 
-	local found_vehicle = nil
 	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
-		if found_vehicle then break end
-		-- go through all prefixes and remove them from the location name, also makes it friendly
-		for _, prefix in ipairs(vehicle_type_prefixes) do
-			if string.friendly(string.gsub(string.gsub(vehicle_object.location.data.name, "_", " "), prefix, ""), true) == vehicle_name and not found_vehicle then
-				found_vehicle = vehicle_id
-				break
-			elseif string.gsub(string.gsub(vehicle_object.location.data.name, "_", " "), prefix, "") ~= string.gsub(vehicle_object.location.data.name, "_", " ") then
-				-- if this vehicle had the correct prefix, but this is not the correct vehicle, break
-				break
-			end
+		if v.removePrefix(vehicle_object.location.data.name) == vehicle_name then
+			return vehicle_id
 		end
 	end
-		
-	return found_vehicle
+	return nil
 end
 
 ---@param reinforcement_type string \"punish\" to make it less likely to spawn, \"reward\" to make it more likely to spawn
@@ -8487,6 +8777,7 @@ function Debugging.setDebug(requested_debug_type, peer_id)
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							s.removeMapObject(peer_id, vehicle_object.map_id)
+							s.removeMapLabel(peer_id, vehicle_object.map_id)
 							s.removeMapLine(peer_id, vehicle_object.map_id)
 							for i = 1, #vehicle_object.path - 1 do
 								local waypoint = vehicle_object.path[i]
@@ -8546,6 +8837,7 @@ function Debugging.setDebug(requested_debug_type, peer_id)
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 							s.removeMapObject(peer_id, vehicle_object.map_id)
+							s.removeMapLabel(peer_id, vehicle_object.map_id)
 							s.removeMapLine(peer_id, vehicle_object.map_id)
 							for i = 1, #vehicle_object.path - 1 do
 								local waypoint = vehicle_object.path[i]
@@ -8849,29 +9141,29 @@ end
 --------------------------------------------------------------------------------
 
 ---@param island_name string the island name you want to get
----@return boolean island_found returns true if the island was found
 ---@return island[] island the island data from the name
+---@return boolean island_found returns true if the island was found
 function getIslandFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
 	if island_name then
 		island_name = string.friendly(island_name)
 		if island_name == string.friendly(g_savedata.ai_base_island.name) then
 			-- if its the ai's main base
-			return true, g_savedata.ai_base_island
+			return g_savedata.ai_base_island, true
 		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
 			-- if its the player's main base
-			return true, g_savedata.player_base_island
+			return g_savedata.player_base_island, true
 		else
 			-- check all other islands
 			for _, island in pairs(g_savedata.islands) do
 				if island_name == string.friendly(island.name) then
-					return true, island
+					return island, true
 				end
 			end
 		end
 	else
-		return false, "island_name was never inputted!"
+		return nil, false
 	end
-	return false, "island was not found! inputted island_name: "..island_name
+	return nil, false
 end
 
 ---@param island_index integer the island index you want to get
