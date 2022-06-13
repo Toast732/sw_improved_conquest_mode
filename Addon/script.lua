@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.57)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.58)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -186,10 +186,22 @@ local capture_speeds = {
 }
 
 local g_holding_pattern = {
-	{x=500, z=500},
-	{x=500, z=-500},
-	{x=-500, z=-500},
-	{x=-500, z=500}
+	{
+		x=500, 
+		z=500
+	},
+	{
+		x=500, 
+		z=-500
+	},
+	{
+		x=-500, 
+		z=-500
+	},
+	{
+		x=-500, 
+		z=500
+	}
 }
 
 local g_is_air_ready = true
@@ -197,6 +209,8 @@ local g_is_boats_ready = false
 local g_count_squads = 0
 local g_count_attack = 0
 local g_count_patrol = 0
+
+local tau = math.pi*2
 
 g_savedata = {
 	ai_base_island = nil,
@@ -273,14 +287,17 @@ g_savedata = {
 	},
 	debug = {
 		chat = false,
+		error = false,
 		profiler = false,
-		map = false
+		map = false,
+		graph_node = false
 	},
 	tick_extensions = {
 		cargo_vehicle_spawn = 0
 	},
 	graph_nodes = {
 		init = false,
+		init_debug = false,
 		nodes = {}
 	}
 }
@@ -794,8 +811,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- sets up their positions for sweep and prune
 			for island_index, island in pairs(g_savedata.islands) do
-				table.insert(g_savedata.sweep_and_prune.flags.x, { island_index = island.index, x = island.transform[13]})
-				table.insert(g_savedata.sweep_and_prune.flags.z, { island_index = island.index, z = island.transform[15]})
+				table.insert(g_savedata.sweep_and_prune.flags.x, { 
+					island_index = island.index, 
+					x = island.transform[13]
+				})
+				table.insert(g_savedata.sweep_and_prune.flags.z, { 
+					island_index = island.index, 
+					z = island.transform[15]
+				})
 			end
 			-- sort the islands from least to most by their x coordinate
 			table.sort(g_savedata.sweep_and_prune.flags.x, function(a, b) return a.x < b.x end)
@@ -859,7 +882,12 @@ function buildPrefabs(location_index)
 	local vehicle_index = #g_savedata.vehicle_list + 1 or 1
 	for key, vehicle in pairs(location.objects.vehicles) do
 
-		local prefab_data = {location = location, vehicle = vehicle, survivors = {}, fires = {}}
+		local prefab_data = {
+			location = location, 
+			vehicle = vehicle, 
+			survivors = {}, 
+			fires = {}
+		}
 
 		for key, char in pairs(location.objects.survivors) do
 			table.insert(prefab_data.survivors, char)
@@ -1184,7 +1212,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 
 	local min_player_dist = 2500
 
-	d.print("Getting island to spawn vehicle at...", true, 0)
+	--d.print("Getting island to spawn vehicle at...", true, 0)
 
 	if not specified_island then
 		-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
@@ -1329,7 +1357,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		end
 	end
 
-	d.print("calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
+	--d.print("calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
 	-- check if we can afford the vehicle
 	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(v.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
 
@@ -1346,7 +1374,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		spawned_vehicle = spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
-	d.print("setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
+	--d.print("setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -1361,7 +1389,7 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
 		d.print("setting vehicle data...", true, 0)
-		d.print("selected_spawn: "..selected_spawn, true, 0)
+		--d.print("selected_spawn: "..selected_spawn, true, 0)
 
 		---@class vehicle_object
 		local vehicle_data = { 
@@ -1897,26 +1925,17 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 					elseif command == "debug" then
 
-						-- get type of debug
-						if arg[1] == "all" then 
-							-- all debug
-							arg[1] = -1
+						local debug_types = {
+							all = -1,
+							chat = 0,
+							error = 1,
+							profiler = 2,
+							map = 3,
+							graph_node = 4,
+						}
 
-						elseif arg[1] == "chat" then 
-							-- chat debug
-							arg[1] = 0
-
-						elseif arg[1] == "error" then 
-							-- chat debug but only errors
-							arg[1] = 1
-
-						elseif arg[1] == "profiler" then 
-							-- profiler debug
-							arg[1] = 2
-
-						elseif arg[1] == "map" then 
-							-- map debug
-							arg[1] = 3
+						if debug_types[arg[1]] then
+							arg[1] = debug_types[arg[1]]
 
 						elseif not arg[1] or tonumber(arg[1]) then 
 							-- none specified
@@ -2553,8 +2572,10 @@ function onPlayerJoin(steam_id, name, peer_id)
 			do_as_i_say = false,
 			debug = {
 				chat = false,
+				error = false,
 				profiler = false,
-				map = false
+				map = false,
+				graph_node = false
 			},
 			timers = {
 				do_as_i_say = 0
@@ -3071,6 +3092,7 @@ function addPath(vehicle_object, target_dest)
 			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)) > m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, path.y, path.z)) and distance >= 7 then
 				
 				if not path.y then
+					--d.print("not path.y\npath.x: "..tostring(path.x).."\npath.y: "..tostring(path.y).."\npath.z: "..tostring(path.z), true, 1)
 					break
 				end
 				table.insert(vehicle_object.path, { 
@@ -3140,7 +3162,11 @@ function tickGamemode()
 				end
 			else
 				d.print("(tickGamemode) vehicle_object is nil! Vehicle ID: "..tostring(vehicle_id).."\nRemoving from sweep and prune pairs to check", true, 1)
+				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				d.print("vehicle existed before? "..tostring(vehicle_object ~= nil), true, 0)
 				g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
+				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				d.print("vehicle existed after? "..tostring(vehicle_object ~= nil), true, 0)
 			end
 		end
 
@@ -3542,7 +3568,7 @@ function tickAI()
 		end
 	end
 
-	if isTickID(60, 60) then
+	if isTickID(0, 60) then
 		g_count_squads = 0
 		g_count_attack = 0
 		g_count_patrol = 0
@@ -3864,6 +3890,13 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	if vehicle_object then
 		local old_squad_index, old_squad = Squad.getSquad(vehicle_object.id)
 
+		local vehicle_object_test, squad_test, squad_index_test = Squad.getVehicle(vehicle_object.id)
+		d.print("(transferToSquadron) vehicle_object existed before? "..tostring(vehicle_object_test ~= nil), true, 0)
+
+		--* add to new squad
+		g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
+		g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_object.id] = vehicle_object
+
 		--* remove from old squad
 		if old_squad_index and g_savedata.ai_army.squadrons[old_squad_index] and g_savedata.ai_army.squadrons[old_squad_index].vehicles then
 			g_savedata.ai_army.squadrons[old_squad_index].vehicles[vehicle_object.id] = nil
@@ -3873,11 +3906,10 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 			end
 		end
 
-		--* add to new squad
-		g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
-		g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_object.id] = vehicle_object
+		local vehicle_object_test, squad_test, squad_index_test = Squad.getVehicle(vehicle_object.id)
+		d.print("(transferToSquadron) vehicle_object existed after? "..tostring(vehicle_object_test ~= nil), true, 0)
 
-		d.print("(transferToSquadron) Transferred "..vehicle_object.name.." from squadron "..tostring(old_squad_index).." to "..squad_index, true, 0)
+		d.print("(transferToSquadron) Transferred "..vehicle_object.name.."("..vehicle_object.id..") from squadron "..tostring(old_squad_index).." to "..squad_index, true, 0)
 	else
 		d.print("(transferToSquadron) vehicle_object is nil!", true, 1)
 	end
@@ -4177,7 +4209,7 @@ function tickSquadrons()
 				local old_path = convoy.path_data.current_path
 
 				--? check to see if we have any paths for the cargo vehicle
-				if #convoy.vehicle_data.path then
+				if #convoy.vehicle_data.path > 0 then
 					for i = convoy.path_data.current_path, #convoy.path_data.path do
 						--d.print("i: "..i, true, 0)
 						i = math.max(i, 1)
@@ -4191,7 +4223,8 @@ function tickSquadrons()
 						end
 					end
 				else
-					--d.print("there are no convoy paths!", true, 1)
+					d.print("there are no convoy paths!", true, 1)
+					addPath(convoy.vehicle_data, squad.target_island.transform)
 				end
 
 				--d.print("old path: "..old_path, true, 0)
@@ -4940,7 +4973,7 @@ function tickVehicles()
 
 				-- make sure the vehicle isn't killed
 				if vehicle_object.is_killed then
-					break
+					goto break_vehicle
 				end
 
 				-- scout vehicles
@@ -5002,7 +5035,7 @@ function tickVehicles()
 							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					end
-					break
+					goto break_vehicle
 				end
 
 				local ai_target = nil
@@ -5367,7 +5400,7 @@ function tickVehicles()
 								local waypoint_pos_next = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
 
 								-- get colour from angle
-								local angle = math.atan(waypoint_pos_next[13] - vehicle_object.transform[13], waypoint_pos_next[15] - vehicle_object.transform[15])
+								local angle = math.atan(waypoint_pos_next[13] - vehicle_object.transform[13], waypoint_pos_next[15] - vehicle_object.transform[15])/tau*math.pi
 
 								local colour_modifier = 25
 
@@ -5392,7 +5425,7 @@ function tickVehicles()
 									local waypoint_pos = m.translation(waypoint.x, waypoint.y, waypoint.z)
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
-									local angle = math.atan(waypoint_pos_next[13] - waypoint_pos[13], waypoint_pos_next[15] - waypoint_pos[15])
+									local angle = math.atan(waypoint_pos_next[13] - waypoint_pos[13], waypoint_pos_next[15] - waypoint_pos[15])/tau*math.pi
 
 									local line_r = math.floor(math.clamp(math.clamp(r, 0, 200) + (angle*colour_modifier), 0, 255))
 									local line_g = math.floor(math.clamp(math.clamp(g, 0, 200) + (angle*colour_modifier), 0, 255))
@@ -5412,6 +5445,7 @@ function tickVehicles()
 					end
 				end
 			end
+			::break_vehicle::
 		end
 	end
 	d.stopProfiler("tickVehicles()", true, "onTick()")
@@ -5688,11 +5722,11 @@ function tickCargoVehicles()
 				-- if the cargo vehicle is in the transfering stage
 				elseif cargo_vehicle.route_status == 2 then
 					-- if its transfering to the next vehicle
-					if cargo_vehicle.route_data[2] then
+					if cargo_vehicle.route_data[1] then
 						-- spawn it if it doesnt already exist
 						local new_cargo_vehicle = nil
 						for next_cargo_vehicle_index, next_cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
-							if next_cargo_vehicle.vehicle_data.name == cargo_vehicle.route_data[2].transport_method.name then
+							if next_cargo_vehicle.vehicle_data.name == cargo_vehicle.route_data[1].transport_method.name then
 								new_cargo_vehicle = g_savedata.cargo_vehicles[next_cargo_vehicle.vehicle_data.id]
 								break
 							end
@@ -5701,7 +5735,7 @@ function tickCargoVehicles()
 						if not new_cargo_vehicle then
 							-- spawn it as it doesnt exist
 							local found_island, island = getIslandFromIndex(cargo_vehicle.route_data[1].island_index)
-							local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(cargo_vehicle.route_data[2].transport_method.name), nil, true, island, 1, 20)
+							local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
 							if not was_spawned then
 								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
 							else
@@ -6365,39 +6399,53 @@ end
 
 -- Credit to woe
 function updatePathfinding()
-    local old_pathfind = server.pathfind --temporarily remember what the old function did
-    local old_pathfindOcean = server.pathfindOcean
-    function server.pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --permanantly do this new function using the old name.
-        local path = old_pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --do the normal old function
-        return getPathY(path) --add y to all of the paths.
-    end
-    function server.pathfindOcean(matrix_start, matrix_end)
-        local path = old_pathfindOcean(matrix_start, matrix_end)
-        return getPathY(path)
-    end
+	local old_pathfind = server.pathfind --temporarily remember what the old function did
+	local old_pathfindOcean = server.pathfindOcean
+	function server.pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --permanantly do this new function using the old name.
+		local path = old_pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --do the normal old function
+		--d.print("(updatePathfinding) getting path y", true, 0)
+		return getPathY(path) --add y to all of the paths.
+	end
+	function server.pathfindOcean(matrix_start, matrix_end)
+		local path = old_pathfindOcean(matrix_start, matrix_end)
+		return getPathY(path)
+	end
 end
+
+local path_res = "%0.1f"
 
 -- Credit to woe
 function getPathY(path)
-    if not g_savedata.graph_nodes.init then --if it has never built the node's table
-        createPathsY() --build the table this one time
-        g_savedata.graph_nodes.init = true --never build the table again unless you run traverse() manually
-    end
-    for each in pairs(path) do
-        if g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)] and
-			g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)][("%0.2f"):format(path[each].z)]
-        then --if y exists
-            path[each].y = g_savedata.graph_nodes.nodes[("%0.2f"):format(path[each].x)][("%0.2f"):format(path[each].z)] --add it to the table that already contains x and z
-        end
-    end
-    return path --return the path with the added, or not, y values.
+	if not g_savedata.graph_nodes.init then --if it has never built the node's table
+		createPathY() --build the table this one time
+		g_savedata.graph_nodes.init = true --never build the table again unless you run traverse() manually
+	end
+	for each in pairs(path) do
+		--d.print("(getPathY) x: "..((path_res):format(path[each].x)).."\nz: "..((path_res):format(path[each].z)), true, 0)
+		if g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)] and g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)][(path_res):format(path[each].z)] then --if y exists
+			path[each].y = g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)][(path_res):format(path[each].z)].y --add it to the table that already contains x and z
+			--d.print("path["..each.."].y: "..tostring(path[each].y), true, 0)
+		end
+	end
+	return path --return the path with the added, or not, y values.
 end
 
 -- Credit to woe
-function createPathsY() --this looks through all env mods to see if there is a "zone" then makes a table of y values based on x and z as keys.
+function createPathY() --this looks through all env mods to see if there is a "zone" then makes a table of y values based on x and z as keys.
+
+	local isGraphNode = function(tags)
+		if tags[1] == "ocean_path" then
+			return "ocean_path"
+		elseif tags[1] == "land_path" then
+			return "land_path"
+		end
+		return false
+	end
+
 	local start_time = s.getTimeMillisec()
 	d.print("Creating Path Y...", true, 0)
 	local count = server.getAddonCount()
+	local total_paths = 0
 	for i = 1, count do
 		local addon_index = i-1
 		local ADDON_DATA = server.getAddonData(addon_index)
@@ -6411,20 +6459,20 @@ function createPathsY() --this looks through all env mods to see if there is a "
 						local COMPONENT_DATA, getLocationComponentData = server.getLocationComponentData(
 							addon_index, location_index, component_index
 						)
-						if COMPONENT_DATA.type=="zone" then
+						local graph_node = isGraphNode(COMPONENT_DATA.tags)
+						if COMPONENT_DATA.type=="zone" and graph_node then
 							local transform_matrix, gotTileTransform = server.getTileTransform(
 								matrix.translation(0, 0, 0), LOCATION_DATA.tile, 300000
 							)
 							if gotTileTransform then
 								local real_transform = matrix.multiply(COMPONENT_DATA.transform, transform_matrix)
 								g_savedata.graph_nodes.nodes = g_savedata.graph_nodes.nodes or {}
-								g_savedata.graph_nodes.nodes[("%0.2f"):format(real_transform[13])] =
-									g_savedata.graph_nodes.nodes[("%0.2f"):format(real_transform[13])] or {}
-								g_savedata.graph_nodes.nodes[
-									("%0.2f"):format(real_transform[13])
-								][
-									("%0.2f"):format(real_transform[15])
-								] = real_transform[14]
+								g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])] = g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])] or {}
+								g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])][(path_res):format(real_transform[15])] = { 
+									y = real_transform[14],
+									type = graph_node
+								}
+								total_paths = total_paths + 1
 							end
 						end
 					end
@@ -6432,7 +6480,18 @@ function createPathsY() --this looks through all env mods to see if there is a "
 			end
 		end
 	end
-	d.print("Got all Path Y! Time taken: "..millisecondsSince(start_time).."ms", true, 0)
+	d.print("Got Y level of all paths\nNumber of nodes: "..total_paths.."\nTime taken: "..(millisecondsSince(start_time)/1000).."s", true, 0)
+end
+
+function addMapCircle(peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines)
+    peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines = peer_id or -1, ui_id or 0, center_matrix or matrix.translation(0, 0, 0), radius or 500, width or 0.25, r or 255, g or 0, b or 0, a or 255, lines or 16
+    local center_x, center_z, tau = center_matrix[13], center_matrix[15], math.pi*2
+    for i = 0, lines do
+        local x1, z1 = center_x+radius*math.cos(tau/lines*i), center_z+radius*math.sin(tau/lines*i)
+        local x2, z2 = center_x+radius*math.cos(tau/lines*(i+1)), center_z+radius*math.sin(tau/lines*(i+1))
+        local start_matrix, end_matrix = matrix.translation(x1, 0, z1), matrix.translation(x2, 0, z2)
+        server.addMapLine(peer_id, ui_id, start_matrix, end_matrix, width, r, g, b, a)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -6776,11 +6835,6 @@ function Vehicle.getCost(vehicle_name)
 
 	--* calculate cost
 
-	if not got_vehicle_data then
-		d.print("(Vehicle.getCost) failed to get vehicle data! name: "..tostring(vehicle_name), true, 1)
-		return nil, cost_existed, false
-	end
-
 	local cost = (prefab.voxels^0.8*1.35+prefab.mass^0.75)/2
 	d.print("(Vehicle.getCost) name: "..tostring(vehicle_name).."\nmass: "..tostring(prefab.mass).."\nvoxels: "..tostring(prefab.voxels).."\ncost: "..tostring(cost), true, 0)
 
@@ -7115,6 +7169,16 @@ end
 function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight of the escort vehicle for use in a convoy
 	local weight = 1
 
+	if not cargo_vehicle then
+		d.print("(Cargo.getEscortWeight) cargo_vehicle is nil!", true, 1)
+		return 0
+	end
+
+	if not escort_vehicle then
+		d.print("(Cargo.getEscortWeight) escort_vehicle is nil!", true, 1)
+		return 0
+	end
+
 	-- calculate weight based on difference of speed
 	speed_weight = cargo_vehicle.pseudo_speed - escort_vehicle.pseudo_speed
 	
@@ -7389,6 +7453,8 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 
 	elseif recipient.object_type == "vehicle" then
 		-- the recipient is a vehicle
+
+		local recipient, squad, squad_index = Squad.getVehicle(recipient.id)
 
 		-- set the variables
 		for cargo_type, amount in pairs(cargo_to_transfer) do
@@ -8446,7 +8512,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		else
 			sel_role = vehicle_list_id
 		end
-		d.print("selected role: "..sel_role, true, 0)
+		--d.print("selected role: "..sel_role, true, 0)
 		if not vehicle_type then
 			if g_savedata.constructable_vehicles[sel_role] then
 				for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
@@ -8467,7 +8533,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 				return false
 			end
 		end
-		d.print("selected vehicle type: "..sel_veh_type, true, 0)
+		--d.print("selected vehicle type: "..sel_veh_type, true, 0)
 
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
@@ -8475,7 +8541,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 		end
 		sel_strat = randChance(strat_chances)
-		d.print("selected strategy: "..sel_strat, true, 0)
+		--d.print("selected strategy: "..sel_strat, true, 0)
 		if g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat] then
 			for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 				if type(v) == "table" then
@@ -8487,7 +8553,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			return false
 		end
 		sel_vehicle = randChance(vehicle_chances)
-		d.print("selected vehicle: "..sel_vehicle, true, 0)
+		--d.print("selected vehicle: "..sel_vehicle, true, 0)
 	else
 		if g_savedata.constructable_vehicles then
 			d.print("unknown arguments for choosing which ai vehicle to spawn.", true, 1)
@@ -8718,6 +8784,10 @@ function Debugging.getDebug(debug_type, peer_id)
 			if g_savedata.debug.map then
 				return true
 			end
+		elseif debug_type == 4 then -- graph node debug
+			if g_savedata.debug.graph_node then
+				return true
+			end
 		else
 			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type!", true, 1)
 		end
@@ -8740,6 +8810,10 @@ function Debugging.getDebug(debug_type, peer_id)
 				if g_savedata.player_data[steam_id].debug.map then
 					return true
 				end
+			elseif debug_type == 4 then -- graph node debug
+				if g_savedata.player_data[steam_id].debug.graph_node then
+					return true
+				end
 			else
 				d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
 			end
@@ -8748,120 +8822,158 @@ function Debugging.getDebug(debug_type, peer_id)
 	return false
 end
 
-function Debugging.setDebug(requested_debug_type, peer_id)
-	if requested_debug_type then
-		if peer_id then
-			local steam_id = getSteamID(peer_id)
-			if requested_debug_type == -1 then -- all debug
-				local none_true = true
-				for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do -- disable all debug
-					if g_savedata.player_data[steam_id].debug[debug_type] then
-						none_true = false
-						g_savedata.player_data[steam_id].debug[debug_type] = false
+function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
+	if debug_type == "chat" then
+		return (enabled and "Enabled" or "Disabled").." Chat Debug"
+	elseif debug_type == "error" then
+		return (enabled and "Enabled" or "Disabled").." Error Debug"
+	elseif debug_type == "profiler" then
+		if not enabled then
+			-- remove profiler debug
+			s.removePopup(peer_id, g_savedata.profiler.ui_id)
+
+			-- clean all the profiler debug, if its disabled globally
+			d.cleanProfilers()
+		end
+
+		return (enabled and "Enabled" or "Disabled").." Profiler Debug"
+	elseif debug_type == "map" then
+		if not enabled then
+			-- remove map debug
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					s.removeMapObject(peer_id, vehicle_object.map_id)
+					s.removeMapLabel(peer_id, vehicle_object.map_id)
+					s.removeMapLine(peer_id, vehicle_object.map_id)
+					for i = 1, #vehicle_object.path - 1 do
+						local waypoint = vehicle_object.path[i]
+						s.removeMapLine(peer_id, waypoint.ui_id)
 					end
 				end
+			end
 
-				if none_true then -- if none was enabled, then enable all
-					for debug_type, _ in pairs(g_savedata.player_data[steam_id].debug) do
-						g_savedata.player_data[steam_id].debug[debug_type] = true
+			for island_index, island in pairs(g_savedata.islands) do
+				updatePeerIslandMapData(peer_id, island)
+			end
+			
+			updatePeerIslandMapData(peer_id, g_savedata.player_base_island)
+			updatePeerIslandMapData(peer_id, g_savedata.ai_base_island)
+		end
+
+		return (enabled and "Enabled" or "Disabled").." Map Debug"
+	elseif debug_type == "graph_node" then
+		local function addNode(map_id, x, z, node_type)
+			local r = 255
+			local g = 255
+			local b = 255
+			if node_type == "ocean_path" then
+				r = 0
+				g = 25
+				b = 255
+			elseif node_type == "land_path" then
+				r = 0
+				g = 225
+				b = 25
+			end
+			addMapCircle(peer_id, map_id, m.translation(x, 0, z), 5, 1.5, r, g, b, 255, 5)
+		end
+
+		if enabled then
+			if not g_savedata.graph_nodes.init_debug then
+				for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+					for z, z_data in pairs(x_data) do
+						z_data.map_id = s.getMapID()
+						addNode(z_data.map_id, x, z, z_data.type)
 					end
-					g_savedata.debug.chat = true
-					g_savedata.debug.profiler = true
-					g_savedata.debug.map = true
-					return "Enabled All Debug"
-				else
-					d.checkDebug()
-
-
-					-- remove map debug
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							s.removeMapObject(peer_id, vehicle_object.map_id)
-							s.removeMapLabel(peer_id, vehicle_object.map_id)
-							s.removeMapLine(peer_id, vehicle_object.map_id)
-							for i = 1, #vehicle_object.path - 1 do
-								local waypoint = vehicle_object.path[i]
-								s.removeMapLine(peer_id, waypoint.ui_id)
-							end
-						end
-					end
-
-					-- remove profiler debug
-					s.removePopup(peer_id, g_savedata.profiler.ui_id)
-
-					for island_index, island in pairs(g_savedata.islands) do
-						updatePeerIslandMapData(peer_id, island)
-					end
-
-					updatePeerIslandMapData(peer_id, g_savedata.player_base_island)
-					updatePeerIslandMapData(peer_id, g_savedata.ai_base_island)
-
-
-					return "Disabled All Debug"
 				end
-				
-			elseif requested_debug_type == 0 or requested_debug_type == 1 then -- chat debug
-				g_savedata.player_data[steam_id].debug.chat = not g_savedata.player_data[steam_id].debug.chat
-				if g_savedata.player_data[steam_id].debug.chat then
-					g_savedata.debug.chat = true
-					return "Enabled Chat Debug"
-				else
-					d.checkDebug()
-					return "Disabled Chat Debug"
-				end
-			elseif requested_debug_type == 2 then -- profiler debug
-				g_savedata.player_data[steam_id].debug.profiler = not g_savedata.player_data[steam_id].debug.profiler
-				if g_savedata.player_data[steam_id].debug.profiler then
-					g_savedata.debug.profiler = true
-					return "Enabled Profiler Debug"
-				else
-					d.checkDebug()
-
-					-- remove profiler debug
-					s.removePopup(peer_id, g_savedata.profiler.ui_id)
-
-					-- clean all the profiler debug, if its disabled globally
-					d.cleanProfilers()
-
-					return "Disabled Profiler Debug"
-				end
-			elseif requested_debug_type == 3 then -- map debug
-				g_savedata.player_data[steam_id].debug.map = not g_savedata.player_data[steam_id].debug.map
-				if g_savedata.player_data[steam_id].debug.map then
-					g_savedata.debug.map = true
-					return "Enabled Map Debug"
-				else
-					d.checkDebug()
-
-					-- remove map debug
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							s.removeMapObject(peer_id, vehicle_object.map_id)
-							s.removeMapLabel(peer_id, vehicle_object.map_id)
-							s.removeMapLine(peer_id, vehicle_object.map_id)
-							for i = 1, #vehicle_object.path - 1 do
-								local waypoint = vehicle_object.path[i]
-								s.removeMapLine(peer_id, waypoint.ui_id)
-							end
-						end
+				g_savedata.graph_nodes.init_debug = true
+			else
+				for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+					for z, z_data in pairs(x_data) do
+						addNode(z_data.map_id, x, z, z_data.type)
 					end
-
-					for island_index, island in pairs(g_savedata.islands) do
-						updatePeerIslandMapData(peer_id, island)
-					end
-					
-					updatePeerIslandMapData(peer_id, g_savedata.player_base_island)
-					updatePeerIslandMapData(peer_id, g_savedata.ai_base_island)
-
-
-					return "Disabled Map Debug"
 				end
 			end
 		else
-			d.print("(d.setDebug) a peer_id was not specified! debug type: "..tostring(debug_type), true, 1)
+			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+				for z, z_data in pairs(x_data) do
+					s.removeMapID(peer_id, z_data.map_id)
+				end
+			end
+		end
+
+		return (enabled and "Enabled" or "Disabled").." Graph Node Debug"
+	end
+end
+
+function Debugging.setDebug(d_type, peer_id)
+
+	if not peer_id then
+		d.print("(Debugging.setDebug) peer_id is nil!", true, 1)
+		return "peer_id was nil"
+	end
+
+	local steam_id = getSteamID(peer_id)
+
+	if not d_type then
+		d.print("(Debugging.setDebug) d_type is nil!", true, 1)
+		return "d_type was nil"
+	end
+
+	local debug_types = {
+		[-1] = "all",
+		[0] = "chat",
+		[1] = "error",
+		[2] = "profiler",
+		[3] = "map",
+		[4] = "graph_node"
+	}
+
+	local ignore_all = { -- debug types to ignore from enabling all
+		[-1] = "all",
+		[4] = "enable"
+	}
+
+	
+	if debug_types[d_type] then
+		if d_type == -1 then
+			local none_true = true
+			for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
+				if g_savedata.player_data[steam_id].debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "disable") then
+					none_true = false
+					g_savedata.player_data[steam_id].debug[debug_type_data] = false
+				end
+			end
+
+			if none_true then -- if none was enabled, then enable all
+				for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
+					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
+						g_savedata.debug[debug_types[d_type]] = none_true
+						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
+					end
+				end
+			else
+				d.checkDebug()
+				for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
+					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "disable") then
+						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
+					end
+				end
+			end
+			return none_true.." All Debug"
+		else
+			g_savedata.player_data[steam_id].debug[debug_types[d_type]] = not g_savedata.player_data[steam_id].debug[debug_types[d_type]]
+
+			if g_savedata.player_data[steam_id].debug[debug_types[d_type]] then
+				g_savedata.debug[debug_types[d_type]] = true
+			else
+				d.checkDebug()
+			end
+
+			return d.handleDebug(debug_types[d_type], g_savedata.player_data[steam_id].debug[debug_types[d_type]], peer_id, steam_id)
 		end
 	else
-		d.print("(d.setDebug) the debug type was not specified!", true, 1)
+		return "Unknown debug type: "..tostring(d_type)
 	end
 end
 
