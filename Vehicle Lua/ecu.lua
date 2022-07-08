@@ -113,9 +113,9 @@ end
 ---@param max number the maximum value
 ---@return number clamped_x the number clamped between the min and max
 function math.clamp(x, min, max)
-	return max<x and max or min>x and min or x
+	return noNil(max<x and max or min>x and min or x)
 end
 
-function noNaN(x)
+function noNil(x)
 	return x ~= x and 0 or x
 end
