@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.59)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.60)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1649,6 +1649,12 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		reset_prefabs = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
@@ -1935,8 +1941,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "vl" then --vehicle list
 			d.print("Valid Vehicles:", false, 0, peer_id)
 			for vehicle_index, vehicle_object in pairs(g_savedata.vehicle_list) do
-				d.print("raw name: \""..vehicle_object.location.data.name.."\"", false, 0, peer_id)
-				d.print("formatted name (for use in commands): \""..string.gsub(vehicle_object.location.data.name, " ", "_").."\"", false, 0, peer_id)
+				d.print("\nName: \""..v.removePrefix(vehicle_object.location.data.name, true).."\"", false, 0, peer_id)
 			end
 
 
@@ -2343,6 +2348,10 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			local true_addon_data = s.getAddonData(true_addon_index)
 			local addon_data = s.getAddonData(addon_index)
 			d.print("file_store: "..tostring(addon_data.file_store).." | "..tostring(true_addon_data.file_store).."\nlocation_count: "..tostring(addon_data.location_count).." | "..tostring(true_addon_data.location_count).."\naddon_name: "..tostring(addon_data.name).." | "..tostring(true_addon_data.name).."\npath_id: "..tostring(addon_data.path_id).." | "..tostring(true_addon_data.path_id), false, 0, peer_id)
+
+		elseif command == "resetprefabs" then
+			g_savedata.prefabs = {}
+			d.print("reset all prefabs", false, 0, peer_id)
 		end
 	else
 		for command_name, command_info in pairs(player_commands.admin) do
@@ -7041,8 +7050,9 @@ function Vehicle.getPrefab(vehicle_name)
 end
 
 ---@param vehicle_name string the name you want to remove the prefix of
+---@param keep_caps boolean if you want to keep the caps of the name, false will make all letters lowercase
 ---@return string vehicle_name the vehicle name without its vehicle type prefix
-function Vehicle.removePrefix(vehicle_name)
+function Vehicle.removePrefix(vehicle_name, keep_caps)
 
 	if not vehicle_name then
 		d.print("(Vehicle.removePrefix) vehicle_name is nil!", true, 1)
@@ -7066,7 +7076,7 @@ function Vehicle.removePrefix(vehicle_name)
 	end
 
 	-- makes the string friendly
-	vehicle_name = string.friendly(vehicle_name, true)
+	vehicle_name = string.friendly(vehicle_name, false, keep_caps)
 
 	return vehicle_name
 end
@@ -7171,13 +7181,13 @@ function Vehicle.getCost(vehicle_name)
 	
 	--TODO: Rewrite to use vehicle_name instead of vehicle_object
 	if not g_savedata.settings.CARGO_MODE then
-		d.print("(Vehicle.getCost) Cargo Mode is disabled!", true, 1)
-		return nil, false
+		d.print("(Vehicle.getCost) Cargo Mode is disabled!", true, 0)
+		return 0, false, false
 	end
 
 	if not vehicle_name then
 		d.print("(Vehicle.getCost) vehicle_name is nil!", true, 1)
-		return nil, nil, false
+		return 0, nil, false
 	end
 
 	vehicle_name = v.removePrefix(vehicle_name)
@@ -7197,6 +7207,8 @@ function Vehicle.getCost(vehicle_name)
 
 	local cost = (prefab.voxels^0.8*1.35+prefab.mass^0.75)/2
 	d.print("(Vehicle.getCost) name: "..tostring(vehicle_name).."\nmass: "..tostring(prefab.mass).."\nvoxels: "..tostring(prefab.voxels).."\ncost: "..tostring(cost), true, 0)
+
+	cost = math.max(cost, 0) or 0
 
 	return cost, cost_existed, true
 end
@@ -7224,7 +7236,7 @@ function Vehicle.getPowertrainTypes(vehicle_object)
 
 	---@class powertrain_types
 	local powertrain_types = {
-		jet = is_jet,
+		jet_fuel = is_jet,
 		diesel = is_diesel,
 		oil = (not is_jet and not is_diesel)
 	}
@@ -9657,23 +9669,26 @@ end
 
 --- @param str string the string the make friendly
 --- @param remove_spaces boolean true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
+--- @param keep_caps boolean if you want to keep the caps of the name, false will make all letters lowercase
 --- @return string friendly_string friendly string, nil if input_string was not a string
-function string.friendly(str, remove_spaces) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
-	if type(str) == "string" then
-		-- make all lowercase
-		local friendly_string = string.lower(str)
-
-		-- replace all underscores with spaces
-		friendly_string = string.gsub(friendly_string, "_", " ")
-
-		-- if remove_spaces is true, remove all spaces
-		if remove_spaces then
-			friendly_string = string.gsub(friendly_string, " ", "")
-		end
-
-		return friendly_string
+function string.friendly(str, remove_spaces, keep_caps) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
+	if type(str) ~= "string" then
+		return "(string.friendly) str is nil"
 	end
-	return nil
+
+	-- make all lowercase
+	
+	local friendly_string = not keep_caps and string.lower(str) or str
+
+	-- replace all underscores with spaces
+	friendly_string = string.gsub(friendly_string, "_", " ")
+
+	-- if remove_spaces is true, remove all spaces
+	if remove_spaces then
+		friendly_string = string.gsub(friendly_string, " ", "")
+	end
+
+	return friendly_string
 end
 
 --------------------------------------------------------------------------------
