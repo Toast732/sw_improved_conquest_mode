@@ -5061,7 +5061,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="20" name="PLANE - EUROFIGHTER" env_mod_spawn_num="1">
+			<l id="20" name="PLANE - Eurofighter" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="81" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=general,visibility_range=1750,spawning_radius=7,strategy=strafing,speed=116,health=1100" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_81.xml" vehicle_file_store="4">
 						<spawn_transform 30="-1.599282" 31="8.210866" 32="-0.878728"/>
@@ -5099,7 +5099,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="21" name="BOAT - DESTROYER" env_mod_spawn_num="1">
+			<l id="21" name="BOAT - Destroyer" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,GPS_TARGET_POSITION,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
@@ -5161,7 +5161,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="22" name="HELI - VENOM" env_mod_spawn_num="1">
+			<l id="22" name="HELI - Venom" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="94" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=general,visibility_range=1400,spawning_radius=5,speed=37,health=1200" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_94.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.187068" 31="3.162882" 32="-1.590729"/>
@@ -5207,7 +5207,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="23" name="HELI - TIGER" env_mod_spawn_num="1">
+			<l id="23" name="HELI - Tiger" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="98" name="type=dlc_weapons,vehicle_type=wep_heli,size=small,role=attack,visibility_range=1300,spawning_radius=5,speed=35,health=600" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_98.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.066559" 31="2.949932" 32="-3.003018"/>
@@ -5637,7 +5637,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="28" name="PLANE - O-2 SKYMASTER" env_mod_spawn_num="1">
+			<l id="28" name="PLANE - O-2 Skymaster" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="597" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=scout,visibility_range=2500,spawning_radius=8,speed=87,health=425" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_597.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.039262" 31="1.954949" 32="-0.050625"/>
@@ -9469,7 +9469,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="48" name="LAND - AL-A1" env_mod_spawn_num="1">
+			<l id="48" name="LAND - Humvee" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="931" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=attack,visibility_range=800,spawning_radius=6,speed=26,health=600" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_931.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.07598" 31="1.599742" 32="-0.162885"/>
@@ -27204,7 +27204,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="152" name="BOAT - GRIFFON" env_mod_spawn_num="1">
+			<l id="152" name="BOAT - Griffon" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2843" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=general,visibility_range=1500,spawning_radius=25,radar,GPS_TARGET_POSITION,speed=10,health=3000,sonar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2843.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.013405" 31="4.603729" 32="0.05137"/>
@@ -27470,7 +27470,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="156" name="TURRET - PILLBOX" env_mod_spawn_num="1">
+			<l id="156" name="TURRET - Pillbox" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2861" name="type=dlc_weapons,vehicle_type=wep_turret,role=bunker,size=small,visibility_range=2500,spawning_radius=8,health=1800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2861.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="0.046223" 31="1.395916" 32="0.054696"/>
@@ -27578,7 +27578,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="158" name="LAND - ROOK" env_mod_spawn_num="1">
+			<l id="158" name="LAND - Rook" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,GPS_TARGET_POSITION,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.034774" 31="2.382319" 32="0.087677"/>
@@ -27654,7 +27654,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="160" name="BOAT - A988-1 SUPPLY" env_mod_spawn_num="1">
+			<l id="160" name="BOAT - A988-1 Supply" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2918" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=cargo,visibility_range=1750,spawning_radius=50.25,speed=6,health=5500,cargo_per_type=8437.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2918.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.839838" 31="4.56963" 32="0.039105"/>
@@ -27684,7 +27684,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="163" name="PLANE - HORNET" env_mod_spawn_num="1">
+			<l id="163" name="PLANE - Hornet" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="3169" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=attack,visibility_range=2250,spawning_radius=7,strategy=strafing,speed=157,health=1100,GPS_TARGET_POSITION" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_3169.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.02668" 31="2.883643" 32="0.025698"/>
