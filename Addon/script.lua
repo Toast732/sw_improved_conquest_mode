@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.61)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.62)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1226,8 +1226,18 @@ function spawnAIVehicle(requested_prefab, vehicle_type, force_spawn, specified_i
 		if not island then
 			return false, "unable to find island to spawn sea vehicle at!"
 		end
+		if #island.zones.sea == 0 then
+			d.print("(spawnAIVehicle) island has no sea spawn zones but says it can spawn sea vehicles! island_name: "..tostring(island.name), true, 1)
+			return false, "island has no sea spawn zones"
+		end
+
 		spawn_transform = island.zones.sea[math.random(1, #island.zones.sea)].transform
 	elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_land") then
+		if #island.zones.land == 0 then
+			d.print("(spawnAIVehicle) island has no land spawn zones but says it can spawn land vehicles! island_name: "..tostring(island.name), true, 1)
+			return false, "island has no land spawn zones"
+		end
+
 		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	elseif hasTag(selected_prefab.vehicle.tags, "vehicle_type=wep_turret") then
 		spawn_transform = island.zones.turrets[spawnbox_index].transform
@@ -9312,7 +9322,7 @@ function Debugging.setDebug(d_type, peer_id)
 					end
 				end
 			end
-			return none_true.." All Debug"
+			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
 			g_savedata.player_data[steam_id].debug[debug_types[d_type]] = not g_savedata.player_data[steam_id].debug[debug_types[d_type]]
 
