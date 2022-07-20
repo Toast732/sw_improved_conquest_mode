@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="167" component_id_counter="3248">
+	<locations location_id_counter="167" component_id_counter="3249">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -9801,7 +9801,7 @@
 							<l value="959"/>
 						</graph_links>
 					</c>
-					<c component_type="10" id="2859" cargo_zone_import_cargo_type="capture,land_access=sawyer" display_name="Garrison Toddy" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+					<c component_type="10" id="2859" cargo_zone_import_cargo_type="capture,land_access=sawyer,can_spawn=land" display_name="Garrison Toddy" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
 						<spawn_transform 00="0.209271" 01="0.041149" 02="-0.976992" 10="-0.001633" 11="0.999128" 12="0.041731" 20="0.977856" 21="-0.007137" 22="0.209156" 30="73.804573" 31="7.916337" 32="453.336731"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
@@ -9846,6 +9846,14 @@
 						<spawn_bounds>
 							<min x="-25.513751" y="-5" z="-5"/>
 							<max x="25.513751" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="3249" cargo_zone_import_cargo_type="land_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.832126" 02="-0.554587" 20="0.554587" 22="0.832126" 30="101.866364" 31="12.784813" 32="434.413086"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
 						</spawn_bounds>
 						<graph_links/>
 					</c>
