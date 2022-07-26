@@ -21938,7 +21938,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="3245" cargo_zone_import_cargo_type="turret,turret_type=SAM_small" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-140.530426" 31="216.636292" 32="-474.616882"/>
+						<spawn_transform 11="0.998623" 12="0.052452" 21="-0.052452" 22="0.998623" 30="-140.530426" 31="216.798004" 32="-475.64093"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>

@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.63)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.64)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -225,6 +225,7 @@ g_savedata = {
 	ai_base_island = nil,
 	player_base_island = nil,
 	islands = {},
+	loaded_islands = {}, -- islands which are loaded
 	ai_army = { 
 		squadrons = { 
 			[RESUPPLY_SQUAD_INDEX] = { 
@@ -646,10 +647,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				local island_tile = s.getTile(island.transform)
 				if island_tile.name == start_island.name or (island_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					if not hasTag(island, "not_main_base") then
+						local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 						---@class PLAYER_ISLAND
 						g_savedata.player_base_island = {
 							name = island.name,
 							index = island_index,
+							flag_vehicle = flag,
 							transform = island.transform,
 							tags = island.tags,
 							faction = ISLAND.FACTION.PLAYER,
@@ -675,6 +678,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							object_type = "island"
 						}
 						islands[island_index] = nil
+						
+						break
 					end
 				end
 			end
@@ -703,10 +708,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			--* set up ai base
 			local ai_island = islands[ai_base_index]
+			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 			---@class AI_ISLAND
 			g_savedata.ai_base_island = {
 				name = ai_island.name,
 				index = ai_base_index,
+				flag_vehicle = flag,
 				transform = ai_island.transform,
 				tags = ai_island.tags,
 				faction = ISLAND.FACTION.AI,
@@ -737,6 +744,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				},
 				object_type = "island"
 			}
+
 			for _, turret_zone in pairs(turret_zones) do
 				if(m.distance(turret_zone.transform, ai_island.transform) <= 1000) then
 					table.insert(g_savedata.ai_base_island.zones.turrets, turret_zone)
@@ -2009,7 +2017,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 					local vehicle_counter = 0
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							if arg[1] ~= "damaged" or arg[1] == "damaged" and vehicle_object.health > 0 then
+							if arg[1] ~= "damaged" or arg[1] == "damaged" and vehicle_object.current_damage > 0 then
 
 								-- refund the cargo to the island which was sending the cargo
 								Cargo.refund(vehicle_id)
@@ -2744,19 +2752,26 @@ function cleanVehicle(squad_index, vehicle_id)
 end
 
 function onVehicleUnload(vehicle_id)
-	if is_dlc_weapons then
+	if not is_dlc_weapons then
+		return
+	end
 
-		local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	local island, got_island = Island.getFromVehicleID(vehicle_id)
+	if got_island then
+		g_savedata.loaded_islands[island.index] = nil
+		return
+	end
 
-		if squad_index then
-			if vehicle_object.is_killed == true then
-				cleanVehicle(squad_index, vehicle_id)
-			else
-				d.print("(onVehicleUnload): set vehicle pseudo: "..vehicle_id, true, 0)
-				if not vehicle_object.name then vehicle_object.name = "nil" end
-				d.print("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, 0)
-				vehicle_object.state.is_simulating = false
-			end
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	if squad_index then
+		if vehicle_object.is_killed == true then
+			cleanVehicle(squad_index, vehicle_id)
+		else
+			d.print("(onVehicleUnload): set vehicle pseudo: "..vehicle_id, true, 0)
+			if not vehicle_object.name then vehicle_object.name = "nil" end
+			d.print("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, 0)
+			vehicle_object.state.is_simulating = false
 		end
 	end
 end
@@ -2813,6 +2828,13 @@ function onVehicleLoad(vehicle_id)
 			g_savedata.player_vehicles[vehicle_id].damage_threshold = player_vehicle_data.voxels / 4
 			g_savedata.player_vehicles[vehicle_id].transform = s.getVehiclePos(vehicle_id)
 		end
+		return
+	end
+
+	local island, got_island = Island.getFromVehicleID(vehicle_id)
+	if got_island then
+		g_savedata.loaded_islands[island.index] = true
+		return
 	end
 
 	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
@@ -3550,9 +3572,13 @@ function tickAI()
 							if squad.command == SQUAD.COMMAND.STAGE then
 								local _, squad_leader = getSquadLeader(squad)
 								if not squad_leader then
-									-- delete the squad as its empty
-									g_savedata.ai_army.squadrons[squad_index] = nil
-									d.print("removed squad: "..tostring(squad_index), true, 0)
+									if squad_index ~= RESUPPLY_SQUAD_INDEX then
+										-- delete the squad as its empty
+										g_savedata.ai_army.squadrons[squad_index] = nil
+										d.print("removed squad: "..tostring(squad_index), true, 0)
+									else
+										setSquadCommand(squad, SQUAD.COMMAND.RESUPPLY)
+									end
 									break
 								end
 								local squad_leader_transform = squad_leader.transform
@@ -3843,9 +3869,20 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 		return
 	end
 
+	if not squad_index then
+		d.print("(transferToSquadron) squad_index is nil!", true, 1)
+		return
+	end
+
 	local old_squad_index, old_squad = Squad.getSquad(vehicle_object.id)
 
 	vehicle_object.previous_squad = old_squad_index
+
+	--? make sure new squad exists
+	if not g_savedata.ai_army.squadrons[squad_index] then
+		--* create the squad as it doesn't exist
+		Squad.createSquadron(squad_index, vehicle_object)
+	end
 
 	--* add to new squad
 	g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
@@ -3890,21 +3927,11 @@ function addToSquadron(vehicle_object)
 			end
 
 			if new_squad == nil then
-				new_squad_index = #g_savedata.ai_army.squadrons + 1
-				new_squad = { 
-					command = SQUAD.COMMAND.NONE,
-					index = new_squad_index,
-					vehicle_type = vehicle_object.vehicle_type,
-					role = vehicle_object.role,
-					vehicles = {},
-					target_island = nil,
-					target_players = {},
-					target_vehicles = {},
-					investigate_transform = nil,
-				}
+				local new_squad_index, squad_created = Squad.createSquadron(nil, vehicle_object)
+
+				new_squad = g_savedata.ai_army.squadrons[new_squad_index]
 
 				new_squad.vehicles[vehicle_object.id] = vehicle_object
-				table.insert(g_savedata.ai_army.squadrons, new_squad)
 				g_savedata.ai_army.squad_vehicles[vehicle_object.id] = new_squad_index
 			end
 
@@ -4506,10 +4533,14 @@ function tickSquadrons()
 						setSquadCommand(squad, SQUAD.COMMAND.NONE)
 					end
 				else
-					d.print("patrol squad missing leader", true, 1)
-					d.print("deleting squad as its empty", true, 1)
-					g_savedata.ai_army.squadrons[squad_index] = nil
-					setSquadCommand(squad, SQUAD.COMMAND.NONE)
+					if squad_index ~= RESUPPLY_SQUAD_INDEX then
+						d.print("patrol squad missing leader", true, 1)
+						d.print("deleting squad as its empty", true, 1)
+						g_savedata.ai_army.squadrons[squad_index] = nil
+						setSquadCommand(squad, SQUAD.COMMAND.NONE)
+					else
+						setSquadCommand(squad, SQUAD.COMMAND.RESUPPLY)
+					end
 				end
 			elseif squad.command == SQUAD.COMMAND.STAGE then
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -5609,6 +5640,58 @@ function tickCargo()
 	d.stopProfiler("tickCargo()", true, "onTick()")
 end
 
+function tickIslands()
+	d.startProfiler("tickIslands()", true)
+
+	--* go through and set the cargo tanks for each island, to sync the cargo in the script with the cargo on the island
+	if g_savedata.settings.CARGO_MODE then
+		for island_index, _ in pairs(g_savedata.loaded_islands) do
+
+			if not isTickID(island_index, 15) then
+				goto break_island
+			end
+
+			local island, got_island = Island.getFromIndex(island_index)
+
+			if not got_island then
+				d.print("(tickIslands) Island not found! island_index: "..tostring(island_index), true, 1)
+				goto break_island
+			end
+
+			if island.cargo.oil <= 0 and island.cargo.diesel <= 0 and island.cargo.jet_fuel <= 0 then
+				goto break_island
+			end
+
+			local fluid_types = {
+				oil = 5,
+				diesel = 1,
+				jet_fuel = 2
+			}
+
+			for cargo_type, amount in pairs(island.cargo) do
+				local tank_data, got_tank = s.getVehicleTank(island.flag_vehicle.id, cargo_type)
+				if got_tank then
+					s.setVehicleTank(island.flag_vehicle.id, cargo_type, math.min(tank_data.capacity, island.cargo[cargo_type]), fluid_types[cargo_type])
+					island.cargo[cargo_type] = island.cargo[cargo_type] - (math.min(tank_data.capacity, island.cargo[cargo_type]) - tank_data.value)
+					s.setVehicleKeypad(island.flag_vehicle.id, cargo_type, island.cargo[cargo_type])
+				end
+			end
+
+			if g_savedata.islands[island_index] then
+				g_savedata.islands[island_index].cargo = island.cargo
+			elseif g_savedata.ai_base_island.index == island_index then
+				g_savedata.ai_base_island.cargo = island.cargo
+			elseif g_savedata.player_base_island.index == island_index then
+				g_savedata.player_base_island.cargo = island.cargo
+			end
+
+			::break_island::
+		end
+	end
+
+	d.stopProfiler("tickIslands()", true, "onTick()")
+end
+
 local cargo_vehicle_tickrate = time.second/4
 
 function tickCargoVehicles()
@@ -5645,7 +5728,7 @@ function tickCargoVehicles()
 					if transfer_complete then
 						d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
 						-- start going on its route
-						local found_island, island = getIslandFromIndex(cargo_vehicle.route_data[1].island_index)
+						local island, found_island = Island.getFromIndex(cargo_vehicle.route_data[1].island_index)
 						if found_island then
 							cargo_vehicle.route_status = 1
 							local squad_index, squad = Squad.getSquad(cargo_vehicle.vehicle_data.id)
@@ -5664,7 +5747,7 @@ function tickCargoVehicles()
 					end
 				-- if the cargo vehicle is in the pathing stage
 				elseif cargo_vehicle.route_status == 1 then
-					local found_island, island = getIslandFromIndex(cargo_vehicle.route_data[1].island_index)
+					local island, found_island = Island.getFromIndex(cargo_vehicle.route_data[1].island_index)
 					local distance = m.xzDistance(island.transform, cargo_vehicle.vehicle_data.transform)
 
 					local distance_thresholds = {
@@ -5694,7 +5777,7 @@ function tickCargoVehicles()
 
 						if not new_cargo_vehicle then
 							-- spawn it as it doesnt exist
-							local found_island, island = getIslandFromIndex(cargo_vehicle.route_data[1].island_index)
+							local island, found_island = Island.getFromIndex(cargo_vehicle.route_data[1].island_index)
 							local was_spawned, vehicle_data = spawnAIVehicleRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
 							if not was_spawned then
 								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
@@ -5751,7 +5834,7 @@ function tickCargoVehicles()
 
 								-- tell new cargo vehicle to go on its route
 
-								local found_island, island = getIslandFromIndex(new_cargo_vehicle.route_data[1].island_index)
+								local island, found_island = Island.getFromIndex(new_cargo_vehicle.route_data[1].island_index)
 								if found_island then
 									new_cargo_vehicle.route_status = 1
 									local squad_index, squad = Squad.getSquad(cargo_vehicle.vehicle_data.id)
@@ -6069,6 +6152,7 @@ function onTick()
 		tickControls() -- ticks custom ai driving
 		tickCargoVehicles()
 		tickCargo()
+		tickIslands()
 		tickModifiers()
 		tickOther()
 
@@ -6776,6 +6860,39 @@ function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will retur
 	return g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], squad_index, squad
 end
 
+---@param squad_index integer the squad's index which you want to create it under, if not specified it will use the next available index
+---@param vehicle_object vehicle_object the vehicle object which is adding to the squad
+---@return integer squad_index the index of the squad
+---@return boolean squad_created if the squad was successfully created
+function Squad.createSquadron(squad_index, vehicle_object)
+
+	local squad_index = squad_index or #g_savedata.ai_army.squadrons + 1
+
+	if not vehicle_object then
+		d.print("(Squad.createSquadron) vehicle_object is nil!", true, 1)
+		return squad_index, false
+	end
+
+	if g_savedata.ai_army.squadrons[squad_index] then
+		d.print("(Squad.createSquadron) Squadron "..tostring(squad_index).." already exists!", true, 1)
+		return squad_index, false
+	end
+
+	g_savedata.ai_army.squadrons[squad_index] = { 
+		command = SQUAD.COMMAND.NONE,
+		index = squad_index,
+		vehicle_type = vehicle_object.vehicle_type,
+		role = vehicle_object.role,
+		vehicles = {},
+		target_island = nil,
+		target_players = {},
+		target_vehicles = {},
+		investigate_transform = nil
+	}
+
+	return squad_index, true
+end
+
 --------------------------------------------------------------------------------
 --
 -- Vehicle Functions
@@ -6823,49 +6940,53 @@ end
 ---@return number speed the speed of the vehicle, 0 if not found
 ---@return boolean got_speed if the speed was found
 function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiveness, terrain_type_override, aggressiveness_override, ignore_convoy_modifier)
-	if vehicle_object then
-
-		local squad_index, squad = Squad.getSquad(vehicle_object.id)
-
-		local speed = 0
-
-		local ignore_me = false
-
-		if squad.command == SQUAD.COMMAND.CARGO then
-			-- return the slowest vehicle in the chain's speed
-			for vehicle_index, _ in pairs(squad.vehicles) do
-				if g_savedata.cargo_vehicles[vehicle_index] and g_savedata.cargo_vehicles[vehicle_index].route_status == 1 then
-					speed = g_savedata.cargo_vehicles[vehicle_index].path_data.speed or 0
-					if speed ~= 0 and not ignore_convoy_modifier then
-						speed = speed + (vehicle_object.speed.convoy_modifier or 0)
-						ignore_me = true
-					end
-				end
-			end
-		end
-
-		if speed == 0 and not ignore_me then
-			speed = vehicle_object.speed.speed
-
-			if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-				-- land vehicle
-				local terrain_type = v.getTerrainType(vehicle_object.transform)
-				local aggressive = agressiveness_override or not ignore_aggressiveness and vehicle_object.is_aggressive or false
-				if aggressive then
-					speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.AGGRESSIVE
-				else
-					speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.NORMAL
-				end
-
-				speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND[string.upper(terrain_type)]
-			end
-		end
-
-		return speed, true
-	else
+	if not vehicle_object then
 		d.print("(Vehicle.getSpeed) vehicle_object is nil!", true, 1)
+		return 0, false
 	end
-	return 0, false
+
+	local squad_index, squad = Squad.getSquad(vehicle_object.id)
+
+	if not squad then
+		d.print("(Vehicle.getSpeed) squad is nil! vehicle_id: "..tostring(vehicle_object.id), true, 1)
+		return 0, false
+	end
+
+	local speed = 0
+
+	local ignore_me = false
+
+	if squad.command == SQUAD.COMMAND.CARGO then
+		-- return the slowest vehicle in the chain's speed
+		for vehicle_index, _ in pairs(squad.vehicles) do
+			if g_savedata.cargo_vehicles[vehicle_index] and g_savedata.cargo_vehicles[vehicle_index].route_status == 1 then
+				speed = g_savedata.cargo_vehicles[vehicle_index].path_data.speed or 0
+				if speed ~= 0 and not ignore_convoy_modifier then
+					speed = speed + (vehicle_object.speed.convoy_modifier or 0)
+					ignore_me = true
+				end
+			end
+		end
+	end
+
+	if speed == 0 and not ignore_me then
+		speed = vehicle_object.speed.speed
+
+		if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
+			-- land vehicle
+			local terrain_type = v.getTerrainType(vehicle_object.transform)
+			local aggressive = agressiveness_override or not ignore_aggressiveness and vehicle_object.is_aggressive or false
+			if aggressive then
+				speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.AGGRESSIVE
+			else
+				speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.NORMAL
+			end
+
+			speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND[string.upper(terrain_type)]
+		end
+	end
+
+	return speed, true
 end
 
 ---@param transform SWMatrix the transform of where you want to check
@@ -7228,6 +7349,50 @@ function Island.canSpawn(island, selected_prefab) -- checks if this island can s
 	end
 
 	return true
+end
+
+---@param vehicle_id integer the vehicle_id of the island's flag vehicle
+---@return ISLAND island the island the flag vehicle belongs to
+---@return boolean got_island if the island was gotten
+function Island.getFromVehicleID(vehicle_id)
+	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.ai_base_island, true
+	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.player_base_island, true
+	else
+		for island_index, island in pairs(g_savedata.islands) do
+			if island.flag_vehicle.id == vehicle_id then
+				return island, true
+			end
+		end
+	end
+
+	return nil, false
+end
+
+---@param island_index integer the island index you want to get
+---@return ISLAND island the island data from the index
+---@return boolean island_found returns true if the island was found
+function Island.getFromIndex(island_index) --! warning: you cannot set data from the output of this function
+	if not island_index then
+		d.print("(Island.getFromIndex) island_index was never inputted!", true, 1)
+		return nil, false
+	end
+
+	if g_savedata.islands[island_index] then
+		-- if its a normal island
+		return g_savedata.islands[island_index], true
+	elseif island_index == g_savedata.ai_base_island.index then
+		-- if its the ai's main base
+		return g_savedata.ai_base_island, true
+	elseif island_index == g_savedata.player_base_island.index then
+		-- if its the player's main base
+		return g_savedata.player_base_island, true 
+	end
+
+	d.print("(Island.getFromIndex) island was not found! inputted island_index: "..tostring(island_index), true, 1)
+
+	return nil, false
 end
 
 --------------------------------------------------------------------------------
@@ -9647,31 +9812,6 @@ function getIslandFromName(island_name) -- function that gets the island by its 
 		return nil, false
 	end
 	return nil, false
-end
-
----@param island_index integer the island index you want to get
----@return boolean island_found returns true if the island was found
----@return island[] island the island data from the index
-function getIslandFromIndex(island_index)
-	if island_index then
-		if island_index == g_savedata.ai_base_island.index then
-			-- if its the ai's main base
-			return true, g_savedata.ai_base_island
-		elseif island_index == g_savedata.player_base_island.index then
-			-- if its the player's main base
-			return true, g_savedata.player_base_island
-		else
-			-- check all other islands
-			for _, island in pairs(g_savedata.islands) do
-				if island_index == island.index then
-					return true, island
-				end
-			end
-		end
-	else
-		return false, "island_index was never inputted!"
-	end
-	return false, "island was not found! inputted island_index: "..island_index
 end
 
 ---@param start_tick number the time you want to see how long its been since (in ticks)
