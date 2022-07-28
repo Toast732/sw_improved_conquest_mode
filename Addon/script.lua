@@ -1,10 +1,36 @@
+--?	Improved Conquest Mode, Addon for Stormworks which adds new features, fixes bugs, improved performance and is more balanced over Default Conquest Mode.
+--? Copyright (C) 2022 Toastery
+
+--? Improved Conquest Mode is free software: you can redistribute it and/or modify
+--? it under the terms of the GNU General Public License as published by
+--? the Free Software Foundation, either version 3 of the License, or
+--? (at your option) any later version.
+
+--? Improved Conquest Mode is distributed in the hope that it will be useful,
+--? but WITHOUT ANY WARRANTY; without even the implied warranty of
+--? MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+--? GNU General Public License for more details.
+
+--? You should have received a copy of the GNU General Public License
+--? along with Improved Conquest Mode.  If not, see <https://www.gnu.org/licenses/>.
+
+--! (If gotten from Steam Workshop) LICENSE is in vehicle_0.xml
+--! (If gotten from anywhere else) LICENSE is in LICENSE and vehicle_0.xml
+
+-- Author: Toastery
+-- GitHub: https://github.com/Toast732
+-- Workshop: https://steamcommunity.com/id/Toastery7/myworkshopfiles/?appid=573090
+--
+--- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
+--- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
+
 local spawnModifiers = {}
 
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.8.1)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.8.2)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
