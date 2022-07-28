@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.64)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.65)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1716,8 +1716,10 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						if successfully_spawned then
 							if arg[2] ~= nil then
 								if arg[2] == "near" then -- the player selected to spawn it in a range
-									if tonumber(arg[3]) >= 150 then -- makes sure the min range is equal or greater than 150
-										if tonumber(arg[4]) >= tonumber(arg[3]) then -- makes sure the max range is greater or equal to the min range
+									arg[3] = tonumber(arg[3]) or 150
+									arg[4] = tonumber(arg[4]) or 1900
+									if arg[3] >= 150 then -- makes sure the min range is equal or greater than 150
+										if arg[4] >= arg[3] then -- makes sure the max range is greater or equal to the min range
 											if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
 												local player_pos = s.getPlayerPos(peer_id)
 												local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
@@ -2572,41 +2574,45 @@ function onPlayerJoin(steam_id, name, peer_id)
 end
 
 function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
-	if is_dlc_weapons then
-		vehicleData = s.getVehicleData(vehicle_id)
-		local player_vehicle = g_savedata.player_vehicles[vehicle_id]
+	if not is_dlc_weapons then
+		return
+	end
 
-		if player_vehicle ~= nil then
-			local damage_prev = player_vehicle.current_damage
-			player_vehicle.current_damage = player_vehicle.current_damage + amount
+	local player_vehicle = g_savedata.player_vehicles[vehicle_id]
 
-			if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
-				player_vehicle.death_pos = player_vehicle.transform
-			end
-			if amount > 0 then -- checks if it was actual damage and not from the player repairing their vehicle
-				-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
-				-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
-				local valid_ai_vehicles = {}
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+	if player_vehicle then
+		local damage_prev = player_vehicle.current_damage
+		player_vehicle.current_damage = player_vehicle.current_damage + amount
+
+		if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
+			player_vehicle.death_pos = player_vehicle.transform
+		end
+		if amount > 0 then -- checks if it was actual damage and not from the player repairing their vehicle
+			-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
+			-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
+			local valid_ai_vehicles = {}
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.command == SQUAD.COMMAND.ENGAGE or squad.command == SQUAD.COMMAND.CARGO then
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.target_vehicle_id == vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
 							if m.xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
 								valid_ai_vehicles[vehicle_id] = vehicle_object
-								if not vehicle_object.damage_dealt[vehicle_id] then vehicle_object.damage_dealt[vehicle_id] = 0 end
 							end
 						end
 					end
 				end
-				-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
-				-- <ai amount> = number of <valid ai>
-				--
-				-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
-				-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
-				for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
-					vehicle_object.damage_dealt[vehicle_id] = vehicle_object.damage_dealt[vehicle_id] + amount/tableLength(valid_ai_vehicles)
-				end
+			end
+			-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
+			-- <ai amount> = number of <valid ai>
+			--
+			-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
+			-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
+			for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
+				vehicle_object.damage_dealt[vehicle_id] = vehicle_object.damage_dealt[vehicle_id] + amount/tableLength(valid_ai_vehicles)
 			end
 		end
+
+	else
 
 		local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
 
@@ -4622,7 +4628,9 @@ function tickSquadrons()
 				else
 					setSquadCommand(squad, SQUAD.COMMAND.NONE)
 				end
-			elseif squad.command == SQUAD.COMMAND.ENGAGE then
+			end
+
+			if squad.command == SQUAD.COMMAND.ENGAGE or squad.command == SQUAD.COMMAND.CARGO then
 				local squad_vision = squadGetVisionData(squad)
 				local player_counts = {}
 				local vehicle_counts = {}
@@ -5090,7 +5098,7 @@ function tickVehicles()
 							end
 						end
 
-						if squad.command == SQUAD.COMMAND.ENGAGE then 
+						if squad.command == SQUAD.COMMAND.ENGAGE or squad.command == SQUAD.COMMAND.CARGO then 
 							if vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
 								ai_state = 3
 							elseif vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then
@@ -9444,7 +9452,7 @@ function Debugging.setDebug(d_type, peer_id)
 		[5] = "driving"
 	}
 
-	local ignore_all = { -- debug types to ignore from enabling all
+	local ignore_all = { -- debug types to ignore from enabling and/or disabling with ?impwep debug all
 		[-1] = "all",
 		[4] = "enable"
 	}
@@ -9454,16 +9462,17 @@ function Debugging.setDebug(d_type, peer_id)
 		if d_type == -1 then
 			local none_true = true
 			for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
-				if g_savedata.player_data[steam_id].debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "disable") then
+				if g_savedata.player_data[steam_id].debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
 					none_true = false
 					g_savedata.player_data[steam_id].debug[debug_type_data] = false
 				end
 			end
 
 			if none_true then -- if none was enabled, then enable all
-				for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
+				for d_id, debug_type_data in pairs(debug_types) do -- enable all debug
 					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
-						g_savedata.debug[debug_types[d_type]] = none_true
+						g_savedata.debug[debug_type_data] = none_true
+						g_savedata.player_data[steam_id].debug[debug_type_data] = none_true
 						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
 					end
 				end
