@@ -1,10 +1,36 @@
+--?	Improved Conquest Mode, Addon for Stormworks which adds new features, fixes bugs, improved performance and is more balanced over Default Conquest Mode.
+--? Copyright (C) 2022 Toastery
+
+--? Improved Conquest Mode is free software: you can redistribute it and/or modify
+--? it under the terms of the GNU General Public License as published by
+--? the Free Software Foundation, either version 3 of the License, or
+--? (at your option) any later version.
+
+--? Improved Conquest Mode is distributed in the hope that it will be useful,
+--? but WITHOUT ANY WARRANTY; without even the implied warranty of
+--? MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+--? GNU General Public License for more details.
+
+--? You should have received a copy of the GNU General Public License
+--? along with Improved Conquest Mode.  If not, see <https://www.gnu.org/licenses/>.
+
+--! (If gotten from Steam Workshop) LICENSE is in vehicle_0.xml
+--! (If gotten from anywhere else) LICENSE is in LICENSE and vehicle_0.xml
+
+-- Author: Toastery
+-- GitHub: https://github.com/Toast732
+-- Workshop: https://steamcommunity.com/id/Toastery7/myworkshopfiles/?appid=573090
+--
+--- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
+--- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
+
 local spawnModifiers = {}
 
 local s = server
 local m = matrix
 local sm = spawnModifiers
 
-local IMPROVED_CONQUEST_VERSION = "(0.2.7)"
+local IMPROVED_CONQUEST_VERSION = "(0.2.8)"
 
 -- valid values:
 -- "TRUE" if this version will be able to run perfectly fine on old worlds 
@@ -1862,22 +1888,25 @@ function onPlayerJoin(steam_id, name, peer_id)
 end
 
 function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
-	if is_dlc_weapons then
-		vehicleData = s.getVehicleData(incoming_vehicle_id)
-		local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
+	if not is_dlc_weapons then
+		return
+	end
 
-		if player_vehicle ~= nil then
-			local damage_prev = player_vehicle.current_damage
-			player_vehicle.current_damage = player_vehicle.current_damage + amount
+	local player_vehicle = g_savedata.player_vehicles[incoming_vehicle_id]
 
-			if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
-				player_vehicle.death_pos = player_vehicle.transform
-			end
-			if amount > 0 then -- checks if it was actual damage and not from the player repairing their vehicle
-				-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
-				-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
-				local valid_ai_vehicles = {}
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+	if player_vehicle then
+		local damage_prev = player_vehicle.current_damage
+		player_vehicle.current_damage = player_vehicle.current_damage + amount
+
+		if damage_prev <= player_vehicle.damage_threshold and player_vehicle.current_damage > player_vehicle.damage_threshold then
+			player_vehicle.death_pos = player_vehicle.transform
+		end
+		if amount > 0 then -- checks if it was actual damage and not from the player repairing their vehicle
+			-- attempts to estimate which vehicles did the damage, as to not favour the vehicles that are closest
+			-- give it to all vehicles within 3000m of the player, and that are targeting the player's vehicle
+			local valid_ai_vehicles = {}
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.command == COMMAND_ENGAGE then
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.target_vehicle_id == incoming_vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
 							if xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
@@ -1887,16 +1916,17 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 						end
 					end
 				end
-				-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
-				-- <ai amount> = number of <valid ai>
-				--
-				-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
-				-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
-				for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
-					vehicle_object.damage_dealt[incoming_vehicle_id] = vehicle_object.damage_dealt[incoming_vehicle_id] + amount/tableLength(valid_ai_vehicles)
-				end
+			end
+			-- <valid ai> = all the enemy ai vehicles within 3000m of the player, and that are targeting the player
+			-- <ai amount> = number of <valid ai>
+			--
+			-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
+			-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
+			for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
+				vehicle_object.damage_dealt[incoming_vehicle_id] = vehicle_object.damage_dealt[incoming_vehicle_id] + amount/tableLength(valid_ai_vehicles)
 			end
 		end
+	else
 
 		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 			for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -1907,7 +1937,7 @@ function onVehicleDamaged(incoming_vehicle_id, amount, x, y, z, body_id)
 
 					local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
-					if not g_savedata.settings.SINKING_MODE or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_land") or g_savedata.settings.SINKING_MODE and hasTag(vehicleData.tags, "vehicle_type=wep_turret") then
+					if not g_savedata.settings.SINKING_MODE or vehicle_object.ai_type ~= AI_TYPE_BOAT then
 
 						if damage_prev <= (enemy_hp * 2) and vehicle_object.current_damage > (enemy_hp * 2) then
 							killVehicle(squad_index, vehicle_id, true)
