@@ -1,5 +1,5 @@
 # Improved Conquest Mode
-## A Stormworks addon that greatly improves upon the default conquest mode, with features such as Adaptive AI, Land AI Pathfinding, Scouting AI, New Vehicles, and tons of other balance changes, improvements, bug fixes and optimisations!
+## A Stormworks addon that greatly improves upon the default conquest mode, with features such as Adaptive AI, Land AI, Scouting AI, New Vehicles, and tons of other balance changes, improvements, bug fixes and optimisations!
 
 ## Download
 You can download the addon from the workshop page [here](https://steamcommunity.com/sharedfiles/filedetails/?id=2722478864)
@@ -7,15 +7,15 @@ You can download the addon from the workshop page [here](https://steamcommunity.
 ## What is different?
 There are ton of changes here, so many in fact that they all can't be listed here. Some examples include:
 - AI Planes no longer divebomb.
-- Boats will have to sink before being destroyed
-- Eurofighter can now shoot missiles
-- Island Contesting
-- Vehicles now have to go closer to their base to reload
+- Boats will have to sink before being destroyed.
+- Eurofighter can now shoot missiles.
+- Island Contesting.
+- Vehicles now have to go closer to their base to reload.
 - Tanks and Cars can move around roads and will take shortcuts.
-- Several new vehicles
-- Tons of balance and bug fixes
+- Several new vehicles.
+- Tons of balance and bug fixes.
 - Land AI Pathfinding support for Donkk, the keys and Sawyer.
-- AI will learn your stratigies and use your weaknesses against you (Adapative AI).
+- AI will learn your strategies and use your weaknesses against you (Adapative AI).
 - Tons More!
 
 ## Why should I use this instead of the default?
