@@ -34,6 +34,7 @@ Debugging = {} -- functions related to debugging
 Vehicle = {} -- functions related to vehicles, and parsing data on them
 AI = {} -- functions related to their AI
 Island = {} -- functions relating to islands
+Map = {}
 
 -- shortened library names
 local d = Debugging
@@ -43,7 +44,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.66)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.67)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -948,8 +949,24 @@ function buildPrefabs(location_index)
 				local role = getTagValue(vehicle.tags, "role", true) or "general"
 				local vehicle_type = string.gsub(getTagValue(vehicle.tags, "vehicle_type", true), "wep_", "") or "unknown"
 				local strategy = getTagValue(vehicle.tags, "strategy", true) or "general"
+
 				tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
-				table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
+
+				local vehicle_exists = false
+				local cv_id = nil
+
+				for constructable_vehicle_id, constructable_vehicle_data in ipairs(g_savedata.constructable_vehicles[role][vehicle_type][strategy]) do
+					if constructable_vehicle_data.id == vehicle_index then
+						vehicle_exists = true
+						cv_id = constructable_vehicle_id
+						break
+					end
+				end
+
+				if not vehicle_exists then
+					table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], prefab_data)
+				end
+				
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
 				d.print("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, 0)
 			else
@@ -3131,10 +3148,10 @@ function tickGamemode()
 			else
 				d.print("(tickGamemode) vehicle_object is nil! Vehicle ID: "..tostring(vehicle_id).."\nRemoving from sweep and prune pairs to check", true, 1)
 				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
-				d.print("vehicle existed before? "..tostring(vehicle_object ~= nil), true, 0)
+				--d.print("vehicle existed before? "..tostring(vehicle_object ~= nil), true, 0)
 				g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
 				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
-				d.print("vehicle existed after? "..tostring(vehicle_object ~= nil), true, 0)
+				--d.print("vehicle existed after? "..tostring(vehicle_object ~= nil), true, 0)
 			end
 		end
 
@@ -3878,8 +3895,8 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 			if vehicle_object.id then
 				debug_data = debug_data.." vehicle_id: "..tostring(vehicle_object.id)
 
-				if g_savedata.squad_vehicles[vehicle_object.id] then
-					debug_data = debug_data.." squad_index: "..tostring(g_savedata.squad_vehicles[vehicle_object.id])
+				if g_savedata.ai_army.squad_vehicles[vehicle_object.id] then
+					debug_data = debug_data.." squad_index: "..tostring(g_savedata.ai_army.squad_vehicles[vehicle_object.id])
 				end
 			end
 		end
@@ -3890,6 +3907,10 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	end
 
 	local old_squad_index, old_squad = Squad.getSquad(vehicle_object.id)
+
+	if not old_squad_index then
+		d.print("(transferToSquadron) old_squad_index is nil! vehicle_id: "..tostring(vehicle_object.id), true, 1)
+	end
 
 	vehicle_object.previous_squad = old_squad_index
 
@@ -3910,13 +3931,13 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	if old_squad_index and g_savedata.ai_army.squadrons[old_squad_index] and g_savedata.ai_army.squadrons[old_squad_index].vehicles then
 		g_savedata.ai_army.squadrons[old_squad_index].vehicles[vehicle_object.id] = nil
 		--? if the squad is now empty then delete the squad and if its not the resupply squad
-		if #g_savedata.ai_army.squadrons[old_squad_index].vehicles == 0 and old_squad_index ~= RESUPPLY_SQUAD_INDEX then
+		if tableLength(g_savedata.ai_army.squadrons[old_squad_index].vehicles) == 0 and old_squad_index ~= RESUPPLY_SQUAD_INDEX then
 			g_savedata.ai_army.squadrons[old_squad_index] = nil
 		end
 	end
 
-	local vehicle_object_test, squad_test, squad_index_test = Squad.getVehicle(vehicle_object.id)
-	d.print("(transferToSquadron) vehicle_object existed after? "..tostring(vehicle_object_test ~= nil), true, 0)
+	--local vehicle_object_test, squad_test, squad_index_test = Squad.getVehicle(vehicle_object.id)
+	--d.print("(transferToSquadron) vehicle_object existed after? "..tostring(vehicle_object_test ~= nil), true, 0)
 
 	d.print("(transferToSquadron) Transferred "..vehicle_object.name.."("..vehicle_object.id..") from squadron "..tostring(old_squad_index).." to "..squad_index, true, 0)
 end
@@ -5586,7 +5607,8 @@ function tickCargo()
 						d.print("(tickCargo) from island: "..resupplier_island.name, true, 0)
 						for route_index, route in ipairs(best_route) do
 							d.print("\n(tickCargo) Route Index: "..route_index, true, 0)
-							d.print("(tickCargo) to island: "..g_savedata.islands[route.island_index].name, true, 0)
+							local island, got_island = is.getFromIndex(route.island_index)
+							d.print("(tickCargo) to island: "..island.name, true, 0)
 							if route.transport_method then
 								d.print("(tickCargo) with vehicle: "..route.transport_method.name.." | "..route.transport_type, true, 0)
 							else
@@ -5626,7 +5648,12 @@ function tickCargo()
 									speed = nil,
 									can_offroad = true
 								},
-								convoy = {}
+								convoy = {},
+								search_area = {
+									ui_id = s.getMapID(),
+									x = nil,
+									z = nil
+								}
 							}
 
 							-- get escorts
@@ -5720,6 +5747,37 @@ function tickCargoVehicles()
 		for cargo_vehicle_index, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 			if isTickID(cargo_vehicle_index, cargo_vehicle_tickrate) then
 
+				local vehicle_object, squad_index, squad = Squad.getVehicle(cargo_vehicle.vehicle_data.id)
+
+				-- temporary backwards compatibility for testing version
+				if not cargo_vehicle.search_area then
+					cargo_vehicle.search_area = {
+						ui_id = s.getMapID(),
+						x = nil,
+						z = nil
+					}
+				end
+
+				--* draw a search radius around the cargo vehicle
+
+				local search_radius = 1850
+
+				if not cargo_vehicle.search_area.x or m.xzDistance(vehicle_object.transform, m.translation(cargo_vehicle.search_area.x, 0, cargo_vehicle.search_area.z)) >= search_radius then
+					--* remove previous search area
+					s.removeMapID(-1, cargo_vehicle.search_area.ui_id)
+
+					--* add new search area
+					local x, z, was_drawn = Map.drawSearchArea(vehicle_object.transform[13], vehicle_object.transform[15], search_radius, cargo_vehicle.search_area.ui_id, -1, "Convoy", "An enemy AI convoy has been detected to be within this area.\nFind and prevent the cargo from arriving to its destination.", 0, 210, 50, 255)
+
+					if not was_drawn then
+						d.print("(tickCargoVehicles) failed to draw search area for cargo vehicle "..tostring(vehicle_object.id), true, 1)
+					else
+						cargo_vehicle.search_area.x = x
+						cargo_vehicle.search_area.z = z
+					end
+				end
+
+
 				--* sync the script's cargo with the true cargo
 
 				--? if the cargo vehicle is simulating and its in the pathing stage
@@ -5741,7 +5799,6 @@ function tickCargoVehicles()
 				--* tick cargo vehicle behaviour
 
 				--? if the vehicle is in the first stage (loading up with cargo)
-				local vehicle_object, squad_index, squad = Squad.getVehicle(cargo_vehicle.vehicle_data.id)
 				cargo_vehicle.vehicle_data = vehicle_object
 				if cargo_vehicle.route_status == 0 then
 					local transfer_complete, transfer_complete_reason = Cargo.transfer(cargo_vehicle.vehicle_data, cargo_vehicle.resupplier_island, cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
@@ -5817,7 +5874,12 @@ function tickCargoVehicles()
 										speed = nil,
 										can_offroad = true
 									},
-									convoy = {}
+									convoy = {},
+									search_area = {
+										ui_id = s.getMapID(),
+										x = nil,
+										z = nil
+									}
 								}
 
 								table.remove(g_savedata.cargo_vehicles[vehicle_data.id].route_data, 1)
@@ -5869,9 +5931,8 @@ function tickCargoVehicles()
 					else
 						local transfer_complete, transfer_complete_reason = Cargo.transfer(cargo_vehicle.resupply_island, cargo_vehicle.vehicle_data, cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
 						
-						d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
-						
 						if transfer_complete then
+							d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
 							local squad_index, squad = Squad.getSquad(cargo_vehicle.vehicle_data.id)
 							killVehicle(squad_index, cargo_vehicle.vehicle_data.id, false, false) -- kills the vehicle thats now empty
 						end
@@ -7420,6 +7481,69 @@ end
 
 --------------------------------------------------------------------------------
 --
+-- Map Functions
+--
+--------------------------------------------------------------------------------
+
+---@param x number the x coordinate of where the search area will be drawn around (required)
+---@param z number the z coordinate of where the search area will be drawn around (required)
+---@param radius number the radius of the search area (required)
+---@param ui_id integer the ui_id of the search area (required)
+---@param peer_id integer the peer_id of the player which you want to draw the search for (defaults to -1)
+---@param label string The text that appears when mousing over the icon. Appears like a title (defaults to "")
+---@param hover_label string The text that appears when mousing over the icon. Appears like a subtitle or description (defaults to "")
+---@param r integer 0-255, the red value of the search area (defaults to 255)
+---@param g integer 0-255, the green value of the search area (defaults to 255)
+---@param b integer 0-255, the blue value of the search area (defaults to 255)
+---@param a integer 0-255, the alpha value of the search area (defaults to 255)
+---@return number x the x coordinate of where the search area was drawn
+---@return number z the z coordinate of where the search area was drawn
+---@return boolean success if the search area was drawn
+function Map.drawSearchArea(x, z, radius, ui_id, peer_id, label, hover_label, r, g, b, a) -- draws a search area within a radius
+
+	if not x then
+		d.print("(Map.drawSearchArea) x is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	if not z then
+		d.print("(Map.drawSearchArea) z is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	if not radius then
+		d.print("(Map.drawSearchArea) radius is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	local peer_id = peer_id or -1
+
+	if not ui_id then
+		d.print("(Map.drawSearchArea) ui_id is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	local label = label or ""
+	local hover_label = hover_label or ""
+
+	local r = r or 255
+	local g = g or 255
+	local b = b or 255
+	local a = a or 255
+
+	local angle = math.random() * math.pi * 2
+	local dist = math.sqrt(math.randomDecimals(0.1, 0.9)) * radius
+
+	local x_pos = dist * math.sin(angle) + x
+	local z_pos = dist * math.cos(angle) + z
+
+	s.addMapObject(peer_id, ui_id, 0, 2, x_pos, z_pos, 0, 0, 0, 0, label, radius, hover_label, r, g, b, a)
+
+	return x_pos, z_pos, true
+end
+
+--------------------------------------------------------------------------------
+--
 -- General AI Functions
 --
 --------------------------------------------------------------------------------
@@ -7532,6 +7656,9 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 		d.print("cargo vehicle id: "..cargo_vehicle.vehicle_data.id.."\nRequested id: "..vehicle_id, true, 0)
 		if cargo_vehicle.vehicle_data.id == vehicle_id then
 			d.print("cleaning cargo vehicle", true, 0)
+
+			--* remove the search area from the map
+			s.removeMapID(-1, cargo_vehicle.search_area.ui_id)
 			g_savedata.cargo_vehicles[vehicle_id] = nil
 
 			-- clear all the island cargo data
@@ -7943,12 +8070,12 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 		-- the recipient is a island
 		recipient = g_savedata.islands[recipient.index]
 
-		d.print("island name: "..recipient.name, true, 0)
+		--d.print("island name: "..recipient.name, true, 0)
 
 		for cargo_type, amount in pairs(cargo_to_transfer) do
 			if amount > 0 then
-				d.print("adding "..amount, true, 0)
-				d.print("type: "..cargo_type, true, 0)
+				--d.print("adding "..amount, true, 0)
+				--d.print("type: "..cargo_type, true, 0)
 				recipient.cargo[cargo_type] = recipient.cargo[cargo_type] + amount
 				recipient.cargo_transfer[cargo_type] = recipient.cargo_transfer[cargo_type] + amount
 			end
@@ -8794,7 +8921,8 @@ end
 function Cargo.getTransportVehicle(vehicle_type)
 	local vehicle_prefab = sm.spawn(true, "cargo", vehicle_type)
 	if not vehicle_prefab then
-		vehicle_prefab = nil 
+		d.print("(Cargo.getTransportVehicle) vehicle_prefab is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
+		vehicle_prefab = nil
 	else
 		vehicle_prefab.name = vehicle_prefab.location.data.name
 	end
@@ -9030,7 +9158,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		else
 			sel_role = vehicle_list_id
 		end
-		--d.print("selected role: "..sel_role, true, 0)
+		--d.print("selected role: "..tostring(sel_role), true, 0)
 		if not vehicle_type then
 			if g_savedata.constructable_vehicles[sel_role] then
 				for veh_type, v in pairs(g_savedata.constructable_vehicles[sel_role]) do
@@ -9051,7 +9179,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 				return false
 			end
 		end
-		--d.print("selected vehicle type: "..sel_veh_type, true, 0)
+		--d.print("selected vehicle type: "..tostring(sel_veh_type), true, 0)
 
 		for strat, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type]) do
 			if type(v) == "table" then
@@ -9059,7 +9187,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 		end
 		sel_strat = randChance(strat_chances)
-		--d.print("selected strategy: "..sel_strat, true, 0)
+		--d.print("selected strategy: "..tostring(sel_strat), true, 0)
 		if g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat] then
 			for vehicle, v in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 				if type(v) == "table" then
@@ -9071,7 +9199,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			return false
 		end
 		sel_vehicle = randChance(vehicle_chances)
-		--d.print("selected vehicle: "..sel_vehicle, true, 0)
+		--d.print("selected vehicle: "..tostring(sel_vehicle), true, 0)
 	else
 		if g_savedata.constructable_vehicles then
 			d.print("unknown arguments for choosing which ai vehicle to spawn.", true, 1)
