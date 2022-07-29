@@ -43,7 +43,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.65)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.66)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -2770,13 +2770,11 @@ function onVehicleUnload(vehicle_id)
 
 	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
 
-	if squad_index then
+	if squad_index and vehicle_object then
 		if vehicle_object.is_killed == true then
 			cleanVehicle(squad_index, vehicle_id)
 		else
-			d.print("(onVehicleUnload): set vehicle pseudo: "..vehicle_id, true, 0)
-			if not vehicle_object.name then vehicle_object.name = "nil" end
-			d.print("(onVehicleUnload) vehicle name: "..vehicle_object.name, true, 0)
+			d.print("(onVehicleUnload): set vehicle "..vehicle_id.." pseudo. Name: "..vehicle_object.name, true, 0)
 			vehicle_object.state.is_simulating = false
 		end
 	end
@@ -2864,9 +2862,8 @@ function onVehicleLoad(vehicle_id)
 		end
 	end
 
-	if squad_index then
+	if vehicle_object and squad_index then
 		d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
-		if not vehicle_object.name then vehicle_object.name = "nil" end
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 		vehicle_object.state.is_simulating = true
 		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
@@ -3876,7 +3873,19 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	end
 
 	if not squad_index then
-		d.print("(transferToSquadron) squad_index is nil!", true, 1)
+		local debug_data = ""
+		if vehicle_object then
+			if vehicle_object.id then
+				debug_data = debug_data.." vehicle_id: "..tostring(vehicle_object.id)
+
+				if g_savedata.squad_vehicles[vehicle_object.id] then
+					debug_data = debug_data.." squad_index: "..tostring(g_savedata.squad_vehicles[vehicle_object.id])
+				end
+			end
+		end
+
+			
+		d.print("(transferToSquadron) squad_index is nil! debug_data:"..debug_data, true, 1)
 		return
 	end
 
@@ -3887,7 +3896,10 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	--? make sure new squad exists
 	if not g_savedata.ai_army.squadrons[squad_index] then
 		--* create the squad as it doesn't exist
-		Squad.createSquadron(squad_index, vehicle_object)
+		squad_index, squad_created = Squad.createSquadron(squad_index, vehicle_object)
+		if not squad_created then
+			d.print("(transferToSquadron) failed to create squad!", true, 1)
+		end
 	end
 
 	--* add to new squad
@@ -4220,7 +4232,7 @@ function tickSquadrons()
 					local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
 					--d.print("convoy_index: "..tostring(convoy_index).." vehicle_id: "..tostring(vehicle_id), true, 0)
 					if not vehicle_object then
-						d.print("(escort) vehicle_object is nil!", true, 1)
+						d.print("(escort) vehicle_object is nil! vehicle_id: "..tostring(vehicle_id), true, 1)
 						goto break_cargo_vehicle
 					end
 
@@ -4534,7 +4546,7 @@ function tickSquadrons()
 
 			elseif squad.command == SQUAD.COMMAND.PATROL then
 				local squad_leader_id, squad_leader = getSquadLeader(squad)
-				if squad_leader ~= nil then
+				if squad_leader then
 					if squad_leader.state.s ~= VEHICLE.STATE.PATHING then -- has finished patrol
 						setSquadCommand(squad, SQUAD.COMMAND.NONE)
 					end
@@ -5756,16 +5768,15 @@ function tickCargoVehicles()
 				-- if the cargo vehicle is in the pathing stage
 				elseif cargo_vehicle.route_status == 1 then
 					local island, found_island = Island.getFromIndex(cargo_vehicle.route_data[1].island_index)
-					local distance = m.xzDistance(island.transform, cargo_vehicle.vehicle_data.transform)
 
 					local distance_thresholds = {
 						plane = 1000,
-						boat = 650,
+						boat = 850,
 						heli = 350,
 						land = 150
 					}
 
-					if distance < distance_thresholds[(cargo_vehicle.vehicle_data.vehicle_type)] and #cargo_vehicle.vehicle_data.path >= 1 then
+					if #cargo_vehicle.vehicle_data.path <= 1 or m.xzDistance(island.transform, cargo_vehicle.vehicle_data.transform) < distance_thresholds[(cargo_vehicle.vehicle_data.vehicle_type)] then
 						cargo_vehicle.route_status = 2 -- make it unload the cargo
 						table.remove(cargo_vehicle.route_data, 1)
 						d.print("transferring cargo", true, 0)
@@ -6863,6 +6874,10 @@ function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will retur
 
 	if not squad_index or not squad then -- if we were not able to get a squad index then return nil
 		return nil, nil, nil
+	end
+
+	if not g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] then
+		d.print("(Squad.getVehicle) failed to get vehicle_object for vehicle with id "..tostring(vehicle_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
 	end
 
 	return g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], squad_index, squad
