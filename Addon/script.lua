@@ -44,7 +44,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.67)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.68)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -643,7 +643,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- init player base
 			local islands = s.getZones("capture")
-			for island_index, island in pairs(islands) do
+			for island_index, island in ipairs(islands) do
 
 				local island_tile = s.getTile(island.transform)
 				if island_tile.name == start_island.name or (island_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
@@ -678,12 +678,17 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 							},
 							object_type = "island"
 						}
-						islands[island_index] = nil
 						
-						break
+						-- only break if the island's name is the same as the island the player is starting at
+						-- as breaking if its the multiplayer base could cause the player to always start at the multiplayer base in specific scenarios
+						if island_tile.name == start_island.name then
+							break
+						end
 					end
 				end
 			end
+
+			islands[g_savedata.player_base_island.index] = nil
 
 			d.print("creating ai's main base...", true, 0)
 
@@ -2855,6 +2860,12 @@ function onVehicleLoad(vehicle_id)
 	local island, got_island = Island.getFromVehicleID(vehicle_id)
 	if got_island then
 		g_savedata.loaded_islands[island.index] = true
+
+		if island.index == g_savedata.ai_base_island.index then
+			s.setVehicleTooltip(g_savedata.ai_base_island.flag_vehicle.id, "AI Main Base, Cannot be Captured.")
+		elseif island.index == g_savedata.player_base_island.index then
+			s.setVehicleTooltip(g_savedata.player_base_island.flag_vehicle.id, "Your Main Base, Cannot be Captured by AI.")
+		end
 		return
 	end
 
@@ -6846,6 +6857,7 @@ function createPathY() --this looks through all env mods to see if there is a "z
 	d.print("Creating Path Y...", true, 0)
 	local count = server.getAddonCount()
 	local total_paths = 0
+	local empty_matrix = m.translation(0, 0, 0)
 	for i = 1, count do
 		local addon_index = i-1
 		local ADDON_DATA = server.getAddonData(addon_index)
@@ -6862,7 +6874,7 @@ function createPathY() --this looks through all env mods to see if there is a "z
 						local graph_node = isGraphNode(COMPONENT_DATA.tags)
 						if COMPONENT_DATA.type=="zone" and graph_node then
 							local transform_matrix, gotTileTransform = server.getTileTransform(
-								m.translation(0, 0, 0), LOCATION_DATA.tile, 300000
+								empty_matrix, LOCATION_DATA.tile, 300000
 							)
 							if gotTileTransform then
 								local real_transform = m.multiply(COMPONENT_DATA.transform, transform_matrix)
@@ -7489,7 +7501,7 @@ end
 ---@param z number the z coordinate of where the search area will be drawn around (required)
 ---@param radius number the radius of the search area (required)
 ---@param ui_id integer the ui_id of the search area (required)
----@param peer_id integer the peer_id of the player which you want to draw the search for (defaults to -1)
+---@param peer_id integer the peer_id of the player which you want to draw the search area for (defaults to -1)
 ---@param label string The text that appears when mousing over the icon. Appears like a title (defaults to "")
 ---@param hover_label string The text that appears when mousing over the icon. Appears like a subtitle or description (defaults to "")
 ---@param r integer 0-255, the red value of the search area (defaults to 255)
