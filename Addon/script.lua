@@ -15,9 +15,6 @@
 --! (If gotten from Steam Workshop) LICENSE is in vehicle_0.xml
 --! (If gotten from anywhere else) LICENSE is in LICENSE and vehicle_0.xml
 
---! (If gotten from Steam Workshop) LICENSE is in vehicle_0.xml
---! (If gotten from anywhere else) LICENSE is in LICENSE and vehicle_0.xml
-
 -- Author: Toastery
 -- GitHub: https://github.com/Toast732
 -- Workshop: https://steamcommunity.com/id/Toastery7/myworkshopfiles/?appid=573090
@@ -44,7 +41,7 @@ local sm = SpawnModifiers
 local v = Vehicle
 local is = Island
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.68)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.69)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -249,9 +246,14 @@ g_savedata = {
 	info = {
 		creation_version = nil,
 		full_reload_versions = {},
-		has_default_addon = false,
-		has_ai_paths = false,
-		awaiting_reload = false
+		awaiting_reload = false,
+		addons = {
+			default_conquest_mode = false,
+			ai_paths = false
+		},
+		mods = {
+			NSO = false
+		}
 	},
 	tick_counter = 0,
 	sweep_and_prune = { -- used for sweep and prune, capture detection
@@ -330,7 +332,7 @@ function setupRules()
 				transfer_time = time.minute * 3, -- how long it takes to transfer the cargo
 
 				VEHICLES = { --? rules for the vehicles which transport the cargo
-					spawn_time = time.hour / 60 -- how long after a cargo vehicle is killed can another be spawned
+					spawn_time = time.minute * 38 -- how long after a cargo vehicle is killed can another be spawned
 				},
 				ISLANDS = { --? rules for the islands
 					max_capacity = 10000 *  g_savedata.settings.CARGO_CAPACITY_MULTIPLIER, -- the max amount of each resource islands can hold
@@ -444,16 +446,21 @@ function warningChecks(peer_id)
 	if not s.dlcWeapons() then
 		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, peer_id)
 	end
+
+	
 	-- check if they left the default addon enabled
-	if g_savedata.info.has_default_addon then
+	if g_savedata.info.addons.default_conquest_mode then
 		d.print("ERROR: The default addon for conquest mode was left enabled! This will cause issues and bugs! Please create a new world with the default addon disabled!", false, 1, peer_id)
 		is_dlc_weapons = false
-	elseif not g_savedata.info.has_ai_paths then
+
+	elseif not g_savedata.info.addons.ai_paths then
 		d.print("ERROR: The AI Paths addon was left disabled! This addon uses it for pathfinding for the ships, you may have issues with the ship's pathfinding! Please make a new world with the \"AI Paths\" Addon enabled", false, 1, peer_id)
 	end
+
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
-		d.print("Hey! Thanks for using and testing the development version! Just note you will very likely experience errors!", false, 0, peer_id)
+		d.print("Hey! Thanks for using and testing a development version! Just note you will very likely experience errors!", false, 0, peer_id)
+
 	-- check for if the world is outdated
 	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
@@ -462,6 +469,8 @@ function warningChecks(peer_id)
 			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, peer_id)
 		end
 	end
+
+
 end
 
 function checkSavedata() -- does a check for savedata, is used for backwards compatibility
@@ -507,14 +516,20 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 	-- checks for Vanilla Conquest Mode addon
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
-		g_savedata.info.has_default_addon = true
+		g_savedata.info.addons.default_conquest_mode = true
 		is_dlc_weapons = false
 	end
 
 	-- checks for AI Paths addon
 	local addon_index, is_success = s.getAddonIndex("AI Paths")
 	if is_success then
-		g_savedata.info.has_ai_paths = true
+		g_savedata.info.addons.ai_paths = true
+	end
+
+	-- check for NSO mod
+	local nso_tile, got_nso_tile = s.getTile(m.translation(-8000, 0, -12000))
+	if got_nso_tile and nso_tile.cost > 0 then
+		g_savedata.info.mods.nso = true
 	end
 
 	warningChecks(-1)
@@ -1623,7 +1638,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	if not is_dlc_weapons then
 
 		--? if vanilla conquest mode was left enabled
-		if g_savedata.info.has_default_addon then
+		if g_savedata.info.addons.default_conquest_mode then
 			d.print("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, 1, peer_id)
 		end
 
@@ -1654,7 +1669,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	if command == "info" then
 		d.print("------ Improved Conquest Mode Info ------", false, 0, peer_id)
 		d.print("Version: "..IMPROVED_CONQUEST_VERSION, false, 0, peer_id)
-		if not g_savedata.info.has_ai_paths then
+		if not g_savedata.info.addons.ai_paths then
 			d.print("AI Paths Disabled (will cause ship pathfinding issues)", false, 1, peer_id)
 		end
 		d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, peer_id)
