@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.72)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.73)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1417,7 +1417,7 @@ function SpawnModifiers.getStats()
 						if type(strat_data) == "table" then
 							g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
 							for vehicle_id, vehicle_data in pairs(strat_data) do
-								if type(vehicle_data) == "table" then
+								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
 										prefab_data = vehicle_data
@@ -3239,9 +3239,45 @@ function Island.canSpawn(island, selected_prefab)
 		return false
 	end
 
-	-- this island can spawn this specific vehicle
-	if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-		return false
+	-- if this vehicle is a turret
+	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
+		local has_spawn = false
+		local total_spawned = 0
+
+		-- check if this island even has any turret zones
+		if not #island.zones.turrets then
+			return false
+		end
+
+		for turret_zone_index = 1, #island.zones.turrets do
+			if not island.zones.turrets[turret_zone_index].is_spawned then
+				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+					has_spawn = true
+				end
+			else
+				total_spawned = total_spawned + 1
+
+				-- already max amount of turrets
+				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false
+				end
+			end
+		end
+
+		-- if no valid turret spawn was found
+		if not has_spawn then
+			return false
+		end
+	else
+		-- this island can spawn this specific vehicle
+		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+			return false
+		end
 	end
 
 	local player_list = s.getPlayers()
@@ -3951,31 +3987,45 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		--* turret spawning
 		-----
 
+		-- check if the island was specified
 		if not specified_island then
 			return false, "you must specify an island to spawn a turret"
 		end
 
 		local island = specified_island
 
+		-- make sure theres turret spawns on this island
 		if (#island.zones.turrets < 1) then
 			return false, "theres no turret zones on this island!\nisland: "..island.name 
 		end
 
 		local turret_count = 0
+		local unoccupied_zones = {}
 
-		for turret_zone_index, turret_zone in pairs(island.zones.turrets) do
-			if turret_zone.is_spawned then turret_count = turret_count + 1 end
+		-- count the amount of turrets this island has spawned
+		for turret_zone_index = 1, turret_zone_index < #island.zones.turrets do
+			if island.zones.turrets[turret_zone_index].is_spawned then 
+				turret_count = turret_count + 1
+
+				-- check if this island already hit the maximum for the amount of turrets
+				if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false, "hit turret limit for this island" 
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false, "the island already has all turret spawns occupied"
+				end
+			else
+				-- add the zone to a list to be picked from for spawning the next turret
+				table.insert(unoccupied_zones, turret_zone_index)
+			end
 		end
 
-		if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
-			return false, "hit turret limit for this island" 
-		end
+		-- pick a spawn point out of the list which is unoccupied
+		spawnbox_index = unoccupied_zones[math.random(1, #unoccupied_zones)]
 
-		spawnbox_index = math.random(1, #island.zones.turrets)
-		if island.zones.turrets[spawnbox_index].is_spawned == true then
-			return false, "the turret spawn point is already occupied!"
-		end
-
+		-- make sure theres no players nearby this turret spawn
 		local player_list = s.getPlayers()
 		if not force_spawn and not pl.noneNearby(player_list, island.zones.turrets[spawnbox_index].transform, 2500, true) then -- makes sure players are not too close before spawning a turret
 			return false, "players are too close to the turret spawn point!"
@@ -3996,7 +4046,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	if not selected_prefab then
-		d.print("Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
+		d.print("(Vehicle.spawn) Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
@@ -4028,7 +4078,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	local min_player_dist = 2500
 
-	d.print("Getting island to spawn vehicle at...", true, 0)
+	d.print("(Vehicle.spawn) Getting island to spawn vehicle at...", true, 0)
 
 	if not specified_island then
 		-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
@@ -4171,7 +4221,32 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_turret") then
-		spawn_transform = island.zones.turrets[spawnbox_index].transform
+		local turret_count = 0
+		local unoccupied_zones = {}
+
+		-- count the amount of turrets this island has spawned
+		for turret_zone_index = 1, #island.zones.turrets do
+			if island.zones.turrets[turret_zone_index].is_spawned then 
+				turret_count = turret_count + 1
+
+				-- check if this island already hit the maximum for the amount of turrets
+				if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false, "hit turret limit for this island" 
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false, "the island already has all turret spawns occupied"
+				end
+			elseif Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+				-- add the zone to a list to be picked from for spawning the next turret
+				table.insert(unoccupied_zones, turret_zone_index)
+			end
+		end
+
+		-- pick a spawn location out of the list which is unoccupied
+		spawn_transform = island.zones.turrets[unoccupied_zones[math.random(1, #unoccupied_zones)]].transform
+
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_plane") or Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_heli") then
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 400, math.random(-500, 500)))
 	end
@@ -4185,11 +4260,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		end
 	end
 
-	d.print("calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
+	d.print("(Vehicle.spawn) calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
 	-- check if we can afford the vehicle
 	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
 
-	d.print("cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
+	d.print("(Vehicle.spawn) cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
 
 	if not was_purchased then
 		return false, "was unable to afford vehicle"
@@ -4202,7 +4277,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		spawned_vehicle = su.spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
-	d.print("setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -4216,7 +4291,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
-		d.print("setting vehicle data...", true, 0)
+		d.print("(Vehicle.spawn) setting vehicle data...", true, 0)
 		--d.print("selected_spawn: "..selected_spawn, true, 0)
 
 		---@class vehicle_object
@@ -4297,7 +4372,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			object_type = "vehicle"
 		}
 
-		--d.print("set vehicle data", true, 0)
+		d.print("(Vehicle.spawn) set vehicle data", true, 0)
 
 		if #spawned_objects.fires > 0 then
 			vehicle_data.fire_id = spawned_objects.fires[1].id
@@ -5362,182 +5437,197 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			d.print("reset all squad vision data", false, 0, peer_id)
 			
 		elseif command == "spawnvehicle" then --spawn vehicle
-			if arg[1] then
 
-				local valid_types = {
-					turret = true,
-					land = true,
-					plane = true,
-					heli = true,
-					helicopter = true,
-					boat = true
-				}
+			-- if vehicle not specified, spawn random vehicle
+			if not arg[1] then
+				d.print("Spawning Random Enemy AI Vehicle", false, 0, peer_id)
+				v.spawn()
+			end
 
-				local vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
-				if vehicle_id or arg[1] == "scout" or arg[1] == "cargo" or valid_types[string.lower(arg[1])] then
-					d.print("Spawning \""..arg[1].."\"", false, 0, peer_id)
-					if arg[1] ~= "scout" and arg[1] ~= "cargo" then
+			local valid_types = {
+				turret = true,
+				land = true,
+				plane = true,
+				heli = true,
+				helicopter = true,
+				boat = true
+			}
 
-						local vehicle_data = nil
-						local successfully_spawned = false
+			local vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
 
-						if not valid_types[string.lower(arg[1])] then
-							successfully_spawned, vehicle_data = v.spawn(vehicle_id, nil, true)
-						else
-							successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
+			if not vehicle_id and arg[1] ~= "scout" and arg[1] ~= "cargo" and not valid_types[string.lower(arg[1])] then
+				d.print("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names", false, 1, peer_id)
+				return
+			end
+
+			d.print("Spawning \""..arg[1].."\"", false, 0, peer_id)
+
+			if arg[1] == "cargo" then -- they want to spawn a cargo vehicle
+				v.spawn(arg[1])
+			elseif arg[1] == "scout" then -- they want to spawn a scout
+				local scout_exists = false
+
+				-- check if theres already a scout that exists
+				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+					for vehicle_index, vehicle in pairs(squad.vehicles) do
+						if vehicle.role == "scout" then
+							scout_exists = true
+							break
 						end
-						if successfully_spawned then
-							if arg[2] ~= nil then
-								if arg[2] == "near" then -- the player selected to spawn it in a range
-									arg[3] = tonumber(arg[3]) or 150
-									arg[4] = tonumber(arg[4]) or 1900
-									if arg[3] >= 150 then -- makes sure the min range is equal or greater than 150
-										if arg[4] >= arg[3] then -- makes sure the max range is greater or equal to the min range
-											if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
-												local player_pos = s.getPlayerPos(peer_id)
-												local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
-												if found_new_location then
-													-- teleport vehicle to new position
-													local veh_x, veh_y, veh_z = m.position(new_location)
-													s.setVehiclePos(vehicle_data.id, new_location)
-													d.print("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, 0, peer_id)
-												else
-													-- delete vehicle as it was unable to find a valid position
-													for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-														for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-															if vehicle_object.id == vehicle_data.id then
-																killVehicle(squad_index, vehicle_index, true, true)
-																d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, peer_id)
-															end
-														end
-													end
-												end
-											elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
-												--[[
-												local possible_islands = {}
-												for island_index, island in pairs(g_savedata.islands) do
-													if island.faction ~= ISLAND.FACTION.PLAYER then
-														if Tags.has(island.tags, "can_spawn=land") then
-															for in pairs(island.zones.land)
-														for g_savedata.islands[island_index]
-														table.insert(possible_islands.)
-													end
-												end
-												--]]
-												d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
-												for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-													for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-														if vehicle_object.id == vehicle_data.id then
-															killVehicle(squad_index, vehicle_index, true, true)
-														end
-													end
-												end
-											else
-												local player_pos = s.getPlayerPos(peer_id)
-												local player_x, player_y, player_z = m.position(player_pos)
-												local veh_x, veh_y, veh_z = m.position(vehicle_data.transform)
-												local new_location = m.translation(player_x + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])), veh_y * 1.5, player_z + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])))
-												local new_veh_x, new_veh_y, new_veh_z = m.position(new_location)
-												s.setVehiclePos(vehicle_data.id, new_location)
-												vehicle_data.transform = new_location
-												d.print("Spawned "..vehicle_data.name.." at x:"..new_veh_x.." y:"..new_veh_y.." z:"..new_veh_z, false, 0, peer_id)
-											end
-										else
-											d.print("your maximum range must be greater or equal to the minimum range!", false, 1, peer_id)
-											for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-												for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-													if vehicle_object.id == vehicle_data.id then
-														killVehicle(squad_index, vehicle_index, true, true)
-													end
-												end
-											end
-										end
+					end
+
+					if scout_exists then
+						break
+					end
+				end
+
+				if scout_exists then -- if a scout vehicle already exists
+					d.print("unable to spawn scout vehicle: theres already a scout vehicle!", false, 1, peer_id)
+					return
+				end
+
+				-- spawn scout
+				v.spawn(arg[1])
+
+			else
+
+				local vehicle_data = nil
+				local successfully_spawned = false
+
+				if not valid_types[string.lower(arg[1])] then
+					successfully_spawned, vehicle_data = v.spawn(vehicle_id, nil, true)
+				else
+					successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
+				end
+				if successfully_spawned then
+					-- if the player didn't specify where to spawn it
+					if arg[2] == nil then
+						return
+					end
+
+					if arg[2] == "near" then -- the player selected to spawn it in a range
+						arg[3] = tonumber(arg[3]) or 150
+						arg[4] = tonumber(arg[4]) or 1900
+						if arg[3] >= 150 then -- makes sure the min range is equal or greater than 150
+							if arg[4] >= arg[3] then -- makes sure the max range is greater or equal to the min range
+								if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
+									local player_pos = s.getPlayerPos(peer_id)
+									local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+									if found_new_location then
+										-- teleport vehicle to new position
+										local veh_x, veh_y, veh_z = m.position(new_location)
+										s.setVehiclePos(vehicle_data.id, new_location)
+										d.print("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, 0, peer_id)
 									else
-										d.print("the minimum range must be at least 150!", false, 1, peer_id)
+										-- delete vehicle as it was unable to find a valid position
 										for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 											for vehicle_index, vehicle_object in pairs(squad.vehicles) do
 												if vehicle_object.id == vehicle_data.id then
 													killVehicle(squad_index, vehicle_index, true, true)
+													d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, peer_id)
 												end
+											end
+										end
+									end
+								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
+									--[[
+									local possible_islands = {}
+									for island_index, island in pairs(g_savedata.islands) do
+										if island.faction ~= ISLAND.FACTION.PLAYER then
+											if Tags.has(island.tags, "can_spawn=land") then
+												for in pairs(island.zones.land)
+											for g_savedata.islands[island_index]
+											table.insert(possible_islands.)
+										end
+									end
+									--]]
+									d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
+									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+										for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+											if vehicle_object.id == vehicle_data.id then
+												killVehicle(squad_index, vehicle_index, true, true)
 											end
 										end
 									end
 								else
-									if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
-										if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
-											if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
-												local new_pos = m.translation(arg[2], 0, arg[3])
-												s.setVehiclePos(vehicle_data.id, new_pos)
-												vehicle_data.transform = new_pos
-												d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
-											elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
-												d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
-												for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-													for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-														if vehicle_object.id == vehicle_data.id then
-															killVehicle(squad_index, vehicle_index, true, true)
-														end
-													end
-												end
-											else -- air vehicle
-												local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
-												s.setVehiclePos(vehicle_data.id, new_pos)
-												vehicle_data.transform = new_pos
-												d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
-											end
-										else
-											d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, peer_id)
-											for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-												for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-													if vehicle_object.id == vehicle_data.id then
-														killVehicle(squad_index, vehicle_index, true, true)
-													end
-												end
-											end
-										end
-									else
-										d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, peer_id)
-										for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-											for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-												if vehicle_object.id == vehicle_data.id then
-													killVehicle(squad_index, vehicle_index, true, true)
-												end
-											end
+									local player_pos = s.getPlayerPos(peer_id)
+									vehicle_data.transform[13] = player_pos[13] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- x
+									vehicle_data.transform[14] = vehicle_data.transform[14] * 1.5 -- y
+									vehicle_data.transform[15] = player_pos[15] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- z
+									s.setVehiclePos(vehicle_data.id, vehicle_data.transform)
+									d.print("Spawned "..vehicle_data.name.." at x:"..vehicle_data.transform[13].." y:"..vehicle_data.transform[14].." z:"..vehicle_data.transform[15], false, 0, peer_id)
+								end
+							else
+								d.print("your maximum range must be greater or equal to the minimum range!", false, 1, peer_id)
+								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+									for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+										if vehicle_object.id == vehicle_data.id then
+											killVehicle(squad_index, vehicle_index, true, true)
 										end
 									end
 								end
 							end
 						else
-							if type(vehicle_data) == "string" then
-								d.print("Failed to spawn vehicle! Error:\n"..vehicle_data, false, 1, peer_id)
-							else
-								d.print("Failed to spawn vehicle!\n(no error code recieved)", false, 1, peer_id)
-							end
-						end
-					elseif arg[1] == "cargo" then
-						v.spawn(arg[1])
-					elseif arg[1] == "scout" then
-						local scout_exists = false
-						for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-							for vehicle_index, vehicle in pairs(squad.vehicles) do
-								if vehicle.role == "scout" then
-									scout_exists = true
-									if squad.command ~= SQUAD.COMMAND.SCOUT then not_scouting = true; squad_to_set = squad_index end
+							d.print("the minimum range must be at least 150!", false, 1, peer_id)
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+									if vehicle_object.id == vehicle_data.id then
+										killVehicle(squad_index, vehicle_index, true, true)
+									end
 								end
 							end
 						end
-						if not scout_exists then -- if a scout vehicle does not exist
-							v.spawn(arg[1])
+					else
+						if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
+							if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
+								if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
+									local new_pos = m.translation(arg[2], 0, arg[3])
+									s.setVehiclePos(vehicle_data.id, new_pos)
+									vehicle_data.transform = new_pos
+									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
+								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
+									d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
+									for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+										for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+											if vehicle_object.id == vehicle_data.id then
+												killVehicle(squad_index, vehicle_index, true, true)
+											end
+										end
+									end
+								else -- air vehicle
+									local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
+									s.setVehiclePos(vehicle_data.id, new_pos)
+									vehicle_data.transform = new_pos
+									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
+								end
+							else
+								d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, peer_id)
+								for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+									for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+										if vehicle_object.id == vehicle_data.id then
+											killVehicle(squad_index, vehicle_index, true, true)
+										end
+									end
+								end
+							end
 						else
-							d.print("unable to spawn scout vehicle: theres already a scout vehicle!", false, 1, peer_id)
+							d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, peer_id)
+							for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+								for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+									if vehicle_object.id == vehicle_data.id then
+										killVehicle(squad_index, vehicle_index, true, true)
+									end
+								end
+							end
 						end
 					end
 				else
-					d.print("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names | this is case sensitive, and all spaces must be replaced with underscores", false, 1, peer_id)
+					if type(vehicle_data) == "string" then
+						d.print("Failed to spawn vehicle! Error:\n"..vehicle_data, false, 1, peer_id)
+					else
+						d.print("Failed to spawn vehicle!\n(no error code recieved)", false, 1, peer_id)
+					end
 				end
-			else -- if vehicle not specified, spawn random vehicle
-				d.print("Spawning Random Enemy AI Vehicle", false, 0, peer_id)
-				v.spawn()
 			end
 
 
@@ -6272,7 +6362,7 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 				if squad.command == SQUAD.COMMAND.ENGAGE or squad.command == SQUAD.COMMAND.CARGO then
 					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.target_vehicle_id == vehicle_id then -- if the ai vehicle is targeting the vehicle which was damaged
-							if m.xzDistance(player_vehicle.transform, vehicle_object.transform) <= 3000 then -- if the ai vehicle is 3000m or less away from the player
+							if m.xzDistance(player_vehicle.transform, vehicle_object.transform) <= 2500 and vehicle_object.state.is_simulating then -- if the ai vehicle is 2500m or less away from the player, and is 
 								valid_ai_vehicles[vehicle_id] = vehicle_object
 							end
 						end
@@ -6782,7 +6872,7 @@ function tickGamemode()
 		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
 			g_savedata.ai_base_island.production_timer = 0
 
-			local spawned, vehicle_data = v.spawn("turret", "turret", true, g_savedata.ai_base_island)
+			local spawned, vehicle_data = v.spawn("turret", "turret", false, g_savedata.ai_base_island)
 			if not spawned then
 				d.print("failed to spawn turret at "..g_savedata.ai_base_island.name.."\nError:\n"..vehicle_data, true, 1)
 			end
@@ -6800,7 +6890,7 @@ function tickGamemode()
 			if island.faction == ISLAND.FACTION.AI and g_savedata.ai_base_island.production_timer == 0 then
 				-- check to see if turrets are disabled
 				if g_savedata.settings.MAX_TURRET_AMOUNT > 0 then
-					local spawned, vehicle_data = v.spawn("turret", "turret", true, island)
+					local spawned, vehicle_data = v.spawn("turret", "turret", false, island)
 					if not spawned then
 						d.print("failed to spawn turret at "..island.name.."\nError:\n"..vehicle_data, true, 1)
 					end

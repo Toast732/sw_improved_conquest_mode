@@ -28,9 +28,45 @@ function Island.canSpawn(island, selected_prefab)
 		return false
 	end
 
-	-- this island can spawn this specific vehicle
-	if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-		return false
+	-- if this vehicle is a turret
+	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
+		local has_spawn = false
+		local total_spawned = 0
+
+		-- check if this island even has any turret zones
+		if not #island.zones.turrets then
+			return false
+		end
+
+		for turret_zone_index = 1, #island.zones.turrets do
+			if not island.zones.turrets[turret_zone_index].is_spawned then
+				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+					has_spawn = true
+				end
+			else
+				total_spawned = total_spawned + 1
+
+				-- already max amount of turrets
+				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false
+				end
+			end
+		end
+
+		-- if no valid turret spawn was found
+		if not has_spawn then
+			return false
+		end
+	else
+		-- this island can spawn this specific vehicle
+		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+			return false
+		end
 	end
 
 	local player_list = s.getPlayers()

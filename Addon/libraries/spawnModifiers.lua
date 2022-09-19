@@ -251,7 +251,7 @@ function SpawnModifiers.getStats()
 						if type(strat_data) == "table" then
 							g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
 							for vehicle_id, vehicle_data in pairs(strat_data) do
-								if type(vehicle_data) == "table" then
+								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
 										prefab_data = vehicle_data

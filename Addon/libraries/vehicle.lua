@@ -415,31 +415,45 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		--* turret spawning
 		-----
 
+		-- check if the island was specified
 		if not specified_island then
 			return false, "you must specify an island to spawn a turret"
 		end
 
 		local island = specified_island
 
+		-- make sure theres turret spawns on this island
 		if (#island.zones.turrets < 1) then
 			return false, "theres no turret zones on this island!\nisland: "..island.name 
 		end
 
 		local turret_count = 0
+		local unoccupied_zones = {}
 
-		for turret_zone_index, turret_zone in pairs(island.zones.turrets) do
-			if turret_zone.is_spawned then turret_count = turret_count + 1 end
+		-- count the amount of turrets this island has spawned
+		for turret_zone_index = 1, turret_zone_index < #island.zones.turrets do
+			if island.zones.turrets[turret_zone_index].is_spawned then 
+				turret_count = turret_count + 1
+
+				-- check if this island already hit the maximum for the amount of turrets
+				if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false, "hit turret limit for this island" 
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false, "the island already has all turret spawns occupied"
+				end
+			else
+				-- add the zone to a list to be picked from for spawning the next turret
+				table.insert(unoccupied_zones, turret_zone_index)
+			end
 		end
 
-		if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
-			return false, "hit turret limit for this island" 
-		end
+		-- pick a spawn point out of the list which is unoccupied
+		spawnbox_index = unoccupied_zones[math.random(1, #unoccupied_zones)]
 
-		spawnbox_index = math.random(1, #island.zones.turrets)
-		if island.zones.turrets[spawnbox_index].is_spawned == true then
-			return false, "the turret spawn point is already occupied!"
-		end
-
+		-- make sure theres no players nearby this turret spawn
 		local player_list = s.getPlayers()
 		if not force_spawn and not pl.noneNearby(player_list, island.zones.turrets[spawnbox_index].transform, 2500, true) then -- makes sure players are not too close before spawning a turret
 			return false, "players are too close to the turret spawn point!"
@@ -460,7 +474,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	if not selected_prefab then
-		d.print("Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
+		d.print("(Vehicle.spawn) Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
@@ -492,7 +506,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	local min_player_dist = 2500
 
-	d.print("Getting island to spawn vehicle at...", true, 0)
+	d.print("(Vehicle.spawn) Getting island to spawn vehicle at...", true, 0)
 
 	if not specified_island then
 		-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
@@ -635,7 +649,32 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 		spawn_transform = island.zones.land[math.random(1, #island.zones.land)].transform
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_turret") then
-		spawn_transform = island.zones.turrets[spawnbox_index].transform
+		local turret_count = 0
+		local unoccupied_zones = {}
+
+		-- count the amount of turrets this island has spawned
+		for turret_zone_index = 1, #island.zones.turrets do
+			if island.zones.turrets[turret_zone_index].is_spawned then 
+				turret_count = turret_count + 1
+
+				-- check if this island already hit the maximum for the amount of turrets
+				if turret_count >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false, "hit turret limit for this island" 
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if turret_count >= #island.zones.turrets then
+					return false, "the island already has all turret spawns occupied"
+				end
+			elseif Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+				-- add the zone to a list to be picked from for spawning the next turret
+				table.insert(unoccupied_zones, turret_zone_index)
+			end
+		end
+
+		-- pick a spawn location out of the list which is unoccupied
+		spawn_transform = island.zones.turrets[unoccupied_zones[math.random(1, #unoccupied_zones)]].transform
+
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_plane") or Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_heli") then
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 400, math.random(-500, 500)))
 	end
@@ -649,11 +688,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		end
 	end
 
-	d.print("calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
+	d.print("(Vehicle.spawn) calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
 	-- check if we can afford the vehicle
 	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
 
-	d.print("cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
+	d.print("(Vehicle.spawn) cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
 
 	if not was_purchased then
 		return false, "was unable to afford vehicle"
@@ -666,7 +705,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		spawned_vehicle = su.spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
-	d.print("setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
 		local vehicle_survivors = {}
@@ -680,7 +719,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
-		d.print("setting vehicle data...", true, 0)
+		d.print("(Vehicle.spawn) setting vehicle data...", true, 0)
 		--d.print("selected_spawn: "..selected_spawn, true, 0)
 
 		---@class vehicle_object
@@ -761,7 +800,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			object_type = "vehicle"
 		}
 
-		--d.print("set vehicle data", true, 0)
+		d.print("(Vehicle.spawn) set vehicle data", true, 0)
 
 		if #spawned_objects.fires > 0 then
 			vehicle_data.fire_id = spawned_objects.fires[1].id
