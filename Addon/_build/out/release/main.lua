@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.73)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.74)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -4003,7 +4003,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local unoccupied_zones = {}
 
 		-- count the amount of turrets this island has spawned
-		for turret_zone_index = 1, turret_zone_index < #island.zones.turrets do
+		for turret_zone_index = 1, #island.zones.turrets do
 			if island.zones.turrets[turret_zone_index].is_spawned then 
 				turret_count = turret_count + 1
 

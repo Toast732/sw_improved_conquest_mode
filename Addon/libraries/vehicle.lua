@@ -431,7 +431,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local unoccupied_zones = {}
 
 		-- count the amount of turrets this island has spawned
-		for turret_zone_index = 1, turret_zone_index < #island.zones.turrets do
+		for turret_zone_index = 1, #island.zones.turrets do
 			if island.zones.turrets[turret_zone_index].is_spawned then 
 				turret_count = turret_count + 1
 
