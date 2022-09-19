@@ -856,3 +856,45 @@ function Vehicle.spawnRetry(requested_prefab, vehicle_type, force_spawn, specifi
 	end
 	return spawned, vehicle_data
 end
+
+-- teleports a vehicle and all of the characters attached to the vehicle to avoid the characters being left behind
+---@param vehicle_id integer the id of the vehicle which to teleport
+---@param transform SWMatrix where to teleport the vehicle and characters to
+---@param boolean is_success if it successfully teleported all of the vehicles and characters
+function Vehicle.teleport(vehicle_id, transform)
+
+	-- make sure vehicle_id is not nil
+	if not vehicle_id then
+		d.print("(Vehicle.teleport) vehicle_id is nil!", true, 1)
+		return false
+	end
+
+	-- make sure transform is not nil
+	if not transform then
+		d.print("(Vehicle.teleport) transform is nil!", true, 1)
+		return false
+	end
+
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	local none_failed = true
+
+	-- set char pos
+	for i, char in ipairs(vehicle_object.survivors) do
+		local is_success = s.setObjectPos(char.id, transform)
+		if not is_success then
+			d.print("(Vehicle.teleport) failed to set character position! char.id: "..char.id, true, 1)
+			none_failed = false
+		end
+	end
+
+	-- set vehicle pos
+	local is_success = s.setVehiclePos(vehicle_id, transform)
+
+	if not is_success then
+		d.print("(Vehicle.teleport) failed to set vehicle position! vehicle_id: "..vehicle_id, true, 1)
+		none_failed = false
+	end
+
+	return none_failed
+end

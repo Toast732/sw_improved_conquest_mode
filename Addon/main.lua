@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.74)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.75)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -35,6 +35,14 @@ local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
 -- shortened library names
 local m = matrix
 local s = server
+
+local ISLAND = {
+	FACTION = {
+		NEUTRAL = "neutral",
+		AI = "ai",
+		PLAYER = "player"
+	}
+}
 
 local VEHICLE = {
 	STATE = {
@@ -1392,7 +1400,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 									if found_new_location then
 										-- teleport vehicle to new position
 										local veh_x, veh_y, veh_z = m.position(new_location)
-										s.setVehiclePos(vehicle_data.id, new_location)
+										v.teleport(vehicle_data.id, new_location)
 										d.print("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, 0, peer_id)
 									else
 										-- delete vehicle as it was unable to find a valid position
@@ -1430,7 +1438,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 									vehicle_data.transform[13] = player_pos[13] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- x
 									vehicle_data.transform[14] = vehicle_data.transform[14] * 1.5 -- y
 									vehicle_data.transform[15] = player_pos[15] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- z
-									s.setVehiclePos(vehicle_data.id, vehicle_data.transform)
+									v.teleport(vehicle_data.id, vehicle_data.transform)
 									d.print("Spawned "..vehicle_data.name.." at x:"..vehicle_data.transform[13].." y:"..vehicle_data.transform[14].." z:"..vehicle_data.transform[15], false, 0, peer_id)
 								end
 							else
@@ -1458,7 +1466,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 							if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
 								if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
 									local new_pos = m.translation(arg[2], 0, arg[3])
-									s.setVehiclePos(vehicle_data.id, new_pos)
+									v.teleport(vehicle_data.id, new_pos)
 									vehicle_data.transform = new_pos
 									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
 								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
@@ -1472,7 +1480,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 									end
 								else -- air vehicle
 									local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
-									s.setVehiclePos(vehicle_data.id, new_pos)
+									v.teleport(vehicle_data.id, new_pos)
 									vehicle_data.transform = new_pos
 									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
 								end
@@ -2426,12 +2434,8 @@ end
 function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	if pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
-		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
-		end
-	elseif vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+	
+	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 		if vehicle_object.capabilities.target_mass then
 			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
@@ -2439,23 +2443,27 @@ function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
 				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
 			end
 		end
+	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+		if vehicle_object.capabilities.target_mass then
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
+		end
 	else
 		if vehicle_object.capabilities.target_mass then
 			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
 		end
 	end
 	if target then
-		tx, ty, tz = m.position(target.last_known_pos)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", tx)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", ty)
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", tz)
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", target.last_known_pos[13])
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", target.last_known_pos[14])
+		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", target.last_known_pos[15])
 		if vehicle_object.capabilities.gps_missile then
 			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
 		end
 	end
 end
 
---[[ attempts to debug why sometimes vehicles load without any npcs
+--[[
 function onSpawnAddonComponent(id, name, type, addon_index)
 	d.print("(onSpawnAddonComponent) id: "..tostring(id).."\nname: "..tostring(name).."\ntype: "..tostring(type).."\naddon_index: "..tostring(addon_index), true, 0)
 end
@@ -2529,7 +2537,7 @@ function onVehicleLoad(vehicle_id)
 							killVehicle(squad_index, vehicle_id, true, true)
 							return
 						else
-							s.setVehiclePos(vehicle_id, m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z))
+							v.teleport(vehicle_id, m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z))
 							break
 						end
 					end

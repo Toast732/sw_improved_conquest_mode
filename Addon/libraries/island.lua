@@ -9,14 +9,6 @@ local Island = {}
 -- shortened library name
 local is = Island
 
-local ISLAND = {
-	FACTION = {
-		NEUTRAL = "neutral",
-		AI = "ai",
-		PLAYER = "player"
-	}
-}
-
 -- checks if this island can spawn the specified vehicle
 ---@param island ISLAND the island you want to check if AI can spawn there
 ---@param selected_prefab selected_prefab[] the selected_prefab you want to check with the island
