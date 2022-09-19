@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.71)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.72)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -8300,7 +8300,7 @@ function tickSquadrons()
 						local target_type = ""
 						if pl.isPlayer(vehicle_object.target_player_id) then -- if its targeting a player
 							target_pos = squad_vision.visible_players_map[vehicle_object.target_player_id].obj.last_known_pos
-							target_id = objectIDFromSteamID(vehicle_object.target_player_id)
+							target_id = pl.objectIDFromSteamID(vehicle_object.target_player_id)
 							target_type = "character"
 						else -- if its targeting a vehicle
 							target_pos = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj.last_known_pos
