@@ -5,6 +5,7 @@ require("libraries.matrix")
 require("libraries.math")
 require("libraries.pathfinding")
 require("libraries.tags")
+require("libraries.tables")
 
 -- library name
 local Cargo = {}
@@ -1358,7 +1359,7 @@ function Cargo.getIslandDistance(island1, island2)
 			distance.sea = 0
 			local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
 			local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
-			if noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
+			if Tables.noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
 				local paths = s.pathfind(ocean1_transform, ocean2_transform, "ocean_path", "tight_area")
 				for path_index, path in pairs(paths) do
 					if path_index ~= #paths then
@@ -1390,7 +1391,7 @@ function Cargo.getIslandDistance(island1, island2)
 				
 					distance.land = 0
 					local start_transform = island1.zones.land[math.random(1, #island1.zones.land)].transform
-					if noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
+					if Tables.noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
 						local paths = s.pathfind(start_transform, island2.transform, "land_path", "")
 						for path_index, path in pairs(paths) do
 							if path_index ~= #paths then

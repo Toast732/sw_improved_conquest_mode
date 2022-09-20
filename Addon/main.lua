@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.75)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.76)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -640,11 +640,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			d.print("setting up spawn zones...", true, 0)
 
-			turret_zones = s.getZones("turret")
+			local turret_zones = s.getZones("turret")
 
-			land_zones = s.getZones("land_spawn")
+			local land_zones = s.getZones("land_spawn")
 
-			sea_zones = s.getZones("boat_spawn")
+			local sea_zones = s.getZones("boat_spawn")
 
 			-- remove any NSO or non_NSO exlcusive zones
 
@@ -681,6 +681,58 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					table.remove(sea_zones, sea_zone_index)
 				end
 			end
+
+			-- add them to a list indexed by which island the zone belongs to
+			local spawn_zones = {}
+
+			for _, zone in ipairs(turret_zones) do
+				local tile_data, is_success = server.getTile(zone.transform)
+				if not is_success then
+					d.print("failed to get the location of turret zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
+				else
+					if not spawn_zones[tile_data.name] then
+						spawn_zones[tile_data.name] = {
+							turrets = {},
+							land = {},
+							sea = {}
+						}
+					end
+					table.insert(spawn_zones[tile_data.name].turrets, zone)
+				end
+			end
+
+			for _, zone in ipairs(land_zones) do
+				local tile_data, is_success = server.getTile(zone.transform)
+				if not is_success then
+					d.print("failed to get the location of land zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
+				else
+					if not spawn_zones[tile_data.name] then
+						spawn_zones[tile_data.name] = {
+							turrets = {},
+							land = {},
+							sea = {}
+						}
+					end
+					table.insert(spawn_zones[tile_data.name].land, zone)
+				end
+			end
+
+			for _, zone in ipairs(sea_zones) do
+				local tile_data, is_success = server.getTile(zone.transform)
+				if not is_success then
+					d.print("failed to get the location of sea zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
+				else
+					if not spawn_zones[tile_data.name] then
+						spawn_zones[tile_data.name] = {
+							turrets = {},
+							land = {},
+							sea = {}
+						}
+					end
+					table.insert(spawn_zones[tile_data.name].sea, zone)
+				end
+			end
+
 
 			d.print("populating constructable vehicles with spawning modifiers...", true, 0)
 
@@ -774,7 +826,11 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			d.print("AI base index:"..tostring(ai_base_index), true, 0)
 
 			--* set up ai base
+
 			local ai_island = islands[ai_base_index]
+
+			local island_tile, is_success = s.getTile(ai_island.transform)
+
 			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 			---@class AI_ISLAND
 			g_savedata.ai_base_island = {
@@ -812,23 +868,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				object_type = "island"
 			}
 
-			for _, turret_zone in pairs(turret_zones) do
-				if(m.distance(turret_zone.transform, ai_island.transform) <= 1000) then
-					table.insert(g_savedata.ai_base_island.zones.turrets, turret_zone)
-				end
-			end
-
-			for _, land_zone in pairs(land_zones) do
-				if(m.distance(land_zone.transform, ai_island.transform) <= 1000) then
-					table.insert(g_savedata.ai_base_island.zones.land, land_zone)
-				end
-			end
-
-			for _, sea_zone in pairs(sea_zones) do
-				if(m.distance(sea_zone.transform, ai_island.transform) <= 1000) then
-					table.insert(g_savedata.ai_base_island.zones.sea, sea_zone)
-				end
-			end
+			g_savedata.ai_base_island.zones = spawn_zones[island_tile.name]
 
 			islands[ai_base_index] = nil
 
@@ -836,6 +876,8 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			-- set up remaining neutral islands
 			for island_index, island in pairs(islands) do
+				local island_tile, is_success = s.getTile(island.transform)
+
 				local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 				---@class ISLAND
 				local new_island = {
@@ -872,23 +914,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					object_type = "island"
 				}
 
-				for _, turret_zone in pairs(turret_zones) do
-					if(m.distance(turret_zone.transform, island.transform) <= 1000) then
-						table.insert(new_island.zones.turrets, turret_zone)
-					end
-				end
-
-				for _, land_zone in pairs(land_zones) do
-					if(m.distance(land_zone.transform, island.transform) <= 1000) then
-						table.insert(new_island.zones.land, land_zone)
-					end
-				end
-
-				for _, sea_zone in pairs(sea_zones) do
-					if(m.distance(sea_zone.transform, island.transform) <= 1000) then
-						table.insert(new_island.zones.sea, sea_zone)
-					end
-				end
+				new_island.zones = spawn_zones[island_tile.name]
 
 				g_savedata.islands[new_island.index] = new_island
 				d.print("Setup island: "..new_island.index.." \""..island.name.."\"", true, 0)
