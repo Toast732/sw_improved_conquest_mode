@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.76)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.77)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -733,7 +733,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				end
 			end
 
-
 			d.print("populating constructable vehicles with spawning modifiers...", true, 0)
 
 			sm.create()
@@ -1352,6 +1351,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			if not arg[1] then
 				d.print("Spawning Random Enemy AI Vehicle", false, 0, peer_id)
 				v.spawn()
+				return
 			end
 
 			local valid_types = {
@@ -1560,17 +1560,17 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				driving = 5
 			}
 
+			if not arg[1] then
+				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, peer_id)
+				return
+			end
+
 			--* make the debug type arg friendly
 			arg[1] = string.friendly(arg[1])
 
 			if debug_types[arg[1]] then
 				arg[1] = debug_types[arg[1]]
-
-			elseif not arg[1] then 
-				-- none specified
-				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, peer_id)
-				return
-			else 
+			else
 				-- unknown debug type
 				d.print("Unknown debug type: "..tostring(arg[1]).." valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, peer_id)
 				return
@@ -4312,10 +4312,12 @@ function tickSquadrons()
 						-- make sure we have a target position and target id
 						if target_pos and target_id then
 
-							if #vehicle_object.path < 1 then -- if we dont have any more paths
+							if #vehicle_object.path < 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE and target_pos[14] <= 50 and vehicle_object.state.is_simulating then -- if we dont have any more paths
 								
 								-- reset its path
-								p.resetPath(vehicle_object)
+								if #vehicle_object.path < 1 then
+									p.resetPath(vehicle_object)
+								end
 
 								if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then -- if this vehicle is a plane
 									if vehicle_object.strategy == "strafing" then -- if the plane has a strategy of strafing
@@ -4340,17 +4342,49 @@ function tickSquadrons()
 
 											-- if in front of the jet is closer to the target than the jet is, and its within distance to start the strafe
 											if in_front_dist < jet_dist and jet_dist <= engage_dist then
+												p.resetPath(vehicle_object)
 												p.addPath(vehicle_object, m.translation(target_pos[13], math.max(target_pos[14] + 5, 18), target_pos[15]))
-												--d.print("strafing")
+												-- d.print("strafing", true, 0)
+												vehicle_object.just_strafed = true
 											else
-												--[[
+												--[[ debug
 												local a = " 1" -- 1 =  jet is closer than infront dist
 												if in_front_dist < jet_dist then -- 2 = not within engage dist
 													a = " 2"
 												end
 												d.print("normal"..a)
 												]]
-												p.addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] + 160, target_pos[15]))
+
+												--[[ 
+												make the jet go further before it starts to try to turn towards the vehicle again
+												this ensures the jet will be able to be facing the target when going overhead
+												instead of just circling the player
+												]]
+
+												if vehicle_object.just_strafed then
+
+													p.resetPath(vehicle_object)
+													
+													local roll, yaw, pitch = m.getMatrixRotation(vehicle_object.transform)
+													p.addPath(vehicle_object, m.translation(
+														target_pos[13] + 1000 * math.sin(yaw), -- x
+														target_pos[14] + 160, -- y
+														target_pos[15] + 1000 * math.cos(yaw) -- z
+													))
+
+													--[[ 
+													after it goes straight for a bit after strafing, make it circle back around
+													to fly towards the target again
+													]]
+
+													p.addPath(vehicle_object, m.translation(
+														target_pos[13], 
+														target_pos[14] + 160, 
+														target_pos[15]
+													))
+
+													vehicle_object.just_strafed = false
+												end
 											end
 										else -- if we think its an air vehicle
 											p.addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] + 3, target_pos[15]))
@@ -4468,10 +4502,8 @@ function tickVision()
 				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
 					local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
 					player_vehicle.death_pos = nil
-					if is_success then
-						if player_vehicle_data then
-							player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
-						end
+					if is_success and player_vehicle_data.voxels then
+						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
 					end
 				end
 			end
@@ -4622,7 +4654,7 @@ function tickVehicles()
 							if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then ai_target[14] = 0 end
 	
 							local vehicle_pos = vehicle_object.transform
-							local distance = m.distance(ai_target, vehicle_pos)
+							local distance = m.xzDistance(ai_target, vehicle_pos)
 	
 							if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE and distance < WAYPOINT_CONSUME_DISTANCE * 4 and vehicle_object.role == "scout" or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or distance < WAYPOINT_CONSUME_DISTANCE and vehicle_object.vehicle_type == VEHICLE.TYPE.HELI or vehicle_object.vehicle_type == VEHICLE.TYPE.LAND and distance < 7 then
 								if #vehicle_object.path > 0 then

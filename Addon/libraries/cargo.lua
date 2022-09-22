@@ -6,6 +6,7 @@ require("libraries.math")
 require("libraries.pathfinding")
 require("libraries.tags")
 require("libraries.tables")
+require("libraries.vehicle")
 
 -- library name
 local Cargo = {}

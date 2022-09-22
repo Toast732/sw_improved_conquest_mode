@@ -1,5 +1,6 @@
 -- required libraries
 require("libraries.players")
+require("libraries.tables")
 
 -- library name
 local Debugging = {}
@@ -367,7 +368,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
 		if unique_name then
 			if g_savedata.profiler.working[unique_name] then
-				Table.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
+				Tables.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][g_savedata.tick_counter] = s.getTimeMillisec()-g_savedata.profiler.working[unique_name]
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-60)] = nil
 				g_savedata.profiler.working[unique_name] = nil

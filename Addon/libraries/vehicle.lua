@@ -787,6 +787,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			},
 			is_aggressive = false,
 			is_killed = false,
+			just_strafed = true, -- used for fighter jet strafing
 			strategy = Tags.getValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
 			can_offroad = Tags.has(selected_prefab.vehicle.tags, "can_offroad"),
 			is_resupply_on_load = false,

@@ -1,5 +1,6 @@
 -- required libraries
 require("libraries.debugging")
+require("libraries.tables")
 
 -- library name
 local Cache = {}
