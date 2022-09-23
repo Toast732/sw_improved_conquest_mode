@@ -435,7 +435,7 @@ function setupRules()
 				input_multiplier = 1
 			},
 			CONVOY_FREQUENCY = {
-				min = nil
+				min = nil,
 				max = nil,
 				input_multiplier = time.minute
 			},
