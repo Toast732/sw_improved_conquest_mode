@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.77)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.78)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -32,6 +32,7 @@ local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
 
+local just_migrated = false
 
 -- shortened library names
 local m = matrix
@@ -223,9 +224,13 @@ g_savedata = {
 	prefabs = {}, 
 	is_attack = false,
 	info = {
-		creation_version = nil,
-		full_reload_versions = {},
-		awaiting_reload = false,
+		version_history = {
+			{
+				version = IMPROVED_CONQUEST_VERSION,
+				ticked_played = 0,
+				backup_g_savedata = {}
+			}
+		},
 		addons = {
 			default_conquest_mode = false,
 			ai_paths = false
@@ -4392,7 +4397,451 @@ function Cargo.reset(island, cargo_type)
 
 	return true, "reset"
 end
- -- functions relating to the Convoys and Cargo Vehicles -- functions for debugging -- functions relating to islands
+ -- functions relating to the Convoys and Cargo Vehicles
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+
+-- library name
+local Compatibility = {}
+
+-- shortened library name
+local comp = Compatibility
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+--# stores which versions require compatibility updates
+local version_updates = {
+	"(0.3.0.78)"
+}
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class VERSION_DATA
+---@field data_version string the version which the data is on currently
+---@field version string the version which the mod is on
+---@field versions_outdated integer how many versions the data is out of date
+---@field is_outdated boolean if the data is outdated compared to the mod
+---@field newer_versions table a table of versions which are newer than the current, indexed by index, value as version string
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+--# creates version data for the specified version, for use in the version_history table
+---@param version string the version you want to create the data on
+---@return table version_history_data the data of the version
+function Compatibility.createVersionHistoryData(version)
+
+	--[[
+		calculate ticks played
+	]] 
+	local ticks_played = g_savedata.tick_counter
+
+	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
+		for _, version_data in ipairs(g_savedata.info.version_history) do
+			ticks_played = ticks_played - version_data.ticks_played
+		end
+	end
+
+	--[[
+		
+	]]
+	local version_history_data = {
+		version = version,
+		ticks_played = ticks_played,
+		backup_g_savedata = {}
+	}
+
+	return version_history_data
+end
+
+--# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
+function Compatibility.getSavedataCopy()
+
+	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
+
+	--[[
+		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
+
+		returns a clone/copy of g_savedata
+	]]
+	
+	local function clone(t)
+		local copy = {}
+		if type(t) == "table" then
+			for key, value in next, t, nil do
+				copy[clone(key)] = clone(value)
+			end
+		else
+			copy = t
+		end
+		return copy
+	end
+
+	local copied_g_savedata = clone(g_savedata)
+	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
+
+	return copied_g_savedata
+end
+
+--# migrates the version system to the new one implemented in 0.3.0.78
+---@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
+---@return table migrated_g_savedata
+---@return boolean is_success if it successfully migrated the versioning system
+function Compatibility.migrateVersionSystem(overwrite_g_savedata)
+
+	d.print("migrating g_savedata...", false, 0)
+
+	--[[
+		create a local copy of g_savedata, as changes we make we dont want to be applied to the actual g_savedata
+	]]
+
+	local migrated_g_savedata = comp.getSavedataCopy()
+
+	--[[
+		make sure that the version_history table doesnt exist
+	]]
+	if g_savedata.info.version_history then
+		-- if it already does, then abort, as the version system is already migrated
+		d.print("(comp.migrateVersionSystem) the version system has already been migrated!", true, 1)
+		return nil, false
+	end
+
+	--[[
+		create the version_history table
+	]]
+	if overwrite_g_savedata then
+		g_savedata.info.version_history = {}
+	end
+
+	migrated_g_savedata.info.version_history = {}
+
+	--[[
+		create the version history data, with the previous version the creation version 
+		sadly, we cannot reliably get the last version used for versions 0.3.0.77 and below
+		so we have to make this assumption
+	]]
+
+	if overwrite_g_savedata then
+		table.insert(g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
+	end
+	
+	table.insert(migrated_g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
+
+	d.print("migrated g_savedata", false, 0)
+
+	return migrated_g_savedata, true
+end
+
+--# returns the version id from the provided version
+---@param version string the version you want to get the id of
+---@return integer version_id the id of the version
+---@return boolean is_success if it found the id of the version
+function Compatibility.getVersionID(version)
+	--[[
+		first, we want to ensure version was provided
+		lastly, we want to go through all of the versions stored in the version history, if we find a match, then we return it as the id
+		if we cannot find a match, we return nil and false
+	]]
+
+	-- ensure version was provided
+	if not version then
+		d.print("(comp.getVersionID) version was not provided!", false, 1)
+		return nil, false
+	end
+
+	-- go through all of the versions saved in version_history
+	for version_id, version_name in ipairs(g_savedata.info.version_history) do
+		if version_name == version then
+			return version_id, true
+		end
+	end
+
+	-- if a version was not found, return nil and false
+	return nil, false
+end
+
+--# returns the version from the version_id
+---@param version_id integer the id of the version
+---@return string version the version associated with the id
+---@return boolean is_success if it successfully got the version from the id
+function Compatibility.getVersion(version_id)
+
+	-- ensure that version_id was specified
+	if not version_id then
+		d.print("(comp.getVersion) version_id was not provided!", false, 1)
+		return nil, false
+	end
+
+	-- ensure that it is a number
+	if type(version_id) ~= "number" then
+		d.print("(comp.getVersion) given version_id was not a number! type: "..type(version_id).." value: "..tostring(version_id), false, 1)
+		return nil, false
+	end
+
+	local version = g_savedata.info.version_history[version_id] and g_savedata.info.version_history[version_id].version or nil
+	return version, version ~= nil
+end
+
+--# returns version data about the specified version, or if left blank, the current version
+---@param version string the current version, leave blank if want data on current version
+---@return VERSION_DATA version_data the data about the version
+---@return boolean is_success if it successfully got the version data
+function Compatibility.getVersionData(version)
+
+	local version_data = {
+		data_version = "",
+		is_outdated = false,
+		version = "",
+		versions_outdated = 0,
+		newer_versions = {}
+	}
+
+	local copied_g_savedata = comp.getSavedataCopy() -- local copy of g_savedata so any changes we make to it wont affect any backups we may make
+
+	--[[
+		first, we want to ensure that the version system is migrated
+		second, we want to get the id of the version depending on the given version argument
+		third, we want to get the data version
+		fourth, we want to count how many versions out of date the data version is from the mod version
+		fifth, we want to want to check if the version is outdated
+		and lastly, we want to return the data
+	]]
+
+	-- (1) check if the version system is not migrated
+	if not g_savedata.info.version_history then
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
+		if not is_success then
+			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
+			return nil, false
+		end
+
+		-- set copied_g_savedata as migrated_g_savedata
+		copied_g_savedata = migrated_g_savedata
+	end
+
+	-- (2) get version id
+	local version_id = version and comp.getVersionID(version) or #copied_g_savedata.info.version_history
+
+	-- (3) get data version
+	--d.print("(comp.getVersionData) data_version: "..tostring(copied_g_savedata.info.version_history[version_id].version))
+	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
+
+	-- (4) count how many versions out of date the data is
+	for _, version_name in ipairs(version_updates) do
+		--[[
+			first, we want to check if the release version is greater (x.#.#.#)
+			if not, second we want to check if the majour version is greater (#.x.#.#)
+			if not, third we want to check if the minor version is greater (#.#.x.#)
+			if not, lastly we want to check if the commit version is greater (#.#.#.x)
+		]]
+
+		-- (4.1) check if release version is outdated (x.#.#.#)
+		if (math.tointeger(string.match(version_name, "%((%d+)%.")) or 0) > (math.tointeger(string.match(version_data.data_version, "%((%d+)%.")) or 0) then
+			table.insert(version_data.newer_versions, version_name)
+			d.print("found new release version: "..version_name.." current version: "..version_data.data_version, false, 0)
+
+		-- (4.2) check if majour version is outdated (#.x.#.#)
+		elseif (math.tointeger(string.match(version_name, "%(%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.(%d+)")) or 0) then
+			table.insert(version_data.newer_versions, version_name)
+			d.print("found new majour version: "..version_name.." current version: "..version_data.data_version, false, 0)
+
+		-- (4.3) check if minor version is outdated (#.#.x.#)
+		elseif (math.tointeger(string.match(version_name, "%(%d+%.%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.(%d+)")) or 0) then
+			table.insert(version_data.newer_versions, version_name)
+			d.print("found new minor version: "..version_name.." current version: "..version_data.data_version, false, 0)
+		
+		-- (4.4) check if commit version is outdated (#.#.#.x)
+		elseif (math.tointeger(string.match(version_name, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) then
+			table.insert(version_data.newer_versions, version_name)
+			d.print("found new commit version: "..version_name.." current version: "..version_data.data_version, false, 0)
+		end
+	end
+
+	-- count how many versions its outdated
+	version_data.versions_outdated = #version_data.newer_versions
+
+	-- (5) check if its outdated
+	version_data.is_outdated = version_data.versions_outdated > 0
+
+	return version_data, true
+end
+
+--# saves backup of current g_savedata
+---@return boolean is_success if it successfully saved a backup of the savedata
+function Compatibility.saveBackup()
+	--[[
+		first, we want to save a current local copy of the g_savedata
+		second we want to ensure that the g_savedata.info.version_history table is created
+		lastly, we want to save the backup g_savedata
+	]]
+
+	-- create local copy of g_savedata
+	local backup_g_savedata = comp.getSavedataCopy()
+
+	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
+		d.print("(comp.saveBackup) migrating version system", true, 0)
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
+		if not is_success then
+			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
+			return false
+		end
+
+		if not g_savedata.info.version_history then
+			d.print("(comp.saveBackup) successfully migrated version system, yet g_savedata doesn't contain the new version system, this is not good!", false, 1)
+		end
+	end
+
+	local version_data, is_success = comp.getVersionData()
+	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
+		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
+		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
+	end
+
+	-- save backup g_savedata
+	g_savedata.info.version_history[#g_savedata.info.version_history].backup_g_savedata = backup_g_savedata
+
+	-- remove g_savedata backups which are from over 2 data updates ago
+	local backup_versions = {}
+	for version_index, version_history_data in ipairs(g_savedata.info.version_history) do
+		if version_history_data.backup_g_savedata.info then
+			table.insert(backup_versions, version_index)
+		end
+	end
+	
+	if #backup_versions >= 3 then
+		d.print("Deleting old backup data...", false, 0)
+		for backup_index, backup_version_index in ipairs(backup_versions) do
+			d.print("Deleting backup data for "..g_savedata.info.version_history[backup_version_index].version, false, 0)
+			backup_versions[backup_index] = nil
+			g_savedata.info.version_history[backup_version_index].backup_g_savedata = {}
+
+			if #backup_versions <= 2 then
+				d.print("Deleted old backup data.", false, 0)
+				break
+			end
+		end
+	end
+
+	return true
+end
+
+--# updates g_savedata to be compatible with the mod version, to ensure that worlds are backwards compatible.
+function Compatibility.update()
+
+	-- ensure that we're actually outdated before proceeding
+	local version_data, is_success = comp.getVersionData()
+	if not is_success then
+		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
+		return
+	end
+
+	if not version_data.is_outdated then
+		d.print("(comp.update) according to version data, the data is not outdated. This is probably not good!", false, 1)
+		return
+	end
+
+	d.print("ICM's data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
+
+	-- save backup
+	local backup_saved = comp.saveBackup()
+	if not backup_saved then
+		d.print("(comp.update) Failed to save backup. This is probably not good!", false, 1)
+		return false
+	end
+
+	d.print("Creating new version history for "..version_data.newer_versions[1].."...", false, 0)
+	local version_history_data = comp.createVersionHistoryData(version_data.newer_versions[1])
+	g_savedata.info.version_history[#g_savedata.info.version_history+1] = version_history_data
+	d.print("Successfully created new version history for "..version_data.newer_versions[1]..".", false, 0)
+
+	-- check for 0.3.0.78 changes
+	if version_data.newer_versions[1] == "(0.3.0.78)" then
+		d.print("Successfully updated ICM data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
+
+		-- clean up old data
+		g_savedata.info.creation_version = nil
+		g_savedata.info.full_reload_versions = nil
+		g_savedata.info.awaiting_reload = nil
+
+		-- clean up old player_data
+		for steam_id, player_data in pairs(g_savedata.player_data) do
+			player_data.timers = nil
+			player_data.fully_reloading = nil
+			player_data.do_as_i_say = nil
+		end
+
+		d.print("ICM data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+	end
+
+	just_migrated = true
+end
+
+--# prints outdated message and starts update
+function Compatibility.outdated()
+	-- print that its outdated
+	d.print("ICM data is outdated! attempting to automatically update...", false, 0)
+
+	-- start update process
+	comp.update()
+end
+
+--# verifies that the mod is currently up to date
+function Compatibility.verify()
+	d.print("verifying if ICM data is up to date...", false, 0)
+	--[[
+		first, check if the versioning system is up to date
+	]]
+	if not g_savedata.info.version_history then
+		-- the versioning system is not up to date
+		comp.outdated()
+	else
+		-- check if we're outdated
+		local version_data, is_success = comp.getVersionData()
+
+		if not is_success then
+			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
+			return
+		end
+
+		-- if we're outdated
+		if version_data.is_outdated then
+			comp.outdated()
+		end
+	end
+end
+
+--# shows the message to save the game and then load the save to complete migration
+function Compatibility.showSaveMessage()
+	is_dlc_weapons = false
+	d.print("ICM Data has been migrated, to complete the process, please save the world, and then load the saved world. ICM has been disabled until this is done.", false, 0)
+	s.setPopupScreen(-1, s.getMapID(), "ICM Migration", true, "Please save world and then load save to complete data migration process. ICM has been disabled till this is complete.", 0, 0)
+end
+
+ -- functions used for making the mod backwards compatible -- functions for debugging -- functions relating to islands
 -- required libraries
 
 -- library name
@@ -4596,6 +5045,7 @@ end
 
 function warningChecks(peer_id)
 	-- check for if they have the weapons dlc enabled
+
 	if not s.dlcWeapons() then
 		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, peer_id)
 	end
@@ -4612,15 +5062,19 @@ function warningChecks(peer_id)
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
 		d.print("Hey! Thanks for using and testing a development version! Just note you will very likely experience errors!", false, 0, peer_id)
+	end
 
-	-- check for if the world is outdated
-	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
+	-- get version data, to check if world is outdated
+	--[[local version_data, is_success = comp.getVersionData()
+	if version_data.is_outdated then
+		d.print("ERROR: world seems to be outdated, this shouldn't be possible!", false, 1, peer_id)
+		--[[
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
 			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, 1, peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
 			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, peer_id)
 		end
-	end
+	end]]
 
 	if g_savedata.info.mods.NSO then
 		d.print("ICM has automatically detected the use of the NSO mod. ICM has official support for NSO, so things have been moved around and added to give a great experience with NSO.", false, 0, peer_id)
@@ -4663,9 +5117,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		}
 	end
 
-	checkSavedata() -- backwards compatibility check
+	comp.verify() -- backwards compatibility check
 
 	is_dlc_weapons = s.dlcWeapons()
+
+	if just_migrated then
+		comp.showSaveMessage()
+		return
+	end
 
 	-- checks for Vanilla Conquest Mode addon
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
@@ -4686,13 +5145,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 	warningChecks(-1)
 
-	if g_savedata.info.awaiting_reload ~= false then
-		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1)--]] do
+	--[[if g_savedata.info.awaiting_reload ~= false then
+		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1) do
 			v.spawn() -- spawn initial ai
 		end
 		d.print("Lastly, you need to save the world and then load that save to complete the full reload", false, 0)
 		g_savedata.info.awaiting_reload = false
-	end
+	end]]
 
 	if is_dlc_weapons then
 
@@ -4721,11 +5180,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 		if is_world_create then
 
-			-- allows the player to make the scripts reload as if the world was just created
-			-- this command is very dangerous
-			if do_as_i_say then
+			-- no longer used as of 0.3.0.78, replaced by automatic migration system
+			--// allows the player to make the scripts reload as if the world was just created
+			--// this command is very dangerous
+			--[[if do_as_i_say then
 				if peer_id then
-					d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
+					--d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
 
 					-- removes vehicle icons and paths
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -4774,17 +5234,9 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						scout = {}, -- the scout progress of each island
 					}
 					-- save that this happened, as to aid in debugging errors
-					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
+					--table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
 				end
-			else
-				if not peer_id then
-					-- things that should never be changed even after this command
-					-- such as changing what version the world was created in, as this could lead to issues when trying to debug
-					if not g_savedata.info.creation_version then
-						g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
-					end
-				end
-			end
+			end]]
 
 			d.print("setting up world...", true, 0)
 
@@ -5377,15 +5829,21 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		debugmigration = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
-		fullreload = {
+		--[[fullreload = { replaced by automatic migration in 0.3.0.78
 			short_desc = "lets you fully reload the addon",
 			desc = "lets you fully reload the addon, basically making it think the world was just created, this command can and probably will break things, so dont use it unless you need to",
 			args = "none",
 			example = "?impwep full_reload",
-		}
+		}]]
 	}
 }
 
@@ -5448,12 +5906,24 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		if not g_savedata.info.addons.ai_paths then
 			d.print("AI Paths Disabled (will cause ship pathfinding issues)", false, 1, peer_id)
 		end
-		d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, peer_id)
-		d.print("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, 0, peer_id)
-		if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
-			d.print("Fully Reloaded Versions: ", false, 0, peer_id)
-			for i = 1, #g_savedata.info.full_reload_versions do
-				d.print(g_savedata.info.full_reload_versions[i], false, 0, peer_id)
+
+		local version_name, is_success = comp.getVersion(1)
+		if not is_success then
+			d.print("(command info) failed to get creation version", false, 1)
+			return
+		end
+
+		local version_info, is_success = comp.getVersionData(version_name)
+		if not is_success then
+			d.print("(command info) failed to get version data of creation version", false, 1)
+			return
+		end
+		d.print("World Creation Version: "..version_info.version, false, 0, peer_id)
+		d.print("Times Addon Data has been Updated: "..tostring(#g_savedata.info.version_history and #g_savedata.info.version_history or 0), false, 0, peer_id)
+		if g_savedata.info.version_history and #g_savedata.info.version_history ~= nil and #g_savedata.info.version_history ~= 0 then
+			d.print("Version History", false, 0, peer_id)
+			for i = 1, #g_savedata.info.version_history do
+				d.print(i..": "..tostring(g_savedata.info.version_history[i].version), false, 0, peer_id)
 			end
 		end
 	end
@@ -6115,6 +6585,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "resetprefabs" then
 			g_savedata.prefabs = {}
 			d.print("reset all prefabs", false, 0, peer_id)
+		elseif command == "debugmigration" then
+			d.print("is migrated? "..tostring(g_savedata.info.version_history ~= nil), false, 0, peer_id)
 		end
 	else
 		for command_name, command_info in pairs(player_commands.admin) do
@@ -6128,6 +6600,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	-- host only commands
 	--
 	if peer_id == 0 and is_admin then
+		--[[ old full reload command, replaced by automatic updating in 0.3.0.78
 		if command == "fullreload" and peer_id == 0 then
 			local steam_id = pl.getSteamID(peer_id)
 			if arg[1] == "confirm" and g_savedata.player_data[steam_id].fully_reloading then
@@ -6142,7 +6615,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				g_savedata.player_data[steam_id].fully_reloading = true
 				g_savedata.player_data[steam_id].timers.do_as_i_say = g_savedata.tick_counter
 			end
-		end
+		end]]
 	else
 		for command_name, command_info in pairs(player_commands.host) do
 			if command == command_name then
@@ -6354,14 +6827,18 @@ end
 
 function onPlayerJoin(steam_id, name, peer_id)
 
+	if just_migrated then
+		comp.showSaveMessage()
+	end
+
 	-- create playerdata if it does not already exist
 	if not g_savedata.player_data[tostring(steam_id)] then
 		g_savedata.player_data[tostring(steam_id)] = {
 			peer_id = peer_id,
 			name = name,
 			object_id = s.getPlayerCharacterID(peer_id),
-			fully_reloading = false,
-			do_as_i_say = false,
+			--fully_reloading = false,
+			--do_as_i_say = false,
 			debug = {
 				chat = false,
 				error = false,
@@ -6370,11 +6847,12 @@ function onPlayerJoin(steam_id, name, peer_id)
 				graph_node = false,
 				driving = false
 			},
-			timers = {
+			--[[timers = {
 				do_as_i_say = 0
-			},
+			},]]
 			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
+
 		-- if its toastey, enable debug for toastery
 		-- this is because enabling debug every time I create a new world is annoying, and sometimes theres debug I miss which is only when the world is first created
 		if tostring(steam_id) == "76561198258457459" then 
@@ -7873,7 +8351,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id, "Resupply") == false) or (not vehicle_object.state.is_simulating and vehicle_object.is_resupply_on_load) then
 	
-						transferToSquadron(vehicle_object, vehicle_object.previous_squadron, true)
+						transferToSquadron(vehicle_object, vehicle_object.previous_squad, true)
 
 						d.print(vehicle_id.." resupplied. joining squad", true, 0)
 					end
@@ -9275,6 +9753,7 @@ end
 
 function tickOther()
 	d.startProfiler("tickOther()", true)
+	--[[ no longer has a use, replaced by automatic migration in 0.3.0.78
 	local steam_id = pl.getSteamID(0)
 	if steam_id then
 		if g_savedata.player_data[steam_id] and g_savedata.player_data[steam_id].do_as_i_say then
@@ -9286,7 +9765,7 @@ function tickOther()
 				g_savedata.player_data[steam_id].timers.do_as_i_say = 0
 			end
 		end
-	end
+	end]]
 	d.stopProfiler("tickOther()", true, "onTick()")
 end
 

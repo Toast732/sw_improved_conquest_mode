@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.77)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.78)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -31,6 +31,7 @@ local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%
 -- "FALSE" if this version has not been tested or its not compatible with older versions
 local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
 
+local just_migrated = false
 
 -- shortened library names
 local m = matrix
@@ -222,9 +223,13 @@ g_savedata = {
 	prefabs = {}, 
 	is_attack = false,
 	info = {
-		creation_version = nil,
-		full_reload_versions = {},
-		awaiting_reload = false,
+		version_history = {
+			{
+				version = IMPROVED_CONQUEST_VERSION,
+				ticked_played = 0,
+				backup_g_savedata = {}
+			}
+		},
 		addons = {
 			default_conquest_mode = false,
 			ai_paths = false
@@ -299,6 +304,7 @@ g_savedata = {
 require("libraries.ai") -- functions relating to their AI
 require("libraries.cache") -- functions relating to the custom 
 require("libraries.cargo") -- functions relating to the Convoys and Cargo Vehicles
+require("libraries.compatibility") -- functions used for making the mod backwards compatible
 require("libraries.debugging") -- functions for debugging
 require("libraries.island") -- functions relating to islands
 require("libraries.map") -- functions for drawing on the map
@@ -440,6 +446,7 @@ end
 
 function warningChecks(peer_id)
 	-- check for if they have the weapons dlc enabled
+
 	if not s.dlcWeapons() then
 		d.print("ERROR: it seems you do not have the weapons dlc enabled, or you do not have the weapon dlc, the addon will not function!", false, 1, peer_id)
 	end
@@ -456,15 +463,19 @@ function warningChecks(peer_id)
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
 		d.print("Hey! Thanks for using and testing a development version! Just note you will very likely experience errors!", false, 0, peer_id)
+	end
 
-	-- check for if the world is outdated
-	elseif g_savedata.info.creation_version ~= IMPROVED_CONQUEST_VERSION then
+	-- get version data, to check if world is outdated
+	--[[local version_data, is_success = comp.getVersionData()
+	if version_data.is_outdated then
+		d.print("ERROR: world seems to be outdated, this shouldn't be possible!", false, 1, peer_id)
+		--[[
 		if IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FALSE" then
 			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! If you encounter any errors, try using \"?impwep full_reload\", however this command is very dangerous, and theres no guarentees it will fix the issue", false, 1, peer_id)
 		elseif IS_COMPATIBLE_WITH_OLDER_VERSIONS == "FULL_RELOAD" then
 			d.print("WARNING: This world is outdated, and this version has been marked as uncompatible with older worlds! However, this is fixable via ?impwep full_reload (tested).", false, 1, peer_id)
 		end
-	end
+	end]]
 
 	if g_savedata.info.mods.NSO then
 		d.print("ICM has automatically detected the use of the NSO mod. ICM has official support for NSO, so things have been moved around and added to give a great experience with NSO.", false, 0, peer_id)
@@ -507,9 +518,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		}
 	end
 
-	checkSavedata() -- backwards compatibility check
+	comp.verify() -- backwards compatibility check
 
 	is_dlc_weapons = s.dlcWeapons()
+
+	if just_migrated then
+		comp.showSaveMessage()
+		return
+	end
 
 	-- checks for Vanilla Conquest Mode addon
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
@@ -530,13 +546,13 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 	warningChecks(-1)
 
-	if g_savedata.info.awaiting_reload ~= false then
-		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT --[[* math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1)--]] do
+	--[[if g_savedata.info.awaiting_reload ~= false then
+		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1) do
 			v.spawn() -- spawn initial ai
 		end
 		d.print("Lastly, you need to save the world and then load that save to complete the full reload", false, 0)
 		g_savedata.info.awaiting_reload = false
-	end
+	end]]
 
 	if is_dlc_weapons then
 
@@ -565,11 +581,12 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 		if is_world_create then
 
-			-- allows the player to make the scripts reload as if the world was just created
-			-- this command is very dangerous
-			if do_as_i_say then
+			-- no longer used as of 0.3.0.78, replaced by automatic migration system
+			--// allows the player to make the scripts reload as if the world was just created
+			--// this command is very dangerous
+			--[[if do_as_i_say then
 				if peer_id then
-					d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
+					--d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
 
 					-- removes vehicle icons and paths
 					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
@@ -618,17 +635,9 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 						scout = {}, -- the scout progress of each island
 					}
 					-- save that this happened, as to aid in debugging errors
-					table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
+					--table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
 				end
-			else
-				if not peer_id then
-					-- things that should never be changed even after this command
-					-- such as changing what version the world was created in, as this could lead to issues when trying to debug
-					if not g_savedata.info.creation_version then
-						g_savedata.info.creation_version = IMPROVED_CONQUEST_VERSION
-					end
-				end
-			end
+			end]]
 
 			d.print("setting up world...", true, 0)
 
@@ -1221,15 +1230,21 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		debugmigration = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {
-		fullreload = {
+		--[[fullreload = { replaced by automatic migration in 0.3.0.78
 			short_desc = "lets you fully reload the addon",
 			desc = "lets you fully reload the addon, basically making it think the world was just created, this command can and probably will break things, so dont use it unless you need to",
 			args = "none",
 			example = "?impwep full_reload",
-		}
+		}]]
 	}
 }
 
@@ -1292,12 +1307,25 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		if not g_savedata.info.addons.ai_paths then
 			d.print("AI Paths Disabled (will cause ship pathfinding issues)", false, 1, peer_id)
 		end
-		d.print("World Creation Version: "..g_savedata.info.creation_version, false, 0, peer_id)
-		d.print("Times Addon Was Fully Reloaded: "..tostring(g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions or 0), false, 0, peer_id)
-		if g_savedata.info.full_reload_versions and #g_savedata.info.full_reload_versions ~= nil and #g_savedata.info.full_reload_versions ~= 0 then
-			d.print("Fully Reloaded Versions: ", false, 0, peer_id)
-			for i = 1, #g_savedata.info.full_reload_versions do
-				d.print(g_savedata.info.full_reload_versions[i], false, 0, peer_id)
+
+		local version_name, is_success = comp.getVersion(1)
+		if not is_success then
+			d.print("(command info) failed to get creation version", false, 1)
+			return
+		end
+
+		local version_info, is_success = comp.getVersionData(version_name)
+		if not is_success then
+			d.print("(command info) failed to get version data of creation version", false, 1)
+			return
+		end
+		d.print("World Creation Version: "..version_info.version, false, 0, peer_id)
+		d.print("Times Addon Data has been Updated: "..tostring(#g_savedata.info.version_history and #g_savedata.info.version_history or 0), false, 0, peer_id)
+		if g_savedata.info.version_history and #g_savedata.info.version_history ~= nil and #g_savedata.info.version_history ~= 0 then
+			d.print("Version History", false, 0, peer_id)
+			for i = 1, #g_savedata.info.version_history do
+				local has_backup = g_savedata.info.version_history[i].backup_g_savedata 
+				d.print(i..": "..tostring(g_savedata.info.version_history[i].version), false, 0, peer_id)
 			end
 		end
 	end
@@ -1959,6 +1987,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "resetprefabs" then
 			g_savedata.prefabs = {}
 			d.print("reset all prefabs", false, 0, peer_id)
+		elseif command == "debugmigration" then
+			d.print("is migrated? "..tostring(g_savedata.info.version_history ~= nil), false, 0, peer_id)
 		end
 	else
 		for command_name, command_info in pairs(player_commands.admin) do
@@ -1972,6 +2002,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	-- host only commands
 	--
 	if peer_id == 0 and is_admin then
+		--[[ old full reload command, replaced by automatic updating in 0.3.0.78
 		if command == "fullreload" and peer_id == 0 then
 			local steam_id = pl.getSteamID(peer_id)
 			if arg[1] == "confirm" and g_savedata.player_data[steam_id].fully_reloading then
@@ -1986,7 +2017,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				g_savedata.player_data[steam_id].fully_reloading = true
 				g_savedata.player_data[steam_id].timers.do_as_i_say = g_savedata.tick_counter
 			end
-		end
+		end]]
 	else
 		for command_name, command_info in pairs(player_commands.host) do
 			if command == command_name then
@@ -2198,14 +2229,18 @@ end
 
 function onPlayerJoin(steam_id, name, peer_id)
 
+	if just_migrated then
+		comp.showSaveMessage()
+	end
+
 	-- create playerdata if it does not already exist
 	if not g_savedata.player_data[tostring(steam_id)] then
 		g_savedata.player_data[tostring(steam_id)] = {
 			peer_id = peer_id,
 			name = name,
 			object_id = s.getPlayerCharacterID(peer_id),
-			fully_reloading = false,
-			do_as_i_say = false,
+			--fully_reloading = false,
+			--do_as_i_say = false,
 			debug = {
 				chat = false,
 				error = false,
@@ -2214,11 +2249,12 @@ function onPlayerJoin(steam_id, name, peer_id)
 				graph_node = false,
 				driving = false
 			},
-			timers = {
+			--[[timers = {
 				do_as_i_say = 0
-			},
+			},]]
 			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
+
 		-- if its toastey, enable debug for toastery
 		-- this is because enabling debug every time I create a new world is annoying, and sometimes theres debug I miss which is only when the world is first created
 		if tostring(steam_id) == "76561198258457459" then 
@@ -3717,7 +3753,7 @@ function tickSquadrons()
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 					if (vehicle_object.state.is_simulating and isVehicleNeedsResupply(vehicle_id, "Resupply") == false) or (not vehicle_object.state.is_simulating and vehicle_object.is_resupply_on_load) then
 	
-						transferToSquadron(vehicle_object, vehicle_object.previous_squadron, true)
+						transferToSquadron(vehicle_object, vehicle_object.previous_squad, true)
 
 						d.print(vehicle_id.." resupplied. joining squad", true, 0)
 					end
@@ -5119,6 +5155,7 @@ end
 
 function tickOther()
 	d.startProfiler("tickOther()", true)
+	--[[ no longer has a use, replaced by automatic migration in 0.3.0.78
 	local steam_id = pl.getSteamID(0)
 	if steam_id then
 		if g_savedata.player_data[steam_id] and g_savedata.player_data[steam_id].do_as_i_say then
@@ -5130,7 +5167,7 @@ function tickOther()
 				g_savedata.player_data[steam_id].timers.do_as_i_say = 0
 			end
 		end
-	end
+	end]]
 	d.stopProfiler("tickOther()", true, "onTick()")
 end
 
