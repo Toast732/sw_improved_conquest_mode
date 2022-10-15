@@ -15,3 +15,13 @@ function matrix.getMatrixRotation(rot_matrix) --returns radians for the function
 	rot_matrix = m.multiply(rot_matrix, m.rotationZ(-z))
 	return math.atan(rot_matrix[7],rot_matrix[6]), math.atan(rot_matrix[9],rot_matrix[11]), z
 end
+
+---@param matrix1 SWMatrix the first matrix
+---@param matrix2 SWMatrix the second matrix
+---@return SWMatrix matrix the multiplied matrix
+function matrix.multiplyXZ(matrix1, matrix2)
+	local matrix3 = {table.unpack(matrix1)}
+	matrix3[13] = matrix3[13] + matrix2[13]
+	matrix3[15] = matrix3[15] + matrix2[15]
+	return matrix3
+end

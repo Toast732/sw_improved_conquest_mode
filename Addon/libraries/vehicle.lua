@@ -313,65 +313,6 @@ function Vehicle.getPowertrainTypes(vehicle_object)
 	return powertrain_types, true	
 end
 
---# made for use with toggles in buttons (only use for toggle inputs to seats)
----@param vehicle_id integer the vehicle's id that has the seat you want to set
----@param seat_name string the name of the seat you want to set
----@param axis_ws number w/s axis
----@param axis_ad number a/d axis
----@param axis_ud number up down axis
----@param axis_lr number left right axis
----@param ... boolean buttons (1-6)
----@return boolean set_seat if the seat was set
-function Vehicle.setSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, ...)
-	
-	if not vehicle_id then
-		d.print("(Vehicle.setSeat) vehicle_id is nil!", true, 1)
-		return false
-	end
-
-	if not seat_name then
-		d.print("(Vehicle.setSeat) seat_name is nil!", true, 1)
-		return false
-	end
-
-	local button = table.pack(...)
-
-	-- sets any nil values to 0 or false
-	axis_ws = axis_ws or 0
-	axis_ad = axis_ad or 0
-	axis_ud = axis_ud or 0
-	axis_lr = axis_lr or 0
-
-	for i = 1, 6 do
-		button[i] = button[i] or false
-	end
-
-	g_savedata.seat_states = g_savedata.seat_states or {}
-
-
-	if not g_savedata.seat_states[vehicle_id] or not g_savedata.seat_states[vehicle_id][seat_name] then
-
-		g_savedata.seat_states[vehicle_id] = g_savedata.seat_states[vehicle_id] or {}
-		g_savedata.seat_states[vehicle_id][seat_name] = {}
-
-		for i = 1, 6 do
-			g_savedata.seat_states[vehicle_id][seat_name][i] = false
-		end
-	end
-
-	for i = 1, 6 do
-		if button[i] ~= g_savedata.seat_states[vehicle_id][seat_name][i] then
-			g_savedata.seat_states[vehicle_id][seat_name][i] = button[i]
-			button[i] = true
-		else
-			button[i] = false
-		end
-	end
-
-	s.setVehicleSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, button[1], button[2], button[3], button[4], button[5], button[6])
-	return true
-end
-
 ---@param requested_prefab any vehicle name or vehicle role, such as scout, will try to spawn that vehicle or type
 ---@param vehicle_type string the vehicle type you want to spawn, such as boat, leave nil to ignore
 ---@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
@@ -409,16 +350,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	local spawnbox_index = nil -- turrets
 
-	if vehicle_type == "turret" then
+	if vehicle_type == "turret" and specified_island then
 
 		-----
 		--* turret spawning
 		-----
-
-		-- check if the island was specified
-		if not specified_island then
-			return false, "you must specify an island to spawn a turret"
-		end
 
 		local island = specified_island
 
@@ -449,6 +385,8 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				table.insert(unoccupied_zones, turret_zone_index)
 			end
 		end
+
+		-- d.print("turret count: "..turret_count, true, 0)
 
 		-- pick a spawn point out of the list which is unoccupied
 		spawnbox_index = unoccupied_zones[math.random(1, #unoccupied_zones)]
@@ -812,6 +750,14 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			setSquadCommand(squad, SQUAD.COMMAND.SCOUT)
 		elseif Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
 			setSquadCommand(squad, SQUAD.COMMAND.TURRET)
+
+			-- set the zone it spawned at to say that a turret was spawned there
+			if g_savedata.islands[selected_spawn] then -- set at their island
+				g_savedata.islands[selected_spawn].zones.turrets[spawnbox_index].is_spawned = true
+			else -- they spawned at their main base
+				g_savedata.ai_base_island.zones.turrets[spawnbox_index].is_spawned = true
+			end
+
 		elseif Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "cargo" then
 			setSquadCommand(squad, SQUAD.COMMAND.CARGO)
 		end

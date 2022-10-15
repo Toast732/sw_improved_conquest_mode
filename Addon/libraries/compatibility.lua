@@ -8,6 +8,8 @@
 
 -- required libraries
 require("libraries.debugging")
+require("libraries.island")
+require("libraries.setup")
 
 -- library name
 local Compatibility = {}
@@ -25,7 +27,8 @@ local comp = Compatibility
 
 --# stores which versions require compatibility updates
 local version_updates = {
-	"(0.3.0.78)"
+	"(0.3.0.78)",
+	"(0.3.0.79)"
 }
 
 --[[
@@ -63,7 +66,7 @@ function Compatibility.createVersionHistoryData(version)
 
 	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
 		for _, version_data in ipairs(g_savedata.info.version_history) do
-			ticks_played = ticks_played - version_data.ticks_played
+			ticks_played = ticks_played - (version_data.ticks_played or 0)
 		end
 	end
 
@@ -393,10 +396,27 @@ function Compatibility.update()
 			player_data.timers = nil
 			player_data.fully_reloading = nil
 			player_data.do_as_i_say = nil
+		end		
+	elseif version_data.newer_versions[1] == "(0.3.0.79)" then -- 0.3.0.79 changes
+
+		-- update the island data with the proper zones, as previously, the zone system improperly filtered out NSO compatible and incompatible zones
+		local spawn_zones = sup.spawnZones()
+		local tile_zones = sup.sortSpawnZones(spawn_zones)
+
+		for tile_name, zones in pairs(tile_zones) do
+			local island, is_success = Island.getDataFromName(tile_name)
+			island.zones = zones
 		end
 
-		d.print("ICM data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+		if g_savedata.info.version_history[1].ticked_played then
+			g_savedata.info.version_history.ticks_played = g_savedata.info.version_history.ticked_played
+			g_savedata.info.version_history.ticked_played = nil
+		end
+
+		d.print("Successfully updated ICM data to "..version_data.newer_versions[1], false, 0)
 	end
+
+	d.print("ICM data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
 
 	just_migrated = true
 end

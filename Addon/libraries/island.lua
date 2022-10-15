@@ -44,7 +44,7 @@ function Island.canSpawn(island, selected_prefab)
 				end
 
 				-- check if this island already has all of the turret spawns filled
-				if turret_count >= #island.zones.turrets then
+				if total_spawned >= #island.zones.turrets then
 					return false
 				end
 			end

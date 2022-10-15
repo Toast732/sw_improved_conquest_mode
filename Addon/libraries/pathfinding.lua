@@ -218,48 +218,45 @@ end
 -- Credit to woe
 function Pathfinding.createPathY() --this looks through all env mods to see if there is a "zone" then makes a table of y values based on x and z as keys.
 
-	local isGraphNode = function(tags)
-		if tags[1] == "ocean_path" then
-			return "ocean_path"
-		elseif tags[1] == "land_path" then
-			return "land_path"
+	local isGraphNode = function(tag)
+		if tag == "land_path" or tag == "ocean_path" then
+			return tag
 		end
 		return false
 	end
 
 	local start_time = s.getTimeMillisec()
 	d.print("Creating Path Y...", true, 0)
-	local count = server.getAddonCount()
 	local total_paths = 0
 	local empty_matrix = m.translation(0, 0, 0)
-	for i = 1, count do
-		local addon_index = i-1
-		local ADDON_DATA = server.getAddonData(addon_index)
-		if ADDON_DATA.location_count and ADDON_DATA.location_count>0 then
-			for ii = 1, ADDON_DATA.location_count do
-				local location_index = ii-1
-				local LOCATION_DATA, gotLocationData = server.getLocationData(addon_index, location_index)
-				if LOCATION_DATA.component_count>0 and LOCATION_DATA.env_mod then
-					for iii = 1, LOCATION_DATA.component_count do
-						local component_index = iii-1
-						local COMPONENT_DATA, getLocationComponentData = server.getLocationComponentData(
+	for addon_index = 0, s.getAddonCount() - 1 do
+		local ADDON_DATA = s.getAddonData(addon_index)
+		if ADDON_DATA.location_count and ADDON_DATA.location_count > 0 then
+			for location_index = 0, ADDON_DATA.location_count - 1 do
+				local LOCATION_DATA, gotLocationData = s.getLocationData(addon_index, location_index)
+				if LOCATION_DATA.env_mod and LOCATION_DATA.component_count > 0 then
+					for component_index = 0, LOCATION_DATA.component_count - 1 do
+						local COMPONENT_DATA, getLocationComponentData = s.getLocationComponentData(
 							addon_index, location_index, component_index
 						)
-						local graph_node = isGraphNode(COMPONENT_DATA.tags)
-						if COMPONENT_DATA.type=="zone" and graph_node then
-							local transform_matrix, gotTileTransform = server.getTileTransform(
-								empty_matrix, LOCATION_DATA.tile, 300000
-							)
-							if gotTileTransform then
-								local real_transform = m.multiply(COMPONENT_DATA.transform, transform_matrix)
-								g_savedata.graph_nodes.nodes = g_savedata.graph_nodes.nodes or {}
-								g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])] = g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])] or {}
-								g_savedata.graph_nodes.nodes[(path_res):format(real_transform[13])][(path_res):format(real_transform[15])] = { 
-									y = real_transform[14],
-									type = graph_node,
-									NSO = Tags.has(COMPONENT_DATA.tags, "NSO") and 1 or Tags.has(COMPONENT_DATA.tags, "not_NSO") and 2 or 0
-								}
-								total_paths = total_paths + 1
+						if COMPONENT_DATA.type == "zone" then
+							local graph_node = isGraphNode(COMPONENT_DATA.tags[1])
+							if graph_node then
+								local transform_matrix, gotTileTransform = s.getTileTransform(
+									empty_matrix, LOCATION_DATA.tile, 100000
+								)
+								if gotTileTransform then
+									local real_transform = matrix.multiplyXZ(COMPONENT_DATA.transform, transform_matrix)
+									local x = (path_res):format(real_transform[13])
+									local last_tag = COMPONENT_DATA.tags[#COMPONENT_DATA.tags]
+									g_savedata.graph_nodes.nodes[x] = g_savedata.graph_nodes.nodes[x] or {}
+									g_savedata.graph_nodes.nodes[x][(path_res):format(real_transform[15])] = { 
+										y = real_transform[14],
+										type = graph_node,
+										NSO = last_tag == "NSO" and 1 or last_tag == "not_NSO" and 2 or 0
+									}
+									total_paths = total_paths + 1
+								end
 							end
 						end
 					end

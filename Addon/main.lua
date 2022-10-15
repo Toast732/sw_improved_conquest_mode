@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.78)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.79)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -36,6 +36,7 @@ local just_migrated = false
 -- shortened library names
 local m = matrix
 local s = server
+local LifeBoatAPI = {}
 
 local ISLAND = {
 	FACTION = {
@@ -226,7 +227,7 @@ g_savedata = {
 		version_history = {
 			{
 				version = IMPROVED_CONQUEST_VERSION,
-				ticked_played = 0,
+				ticks_played = 0,
 				backup_g_savedata = {}
 			}
 		},
@@ -311,7 +312,8 @@ require("libraries.map") -- functions for drawing on the map
 require("libraries.math") -- custom math functions
 require("libraries.matrix") -- custom matrix functions
 require("libraries.pathfinding") -- functions for pathfinding
-require("libraries.players") -- functions relatingto Players
+require("libraries.players") -- functions relating to Players
+require("libraries.setup") -- functions for script/world setup.
 require("libraries.spawningUtils") -- functions used by the spawn vehicle function
 require("libraries.spawnModifiers") -- functions relating to the Adaptive AI
 require("libraries.squad") -- functions for squads
@@ -580,65 +582,6 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 		end
 
 		if is_world_create then
-
-			-- no longer used as of 0.3.0.78, replaced by automatic migration system
-			--// allows the player to make the scripts reload as if the world was just created
-			--// this command is very dangerous
-			--[[if do_as_i_say then
-				if peer_id then
-					--d.print(s.getPlayerName(peer_id).." has reloaded the improved conquest mode addon, this command is very dangerous and can break many things", false, 0)
-
-					-- removes vehicle icons and paths
-					for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							s.removeMapObject(-1, vehicle_object.ui_id)
-							s.removeMapLabel(-1, vehicle_object.ui_id)
-							s.removeMapLine(-1, vehicle_object.ui_id)
-							for i = 0, #vehicle_object.path - 1 do
-								local waypoint = vehicle_object.path[i]
-								if waypoint then
-									s.removeMapLine(-1, waypoint.ui_id)
-								end
-							end
-							killVehicle(squad_index, vehicle_id, true, true)
-						end
-					end
-					s.removeMapObject(-1, g_savedata.player_base_island.ui_id)
-					s.removeMapObject(-1, g_savedata.ai_base_island.ui_id)
-
-					-- resets some island data
-					for island_index, island in pairs(g_savedata.islands) do
-						-- resets map icons
-						updatePeerIslandMapData(-1, island, true)
-
-						-- removes all flags/capture point vehicles
-						s.despawnVehicle(island.flag_vehicle.id, true)
-					end
-
-					-- reset savedata
-					g_savedata.ai_army.squadrons = {}
-					g_savedata.ai_base_island.zones = {}
-					g_savedata.player_base_island = nil
-					g_savedata.ai_base_island = nil
-					g_savedata.islands = {}
-					g_savedata.constructable_vehicles = {}
-					g_savedata.is_attack = {}
-					g_savedata.vehicle_list = {}
-					g_savedata.tick_counter = 0
-					g_savedata.ai_history = {
-						has_defended = 0, -- logs the time in ticks the player attacked at
-						defended_charge = 0, -- the charge for it to detect the player is attacking, kinda like a capacitor
-						scout_death = -1, -- saves the time the scout plane was destroyed, allows the players some time between each time the scout comes
-					}
-					g_savedata.ai_knowledge = {
-						last_seen_positions = {}, -- saves the last spot it saw each player, and at which time (tick counter)
-						scout = {}, -- the scout progress of each island
-					}
-					-- save that this happened, as to aid in debugging errors
-					--table.insert(g_savedata.info.full_reload_versions, IMPROVED_CONQUEST_VERSION.." (by \""..s.getPlayerName(peer_id).."\")")
-				end
-			end]]
-
 			d.print("setting up world...", true, 0)
 
 			d.print("getting y level of all graph nodes...", true, 0)
@@ -649,98 +592,10 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			d.print("setting up spawn zones...", true, 0)
 
-			local turret_zones = s.getZones("turret")
-
-			local land_zones = s.getZones("land_spawn")
-
-			local sea_zones = s.getZones("boat_spawn")
-
-			-- remove any NSO or non_NSO exlcusive zones
-
-			-----
-			--* filter NSO and non NSO exclusive islands
-			-----
-
-			-- turrets
-			d.print("filtering NSO and non NSO exclusive turret spawns...", true, 0)
-			for turret_zone_index, turret_zone in pairs(turret_zones) do
-				if not g_savedata.info.mods.NSO and Tags.has(turret_zone.tags, "NSO") then
-					table.remove(turret_zones, turret_zone_index)
-				elseif g_savedata.info.mods.NSO and Tags.has(turret_zone.tags, "not_NSO") then
-					table.remove(turret_zones, turret_zone_index)
-				end
-			end
-
-			-- land
-			d.print("filtering NSO and non NSO exclusive land spawns...", true, 0)
-			for land_zone_index, land_zone in pairs(land_zones) do
-				if not g_savedata.info.mods.NSO and Tags.has(land_zone.tags, "NSO") then
-					table.remove(land_zones, land_zone_index)
-				elseif g_savedata.info.mods.NSO and Tags.has(land_zone.tags, "not_NSO") then
-					table.remove(land_zones, land_zone_index)
-				end
-			end
-
-			-- sea
-			d.print("filtering NSO and non NSO exclusive sea spawns...", true, 0)
-			for sea_zone_index, sea_zone in pairs(sea_zones) do
-				if not g_savedata.info.mods.NSO and Tags.has(sea_zone.tags, "NSO") then
-					table.remove(sea_zones, sea_zone_index)
-				elseif g_savedata.info.mods.NSO and Tags.has(sea_zone.tags, "not_NSO") then
-					table.remove(sea_zones, sea_zone_index)
-				end
-			end
+			local spawn_zones = sup.spawnZones()
 
 			-- add them to a list indexed by which island the zone belongs to
-			local spawn_zones = {}
-
-			for _, zone in ipairs(turret_zones) do
-				local tile_data, is_success = server.getTile(zone.transform)
-				if not is_success then
-					d.print("failed to get the location of turret zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
-				else
-					if not spawn_zones[tile_data.name] then
-						spawn_zones[tile_data.name] = {
-							turrets = {},
-							land = {},
-							sea = {}
-						}
-					end
-					table.insert(spawn_zones[tile_data.name].turrets, zone)
-				end
-			end
-
-			for _, zone in ipairs(land_zones) do
-				local tile_data, is_success = server.getTile(zone.transform)
-				if not is_success then
-					d.print("failed to get the location of land zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
-				else
-					if not spawn_zones[tile_data.name] then
-						spawn_zones[tile_data.name] = {
-							turrets = {},
-							land = {},
-							sea = {}
-						}
-					end
-					table.insert(spawn_zones[tile_data.name].land, zone)
-				end
-			end
-
-			for _, zone in ipairs(sea_zones) do
-				local tile_data, is_success = server.getTile(zone.transform)
-				if not is_success then
-					d.print("failed to get the location of sea zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]))
-				else
-					if not spawn_zones[tile_data.name] then
-						spawn_zones[tile_data.name] = {
-							turrets = {},
-							land = {},
-							sea = {}
-						}
-					end
-					table.insert(spawn_zones[tile_data.name].sea, zone)
-				end
-			end
+			local tile_zones = sup.sortSpawnZones(spawn_zones)
 
 			d.print("populating constructable vehicles with spawning modifiers...", true, 0)
 
@@ -876,7 +731,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 				object_type = "island"
 			}
 
-			g_savedata.ai_base_island.zones = spawn_zones[island_tile.name]
+			g_savedata.ai_base_island.zones = tile_zones[island_tile.name]
 
 			islands[ai_base_index] = nil
 
@@ -922,7 +777,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 					object_type = "island"
 				}
 
-				new_island.zones = spawn_zones[island_tile.name]
+				new_island.zones = tile_zones[island_tile.name]
 
 				g_savedata.islands[new_island.index] = new_island
 				d.print("Setup island: "..new_island.index.." \""..island.name.."\"", true, 0)
@@ -1239,12 +1094,7 @@ local player_commands = {
 		}
 	},
 	host = {
-		--[[fullreload = { replaced by automatic migration in 0.3.0.78
-			short_desc = "lets you fully reload the addon",
-			desc = "lets you fully reload the addon, basically making it think the world was just created, this command can and probably will break things, so dont use it unless you need to",
-			args = "none",
-			example = "?impwep full_reload",
-		}]]
+
 	}
 }
 
@@ -1314,13 +1164,13 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			return
 		end
 
-		local version_info, is_success = comp.getVersionData(version_name)
+		local version_data, is_success = comp.getVersionData(version_name)
 		if not is_success then
 			d.print("(command info) failed to get version data of creation version", false, 1)
 			return
 		end
-		d.print("World Creation Version: "..version_info.version, false, 0, peer_id)
-		d.print("Times Addon Data has been Updated: "..tostring(#g_savedata.info.version_history and #g_savedata.info.version_history or 0), false, 0, peer_id)
+		d.print("World Creation Version: "..version_data.data_version, false, 0, peer_id)
+		d.print("Times Addon Data has been Updated: "..tostring(#g_savedata.info.version_history and #g_savedata.info.version_history - 1 or 0), false, 0, peer_id)
 		if g_savedata.info.version_history and #g_savedata.info.version_history ~= nil and #g_savedata.info.version_history ~= 0 then
 			d.print("Version History", false, 0, peer_id)
 			for i = 1, #g_savedata.info.version_history do
@@ -1383,7 +1233,6 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			end
 
 			local valid_types = {
-				turret = true,
 				land = true,
 				plane = true,
 				heli = true,
@@ -1433,8 +1282,10 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				local successfully_spawned = false
 
 				if not valid_types[string.lower(arg[1])] then
+					-- they did not specify a type of vehicle to spawn
 					successfully_spawned, vehicle_data = v.spawn(vehicle_id, nil, true)
 				else
+					-- they specified a type of vehicle to spawn
 					successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
 				end
 				if successfully_spawned then
@@ -1589,18 +1440,18 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			}
 
 			if not arg[1] then
-				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, peer_id)
+				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\"", false, 1, peer_id)
 				return
 			end
 
 			--* make the debug type arg friendly
-			arg[1] = string.friendly(arg[1])
+			arg[1] = string.friendly(arg[1], true)
 
 			if debug_types[arg[1]] then
 				arg[1] = debug_types[arg[1]]
 			else
 				-- unknown debug type
-				d.print("Unknown debug type: "..tostring(arg[1]).." valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\"", false, 1, peer_id)
+				d.print("Unknown debug type: "..tostring(arg[1]).." valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\"", false, 1, peer_id)
 				return
 			end
 
@@ -1668,17 +1519,12 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				d.print("Invalid Syntax! command usage: ?impwep cp (island_name) (faction)", false, 1, peer_id)
 			end
 
-
-		
-
-
 		elseif command == "aimod" then
 			if arg[1] then
 				sm.debug(peer_id, arg[1], arg[2], arg[3], arg[4])
 			else
 				d.print("you need to specify which type to debug!", false, 1, peer_id)
 			end
-
 
 		elseif command == "setmod" then
 			if arg[1] then
@@ -1990,40 +1836,16 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "debugmigration" then
 			d.print("is migrated? "..tostring(g_savedata.info.version_history ~= nil), false, 0, peer_id)
 		end
-	else
-		for command_name, command_info in pairs(player_commands.admin) do
-			if command == command_name then
-				d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
-			end
-		end
+	elseif player_commands.admin[command] then
+		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
 	end
 
 	--
 	-- host only commands
 	--
 	if peer_id == 0 and is_admin then
-		--[[ old full reload command, replaced by automatic updating in 0.3.0.78
-		if command == "fullreload" and peer_id == 0 then
-			local steam_id = pl.getSteamID(peer_id)
-			if arg[1] == "confirm" and g_savedata.player_data[steam_id].fully_reloading then
-				d.print(s.getPlayerName(peer_id).." IS FULLY RELOADING IMPROVED CONQUEST MODE ADDON, THINGS HAVE A HIGH CHANCE OF BREAKING!", false, 0)
-				onCreate(true, true, peer_id)
-			elseif arg[1] == "cancel" and g_savedata.player_data[steam_id].fully_reloading == true then
-				d.print("Action has been reverted, no longer will be fully reloading addon", false, 0, peer_id)
-				g_savedata.player_data[steam_id].fully_reloading = nil
-			end
-			if not arg[1] then
-				d.print("WARNING: This command can break your entire world, if you care about this world, before commencing with this command please MAKE A BACKUP.\n\nTo acknowledge you've read this, do\n\"?impwep full_reload confirm\".\n\nIf you want to go back now, do\n\"?impwep full_reload cancel.\"\n\nAction will be automatically reverting in 15 seconds", false, 0, peer_id)
-				g_savedata.player_data[steam_id].fully_reloading = true
-				g_savedata.player_data[steam_id].timers.do_as_i_say = g_savedata.tick_counter
-			end
-		end]]
-	else
-		for command_name, command_info in pairs(player_commands.host) do
-			if command == command_name then
-				d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
-			end
-		end
+	elseif player_commands.host[command] then
+		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
 	end
 	
 	--
@@ -5604,7 +5426,7 @@ function tickControls()
 
 				if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 					-- resets seat
-					v.setSeat(vehicle_id, "Driver", 0, 0, 0, 0, false, false, false, false, false, false)
+					AI.setSeat(vehicle_id, "Driver", 0, 0, 0, 0, false, false, false, false, false, false, false)
 				end
 
 				-- removes debug
@@ -5774,7 +5596,7 @@ function tickControls()
 				local ad = math.wrap(-(ad)/3, -math.pi, math.pi)
 				--d.print("a/d: "..ad, true, 0)
 
-				v.setSeat(vehicle_id, "Driver", (speed/vehicle_object.speed.speed)/math.max(1, math.abs(ad)+0.6), ad, 0, 0, true, false, false, false, false, false)
+				AI.setSeat(vehicle_id, "Driver", (speed/vehicle_object.speed.speed)/math.max(1, math.abs(ad)+0.6), ad, 0, 0, true, false, false, false, false, false, false)
 
 				if d.getDebug(5) then
 					-- calculate info for debug
@@ -6266,3 +6088,4 @@ end
 function millisecondsSince(start_ms)
 	return s.getTimeMillisec() - start_ms
 end
+

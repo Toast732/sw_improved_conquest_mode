@@ -1,6 +1,7 @@
 -- required libraries
 require("libraries.players")
 require("libraries.tables")
+require("libraries.map")
 
 -- library name
 local Debugging = {}
