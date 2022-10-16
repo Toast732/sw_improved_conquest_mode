@@ -2,7 +2,7 @@
 require("libraries.debugging")
 
 -- library name
-local Tags = {}
+Tags = {}
 
 function Tags.has(tags, tag, decrement)
 	if type(tags) ~= "table" then

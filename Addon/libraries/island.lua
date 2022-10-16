@@ -4,10 +4,10 @@ require("libraries.players")
 require("libraries.tags")
 
 -- library name
-local Island = {}
+Island = {}
 
 -- shortened library name
-local is = Island
+is = Island
 
 -- checks if this island can spawn the specified vehicle
 ---@param island ISLAND the island you want to check if AI can spawn there

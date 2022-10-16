@@ -3,10 +3,10 @@ require("libraries.debugging")
 require("libraries.matrix")
 
 -- library name
-local Players = {}
+Players = {}
 
 -- shortened library name
-local pl = Players
+pl = Players
 
 ---@param player_list Players[] the list of players to check
 ---@param target_pos Matrix the position that you want to check

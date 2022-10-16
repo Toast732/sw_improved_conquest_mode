@@ -2,7 +2,7 @@
 require("libraries.debugging")
 
 -- library name
-local Squad = {}
+Squad = {}
 
 ---@param vehicle_id integer the id of the vehicle you want to get the squad ID of
 ---@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil

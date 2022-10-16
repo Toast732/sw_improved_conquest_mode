@@ -3,10 +3,10 @@ require("libraries.debugging")
 require("libraries.tags")
 
 -- library name
-local SpawningUtils = {}
+SpawningUtils = {}
 
 -- shortened library name
-local su = SpawningUtils
+su = SpawningUtils
 
 -- spawn an individual object descriptor from a playlist location
 function SpawningUtils.spawnObjectType(spawn_transform, location_index, object_descriptor, parent_vehicle_id)

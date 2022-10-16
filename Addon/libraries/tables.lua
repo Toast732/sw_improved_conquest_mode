@@ -2,7 +2,7 @@
 require("libraries.debugging")
 
 -- library name
-local Tables = {}
+Tables = {}
 
 --# check for if none of the inputted variables are nil
 ---@param print_error boolean if you want it to print an error if any are nil (if true, the second argument must be a name for debugging puposes)

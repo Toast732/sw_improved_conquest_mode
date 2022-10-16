@@ -12,10 +12,10 @@ require("libraries.tables")
 require("libraries.tags")
 
 -- library name
-local Setup = {}
+Setup = {}
 
 -- shortened library name
-local sup = Setup
+sup = Setup
 
 --[[
 

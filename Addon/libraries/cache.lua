@@ -3,7 +3,7 @@ require("libraries.debugging")
 require("libraries.tables")
 
 -- library name
-local Cache = {}
+Cache = {}
 
 ---@param location g_savedata.cache[] where to reset the data, if left blank then resets all cache data
 ---@param boolean success returns true if successfully cleared the cache

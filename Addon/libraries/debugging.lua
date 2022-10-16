@@ -4,10 +4,10 @@ require("libraries.tables")
 require("libraries.map")
 
 -- library name
-local Debugging = {}
+Debugging = {}
 
 -- shortened library name
-local d = Debugging 
+d = Debugging 
 
 ---@param message string the message you want to print
 ---@param requires_debug boolean if it requires <debug_type> debug to be enabled

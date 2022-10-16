@@ -4,10 +4,10 @@ require("libraries.math")
 require("libraries.string")
 
 -- library name
-local SpawnModifiers = {}
+SpawnModifiers = {}
 
 -- shortened library name
-local sm = SpawnModifiers
+sm = SpawnModifiers
 
 local default_mods = {
 	attack = 0.55,

@@ -8,12 +8,14 @@ require("libraries.tags")
 require("libraries.players")
 require("libraries.matrix")
 require("libraries.spawnModifiers")
+require("libraries.cargo")
+require("libraries.objective")
 
 -- library name
-local Vehicle = {}
+Vehicle = {}
 
 -- shortened library name
-local v = Vehicle
+v = Vehicle
 
 ---@param vehicle_object vehicle_object the vehicle you want to get the speed of
 ---@param ignore_terrain_type boolean if false or nil, it will include the terrain type in speed, otherwise it will return the offroad speed (only applicable to land vehicles)
@@ -449,7 +451,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	if not specified_island then
 		-- if the vehicle we want to spawn is an attack vehicle, we want to spawn it as close to their objective as possible
 		if Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "attack" or Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
-			target, ally = getObjectiveIsland()
+			target, ally = Objective.getIslandToAttack()
 			if not target then
 				sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
 				sm.train(PUNISH, attack, 5)
@@ -674,7 +676,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				} 
 			},
 			state = { 
-				s = VEHICLE.STATE.HOLDING, 
+				s = VEHICLE.STATE.HOLDING,
 				timer = math.floor(math.fmod(spawned_objects.spawned_vehicle.id, 300 * stats_multiplier)),
 				is_simulating = false,
 				convoy = {
@@ -689,9 +691,10 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			ui_id = s.getMapID(),
 			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
 			role = Tags.getValue(selected_prefab.vehicle.tags, "role", true) or "general",
-			size = spawned_objects.spawned_vehicle.size,
+			size = spawned_objects.spawned_vehicle.size or "small",
 			holding_index = 1,
 			holding_target = m.translation(home_x, home_y, home_z),
+			spawnbox_index = spawnbox_index,
 			costs = {
 				buy_on_load = not cost_existed,
 				purchase_type = purchase_type
@@ -844,4 +847,142 @@ function Vehicle.teleport(vehicle_id, transform)
 	end
 
 	return none_failed
+end
+
+---@param vehicle_id integer the id of the vehicle you want to kill
+---@param kill_instantly boolean if you want to kill the vehicle instantly, if not, it will despawn it when the vehicle is unloaded, or takes enough damage to explode
+---@param force_kill boolean if you want to forcibly kill the vehicle, if so, it will go without explosions, and will not affect the spawn modifiers. Used for things like ?impwep dv
+---@return boolean is_success if it was able to successfully kill the vehicle
+function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
+	local debug_prefix = "(Vehicle.kill) "
+
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	if not squad then
+		d.print(debug_prefix.."Failed to find the squad for vehicle "..tostring(vehicle_id), true, 1)
+		return false
+	end
+
+	if not squad_index then
+		d.print(debug_prefix.."Failed to get the squad_index for vehicle "..tostring(vehicle_id), true, 1)
+		return false
+	end
+
+	if not vehicle_object then
+		d.print(debug_prefix.."Failed to get the vehicle_object for vehicle "..tostring(vehicle_id), true, 1)
+		return false
+	end
+
+	if vehicle_object.is_killed ~= true and not kill_instantly then
+		d.print(debug_prefix.."Vehicle "..tostring(vehicle_id).."is already killed!", true, 1)
+		return false
+	end
+
+	d.print(debug_prefix..vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
+
+	-- set the vehicle to say its been killed, and set its death_timer to 0.
+	vehicle_object.is_killed = true
+	vehicle_object.death_timer = 0
+
+	-- clean the cargo vehicle if it is one
+	Cargo.clean(vehicle_id)
+
+	-- if it is a scout vehicle, we want to reset its scouting progress on whatever island it was on
+	-- as it lost all of the data as it was killed.
+	if vehicle_object.role == "scout" then
+		local target_island, origin_island = Objective.getIslandToAttack(true)
+		if target_island then
+
+			-- reset the island's scouted %
+			g_savedata.ai_knowledge.scout[target_island.name].scouted = 0
+
+			-- say that we're no longer scouting the island
+			target_island.is_scouting = false
+
+			 -- saves that the scout vehicle just died, after 30 minutes it should spawn another scout plane
+			g_savedata.ai_history.scout_death = g_savedata.tick_counter
+
+			d.print(debug_prefix.."scout vehicle died! set to respawn in 30 minutes", true, 0)
+		end
+	end
+
+	-- we dont want to force kill cargo vehicles unless we're forcing it.
+	-- as we want to give time for the player to try to recover the cargo.
+	if vehicle_object.role ~= SQUAD.COMMAND.CARGO or force_kill then
+		-- change ai spawning modifiers
+		if not force_kill and vehicle_object.role ~= SQUAD.COMMAND.SCOUT and vehicle_object.role ~= SQUAD.COMMAND.CARGO then -- if the vehicle was not forcefully despawned, and its not a scout or cargo vehicle
+
+			local ai_damaged = vehicle_object.current_damage or 0
+			local ai_damage_dealt = 1
+			for vehicle_id, damage in pairs(vehicle_object.damage_dealt) do
+				ai_damage_dealt = ai_damage_dealt + damage
+			end
+
+			local constructable_vehicle_id = sm.getConstructableVehicleID(vehicle_object.role, vehicle_object.vehicle_type, vehicle_object.strategy, sm.getVehicleListID(vehicle_object.name))
+
+			d.print(debug_prefix.."ai damage taken: "..ai_damaged.." ai damage dealt: "..ai_damage_dealt, true, 0)
+			if ai_damaged * 0.3333 < ai_damage_dealt then -- if the ai did more damage than the damage it took / 3
+				local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
+				sm.train(
+					REWARD, 
+					vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
+					vehicle_object.vehicle_type, math.clamp(ai_reward_ratio, 1, 3), 
+					vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
+					constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
+				)
+			else -- if the ai did less damage than the damage it took / 3
+				local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
+				sm.train(
+					PUNISH, 
+					vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
+					vehicle_object.vehicle_type, math.clamp(ai_punish_ratio, 1, 3),
+					vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
+					constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
+				)
+			end
+		end
+
+		-- make it be killed instantly if its not loaded
+		if not vehicle_object.state.is_simulating and not kill_instantly then
+			kill_instantly = true
+			d.print(debug_prefix.."set kill_instantly to true as the vehicle is not simulating", true, 0)
+		end
+
+		-- set it on fire if its not forcibly being killed and if its not being killed instantly
+		if not kill_instantly and not force_kill then
+			local fire_id = vehicle_object.fire_id
+			if fire_id ~= nil then
+				d.print(debug_prefix.."spawned explosion fire, vehicle will explode if it takes enough damage.", true, 0)
+				s.setFireData(fire_id, true, true)
+			end
+		end
+
+		-- despawn the vehicle
+		s.despawnVehicle(vehicle_id, kill_instantly)
+
+		-- despawn all of the enemy AI NPCs
+		for _, survivor in pairs(vehicle_object.survivors) do
+			s.despawnObject(survivor.id, kill_instantly)
+		end
+
+		-- despawn its vehicle fire if it had one
+		if vehicle_object.fire_id ~= nil then
+			s.despawnObject(vehicle_object.fire_id, kill_instantly)
+		end
+
+		if kill_instantly and not force_kill then
+
+			local explosion_sizes = {
+				small = 0.5,
+				medium = 1,
+				large = 2
+			}
+
+			s.spawnExplosion(vehicle_object.transform, explosion_sizes[vehicle_object.size])
+
+			d.print(debug_prefix.."size "..explosion_sizes[vehicle_object.size].." explosion spawned", true, 0)
+		end
+	end
+
+	return true
 end

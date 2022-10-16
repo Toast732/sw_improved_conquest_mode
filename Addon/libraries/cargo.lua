@@ -7,9 +7,10 @@ require("libraries.pathfinding")
 require("libraries.tags")
 require("libraries.tables")
 require("libraries.vehicle")
+require("libraries.objective")
 
 -- library name
-local Cargo = {}
+Cargo = {}
 
 --- @param vehicle_id integer the vehicle's id you want to clean
 function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it exists
@@ -51,7 +52,7 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 					local squad_index, squad = Squad.getSquad(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id)
 
 					if squad_index then
-						killVehicle(squad_index, g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id, true, true)
+						v.kill(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id, true, true)
 					end
 				end
 			end
@@ -671,7 +672,7 @@ function Cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	-- weight by how many vehicles the island has defending
 	local weight_modifier = 1 * math.max(5 - island.defenders, 1) -- defenders
 
-	local target_island, origin_island = getObjectiveIsland()
+	local target_island, origin_island = Objective.getIslandToAttack()
 	if origin_island.name == island.name then -- if this island the ai is using to attack from
 		weight_modifier = weight_modifier * 1.2 -- increase weight
 	end

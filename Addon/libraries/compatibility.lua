@@ -12,10 +12,10 @@ require("libraries.island")
 require("libraries.setup")
 
 -- library name
-local Compatibility = {}
+Compatibility = {}
 
 -- shortened library name
-local comp = Compatibility
+comp = Compatibility
 
 --[[
 

@@ -6,10 +6,10 @@ require("libraries.matrix")
 require("libraries.tags")
 
 -- library name
-local Pathfinding = {}
+Pathfinding = {}
 
 -- shortened library name
-local p = Pathfinding
+p = Pathfinding
 
 function Pathfinding.resetPath(vehicle_object)
 	for _, v in pairs(vehicle_object.path) do
@@ -63,7 +63,7 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 	if g_savedata.info.mods.NSO then
 		exclude = "not_NSO" -- exclude non NSO graph nodes
 	else
-		exclude = "NSO" -- exclude NSO grpah nodes
+		exclude = "NSO" -- exclude NSO graph nodes
 	end
 
 	if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then 

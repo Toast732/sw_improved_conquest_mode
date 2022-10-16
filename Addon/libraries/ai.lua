@@ -1,8 +1,10 @@
+-- This library is for controlling or getting things about the Enemy AI.
+
 -- required libraries
 require("libraries.debugging")
 
 -- library name
-local AI = {}
+AI = {}
 
 --- @param vehicle_object vehicle_object the vehicle you want to set the state of
 --- @param state string the state you want to set the vehicle to

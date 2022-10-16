@@ -3,7 +3,7 @@ require("libraries.debugging")
 require("libraries.math")
 
 -- library name
-local Map = {}
+Map = {}
 
 --# draws a search area within the specified radius at the coordinates provided
 ---@param x number the x coordinate of where the search area will be drawn around (required)
