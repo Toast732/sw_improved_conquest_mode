@@ -7,31 +7,31 @@
 --      By Nameous Changey
 -- Minimized Size: 511 (823 with comment) chars
 
-g=math
-i=input
-_=i.getNumber
-j=output.setBool
-a=property.getNumber
-local q=a("Min Y")local c=a("Min Distance")local d=a("Max Distance")local n=a("Fire Rate (s)")local l=n*60
-local b=0
-function onTick()j(1,false)if b>0 then
-b=g.max(0,b-1)return
+h=math
+j=input
+_=j.getNumber
+g=output.setBool
+b=property.getNumber
+local k=b("Min Y")local c=b("Min Distance")local d=b("Max Distance")local l=b("Fire Rate (s)")local o=l*60
+local a=0
+function onTick()g(1,false)if a>0 then
+a=h.max(0,a-1)return
 end
-if not i.getBool(1)then
+if not j.getBool(1)then
 return
 end
-if _(2)<q then
+if _(2)<k then
 return
 end
 if c~=0 or d~=0 then
-local k=_(1)local o=_(3)local p=_(4)local m=_(5)local e=k-p
-local f=o-m
-local h=g.sqrt(e*e+f*f)if d~=0 and h>d then
+local q=_(1)local n=_(3)local p=_(4)local m=_(5)local i=q-p
+local e=n-m
+local f=h.sqrt(i*i+e*e)if d~=0 and f>d then
 return
 end
-if c~=0 and h<c then
+if c~=0 and f<c then
 return
 end
 end
-j(1,true)b=l
+g(1,true)a=o
 end

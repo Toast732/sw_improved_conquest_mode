@@ -57,7 +57,7 @@ yaw_modifier = 1
 pitch_modifier = 1
 
 function getAngle(tx, tz, px, pz)
-	return math.atan(px - tx, pz - tz)/tau
+	return math.atan(tx - px, tz - pz)/tau
 end
 
 function getDist(px, pz, tx, tz)
@@ -163,7 +163,7 @@ function onTick()
 						-- horizontal
 						if horizontal_type >= 2 then
 							-- velocity
-							yaw = noNaN(((yaw-horizontal_rot*horizontal_modifier)%1+1.5)%1-0.5)
+							yaw = noNaN(((yaw-horizontal_rot)%1+1.5)%1-0.5)
 						end
 	
 						pitch = noNaN(math.clamp(math.atan((target_y-pos_y)/distance)/tau, vertical_min, vertical_max)*pitch_modifier)

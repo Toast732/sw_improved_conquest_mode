@@ -7,47 +7,47 @@
 --      By Nameous Changey
 -- Minimized Size: 1041 (1355 with comment) chars
 
-A=true
+y=true
 j=false
-t=math
-y=output
-z=input
-f=z.getNumber
-g=y.setBool
-b=y.setNumber
+l=math
+u=output
+v=input
+f=v.getNumber
+g=u.setBool
+b=u.setNumber
 c=property.getNumber
-local h=t
-D=c("Throttle Type")H=c("Starter RPS")w=c("Min RPS")v=c("Max RPS")B=c("AFR")L=c("Enabling Cooling System Temp")I=c("Half Throttle Temp")F=c("Automatic Shutdown Temp")function E(o,m,s)return{o=o,m=m,s=s,a=0,e=0,i=0,G=function(_,J,C)local a,e,r
-a=J-C
+local h=l
+N=c("Throttle Type")E=c("Starter RPS")x=c("Min RPS")A=c("Max RPS")J=c("AFR")M=c("Enabling Cooling System Temp")F=c("Half Throttle Temp")D=c("Automatic Shutdown Temp")function L(p,q,t)return{p=p,q=q,t=t,a=0,e=0,k=0,K=function(_,I,G)local a,e,o
+a=I-G
 e=a-_.a
-r=t.abs(e-_.e)_.a=a
+o=l.abs(e-_.e)_.a=a
 _.e=e
-_.i=r<a and _.i+a*_.m or _.i*.5
-return a*_.o+(r<a and _.i or 0)+e*_.s
+_.k=o<a and _.k+a*_.q or _.k*.5
+return a*_.p+(o<a and _.k or 0)+e*_.t
 end}end
-function u()b(1,0)b(2,0)q=j
+function z()b(1,0)b(2,0)s=j
 b(4,0)g(1,j)end
-function onTick()local M=E(-.037+f(7),.00025+f(8),.125052+f(9))q=z.getBool(1)if not q then
-u()end
-local p=f(3)if p>=F then
-u()end
-local k=f(5)if p>L then
-g(2,A)else
+function onTick()local C=L(-.037+f(7),.00025+f(8),.125052+f(9))s=v.getBool(1)if not s then
+z()end
+local n=f(3)if n>=D then
+z()end
+local i=f(5)if n>M then
+g(2,y)else
 g(2,j)end
-if not q then
+if not s then
 return
 end
-if p>I then
-k=k/2
+if n>F then
+i=i/2
 end
-local l=f(4)local n=k+.8
-if D==0 then
-n=h.max(h.abs(v*k),w)+.8
+local m=f(4)local r=i+.8
+if N==0 then
+r=h.max(h.abs(A*i),x)+.8
 end
-local x=h.K(M:G(n,l),0,1)b(5,n)b(1,x/B)b(2,x)b(3,O(h.sqrt(h.max(l-w)/v,0)))if l<H then
-b(4,1)g(1,A)else
+local w=h.B(C:K(r,m),0,1)b(5,r)b(1,w/J)b(2,w)b(3,O(h.sqrt(h.max(m-x)/A,0)))if m<E then
+b(4,1)g(1,y)else
 b(4,0)g(1,j)end
 end
-function t.K(d,min,max)return N(max<d and max or min>d and min or d)end
-function N(d)return d~=d and 0 or d
+function l.B(d,min,max)return H(max<d and max or min>d and min or d)end
+function H(d)return d~=d and 0 or d
 end
