@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.81)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.82)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -493,6 +493,7 @@ end
 local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
 local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs and transports resources to make more vehicles)", "true")
+local AIR_CRASH_MODE_BOX = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
 
 function onCreate(is_world_create, do_as_i_say, peer_id)
 
@@ -505,6 +506,7 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 			SINKING_MODE = SINKING_MODE_BOX,
 			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
 			CARGO_MODE = CARGO_MODE_BOX,
+			AIR_CRASH_MODE = AIR_CRASH_MODE_BOX,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
 			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
 			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5", 10, 600, 1, 60) * 60 * 60,
@@ -1115,8 +1117,10 @@ local command_aliases = {
 
 function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
 
+	prefix = string.lower(prefix)
+
 	--? if the command they're entering is not for this addon
-	if prefix ~= "?impwep" then
+	if prefix ~= "?impwep" and prefix ~= "?icm" then
 		return
 	end
 
@@ -1325,7 +1329,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 										end
 									end
 									--]]
-									d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
+									d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon!", false, 1, peer_id)
 									v.kill(vehicle_data.id, true, true)
 								else
 									local player_pos = s.getPlayerPos(peer_id)
@@ -1352,7 +1356,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 									vehicle_data.transform = new_pos
 									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
 								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
-									d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle! this functionality will be added soon (should be implemented in 0.3.0, the next majour update)!", false, 1, peer_id)
+									d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle!", false, 1, peer_id)
 									v.kill(vehicle_data.id, true, true)
 								else -- air vehicle
 									local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
@@ -2265,6 +2269,10 @@ function onVehicleUnload(vehicle_id)
 	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
 
 	if squad_index and vehicle_object then
+
+		-- reset it's transform history
+		vehicle_object.transform_history = {}
+
 		if vehicle_object.is_killed == true then
 			cleanVehicle(squad_index, vehicle_id)
 		else
@@ -4351,6 +4359,36 @@ function tickVehicles()
 					goto break_vehicle
 				end
 
+				-- if air crash mode is enabled
+				-- then we want to check if this vehicle is a plane or heli
+				-- if it is, we want to see how much its moved
+				-- and compare it to the previous time we checked, if its a large difference, then we make it explode.
+				if g_savedata.settings.AIR_CRASH_MODE and vehicle_object.state.is_simulating then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
+
+						-- get its previous positions
+						local last_pos = vehicle_object.transform_history[getTickID(vehicle_id - vehicle_update_tickrate, vehicle_update_tickrate*2)/vehicle_update_tickrate]
+						local second_last_pos = vehicle_object.transform_history[getTickID(vehicle_id, vehicle_update_tickrate*2)/vehicle_update_tickrate]
+
+						-- make sure they both exist
+						if last_pos and second_last_pos then
+							local last_change = math.abs(last_pos[13] - second_last_pos[13]) + math.abs(last_pos[14] - second_last_pos[14]) + math.abs(last_pos[15] - second_last_pos[15])
+							local cur_change = math.abs(vehicle_object.transform[13] - last_pos[13]) + math.abs(vehicle_object.transform[14] - last_pos[14]) + math.abs(vehicle_object.transform[15] - last_pos[15])
+
+							local total_change = math.abs(cur_change - last_change)*vehicle_update_tickrate/60
+
+							--d.print("Change from last: "..(total_change), true, 0)
+
+							if total_change >= 90 or total_change < 0.001 then
+								d.print("Vehicle "..vehicle_object.name.." ("..vehicle_id..") Crashed!", true, 0)
+								v.kill(vehicle_id, true)
+							end
+						end
+
+						vehicle_object.transform_history[getTickID(vehicle_id, vehicle_update_tickrate*2)/vehicle_update_tickrate] = vehicle_object.transform
+					end
+				end
+
 				local ai_target = nil
 				if ai_state ~= 2 then ai_state = 1 end
 				local ai_speed_pseudo = (vehicle_object.speed.speed or VEHICLE.SPEED.BOAT) * vehicle_update_tickrate / 60
@@ -5852,6 +5890,13 @@ end
 ---@return boolean isTick if its the current tick that you requested
 function isTickID(id, rate)
 	return (g_savedata.tick_counter + id) % rate == 0
+end
+
+---@param id integer the tick offset you want to get the id of
+---@param rate integer the rate of the tick_id, for example, 60 will result in it going from 1 to 60
+---@return integer tick_id The tick ID
+function getTickID(id, rate)
+	return (g_savedata.tick_counter + id) % rate
 end
 
 -- iterator function for iterating over all playlists, skipping any that return nil data

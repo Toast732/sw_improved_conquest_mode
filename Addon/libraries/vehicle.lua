@@ -613,7 +613,10 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		end
 
 		-- pick a spawn location out of the list which is unoccupied
-		spawn_transform = island.zones.turrets[unoccupied_zones[math.random(1, #unoccupied_zones)]].transform
+
+		spawnbox_index = unoccupied_zones[math.random(1, #unoccupied_zones)]
+
+		spawn_transform = island.zones.turrets[spawnbox_index].transform
 
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_plane") or Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_heli") then
 		spawn_transform = m.multiply(selected_spawn_transform, m.translation(math.random(-500, 500), CRUISE_HEIGHT + 400, math.random(-500, 500)))
@@ -733,6 +736,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			can_offroad = Tags.has(selected_prefab.vehicle.tags, "can_offroad"),
 			is_resupply_on_load = false,
 			transform = spawn_transform,
+			transform_history = {},
 			target_vehicle_id = nil,
 			target_player_id = nil,
 			current_damage = 0,
@@ -874,7 +878,7 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 	end
 
 	if vehicle_object.is_killed ~= true and not kill_instantly then
-		d.print(debug_prefix.."Vehicle "..tostring(vehicle_id).."is already killed!", true, 1)
+		d.print(debug_prefix.."Vehicle "..tostring(vehicle_id).." is already killed!", true, 1)
 		return false
 	end
 

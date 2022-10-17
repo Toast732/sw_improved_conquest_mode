@@ -28,7 +28,8 @@ comp = Compatibility
 --# stores which versions require compatibility updates
 local version_updates = {
 	"(0.3.0.78)",
-	"(0.3.0.79)"
+	"(0.3.0.79)",
+	"(0.3.0.82)"
 }
 
 --[[
@@ -411,6 +412,16 @@ function Compatibility.update()
 		if g_savedata.info.version_history[1].ticked_played then
 			g_savedata.info.version_history.ticks_played = g_savedata.info.version_history.ticked_played
 			g_savedata.info.version_history.ticked_played = nil
+		end
+
+		d.print("Successfully updated ICM data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.0.82)" then -- 0.3.0.82 changes
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+				vehicle_object.transform_history = {}
+			end
 		end
 
 		d.print("Successfully updated ICM data to "..version_data.newer_versions[1], false, 0)
