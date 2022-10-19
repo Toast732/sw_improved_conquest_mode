@@ -814,7 +814,7 @@ end
 -- teleports a vehicle and all of the characters attached to the vehicle to avoid the characters being left behind
 ---@param vehicle_id integer the id of the vehicle which to teleport
 ---@param transform SWMatrix where to teleport the vehicle and characters to
----@param boolean is_success if it successfully teleported all of the vehicles and characters
+---@return boolean is_success if it successfully teleported all of the vehicles and characters
 function Vehicle.teleport(vehicle_id, transform)
 
 	-- make sure vehicle_id is not nil

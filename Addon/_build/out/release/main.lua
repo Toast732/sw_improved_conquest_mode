@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.82)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.83)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -3120,7 +3120,7 @@ end
 -- teleports a vehicle and all of the characters attached to the vehicle to avoid the characters being left behind
 ---@param vehicle_id integer the id of the vehicle which to teleport
 ---@param transform SWMatrix where to teleport the vehicle and characters to
----@param boolean is_success if it successfully teleported all of the vehicles and characters
+---@return boolean is_success if it successfully teleported all of the vehicles and characters
 function Vehicle.teleport(vehicle_id, transform)
 
 	-- make sure vehicle_id is not nil
@@ -6040,6 +6040,12 @@ local player_commands = {
 			args = "(vehicle_id|\"all\"|\"damaged\")",
 			example = "?impwep delete_vehicle all"
 		},
+		teleport = { -- teleport vehicle
+			short_desc = "lets you teleport an ai vehicle",
+			desc = "lets you teleport an ai vehicle by vehicle id, to the specified x, y and z",
+			args = "(vehicle_id) (x) (y) (z)",
+			example = "?impwep teleport 50 100 10 -5000"
+		},
 		si = { -- set scout intel
 			short_desc = "lets you set the ai's scout level",
 			desc = "lets you set the ai's scout level on a specific island, from 0 to 100 for 0% scouted to 100% scouted",
@@ -6129,7 +6135,9 @@ local command_aliases = {
 	scoutintel = "si",
 	setintel = "si",
 	vl = "vehiclelist",
-	listvehicles = "vl"
+	listvehicles = "vl",
+	tp = "teleport",
+	teleport_vehicle = "teleport"
 }
 
 function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
@@ -6399,6 +6407,36 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				end
 			end
 
+		elseif command == "teleport" then -- teleport vehicles
+			if not math.tointeger(arg[1]) then
+				d.print("vehicle_id must be a integer!", false, 1, peer_id)
+				return
+			end
+
+			if not tonumber(arg[2]) then
+				d.print("x coordinate must be a number!", false, 1, peer_id)
+				return
+			end
+
+			if not tonumber(arg[3]) then
+				d.print("y coordinate must be a number!", false, 1, peer_id)
+				return
+			end
+
+			if not tonumber(arg[4]) then
+				d.print("z coordinate must be a number!", false, 1, peer_id)
+				return
+			end
+
+			local new_transform = matrix.translation(tonumber(arg[2]), tonumber(arg[3]), tonumber(arg[4]))
+
+			local is_success = v.teleport(math.tointeger(arg[1]), new_transform)
+
+			if is_success then
+				d.print(("Teleported vehicle %s to\nx: %0.1f\ny: %0.1f\nz: %0.1f"):format(arg[1], new_transform[13], new_transform[14], new_transform[15]), false, 0, peer_id)
+			else
+				d.print(("Failed to teleport vehicle %s!"):format(arg[1]), false, 1, peer_id)
+			end
 
 		elseif command == "vehiclelist" then --vehicle list
 			d.print("Valid Vehicles:", false, 0, peer_id)
