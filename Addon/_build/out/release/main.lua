@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.83)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.84)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -105,7 +105,6 @@ local CAPTURE_RADIUS = 1500
 local RESUPPLY_RADIUS = 200
 local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 
-local VISIBLE_DISTANCE = 1900
 local WAYPOINT_CONSUME_DISTANCE = 100
 
 local explosion_depths = {
@@ -126,24 +125,22 @@ local g_debug_speed_multiplier = 1
 
 local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
 
-local vehicles_debugging = {}
-
 -- please note: this is not machine learning, this works by making a
 -- vehicle spawn less or more often, depending on the damage it did
 -- compared to the damage it has taken
 local ai_training = {
 	punishments = {
-		-0.02,
-		-0.05,
 		-0.1,
-		-0.15,
-		-0.5
+		-0.2,
+		-0.3,
+		-0.5,
+		-0.7
 	},
 	rewards = {
-		0.01,
-		0.05,
-		0.15,
-		0.4,
+		0.1,
+		0.2,
+		0.3,
+		0.5,
 		1
 	}
 }
@@ -2779,16 +2776,18 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			local islands_needing_checked = {}
 
 			for island_index, island in pairs(g_savedata.islands) do
-				if is.canSpawn(island, selected_prefab) and (not lowest_defenders or island.defenders < lowest_defenders) then -- choose the island with the least amount of defence (A)
-					lowest_defenders = island.defenders -- set the new lowest defender amount on an island
-					selected_spawn_transform = island.transform
-					selected_spawn = island_index
-					check_last_seen = false -- say that we dont need to do a tie breaker
-					islands_needing_checked = {}
-				elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
-					islands_needing_checked[selected_spawn] = selected_spawn_transform
-					islands_needing_checked[island_index] = island.transform
-					check_last_seen = true -- we need a tie breaker
+				if is.canSpawn(island, selected_prefab) then
+					if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
+						lowest_defenders = island.defenders -- set the new lowest defender amount on an island
+						selected_spawn_transform = island.transform
+						selected_spawn = island_index
+						check_last_seen = false -- say that we dont need to do a tie breaker
+						islands_needing_checked = {}
+					elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
+						islands_needing_checked[selected_spawn] = selected_spawn_transform
+						islands_needing_checked[island_index] = island.transform
+						check_last_seen = true -- we need a tie breaker
+					end
 				end
 			end
 
@@ -2809,7 +2808,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 					for island_index, island_transform in pairs(islands_needing_checked) do
 						for player_island_index, player_island in pairs(g_savedata.islands) do
 							if player_island.faction == ISLAND.FACTION.PLAYER then
-								if m.xzDistance(selected_spawn_transform, island_transform) > m.xzDistance(player_island.transform, island_transform) then
+								if m.xzDistance(player_island.transform, selected_spawn_transform) > m.xzDistance(player_island.transform, island_transform) then
 									selected_spawn_transform = island_transform
 									selected_spawn = island_index
 								end
@@ -5502,17 +5501,13 @@ function warningChecks(peer_id)
 	end
 end
 
-function checkSavedata() -- does a check for savedata, is used for backwards compatibility
-	-- nothing for 0.3.0, alot of stuff was rewritten.
-end
-
 -- checkbox settings
 local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
 local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs and transports resources to make more vehicles)", "true")
 local AIR_CRASH_MODE_BOX = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
 
-function onCreate(is_world_create, do_as_i_say, peer_id)
+function onCreate(is_world_create)
 
 	-- start the timer for when the world has started to be setup
 	local world_setup_time = s.getTimeMillisec()
@@ -5847,20 +5842,14 @@ function onCreate(is_world_create, do_as_i_say, peer_id)
 
 			d.print("completed setting up world!", true, 0)
 
-			if not do_as_i_say then
-				-- if the world was just created like normal
+			-- if the world was just created like normal
 
-				d.print("spawning initial ai vehicles...", true, 0)
+			d.print("spawning initial ai vehicles...", true, 0)
 				
-				for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.ceil(math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1)/2) do
-					local spawned, vehicle_data = v.spawnRetry(nil, nil, true, nil, nil, 5) -- spawn initial ai
-				end
-				d.print("all initial ai vehicles spawned!")
-			else -- say we're ready to reload scripts
-				g_savedata.info.awaiting_reload = true
-				d.print("to complete this process, do ?reload_scripts", false, 0, peer_id)
-				is_dlc_weapons = false
+			for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.ceil(math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1)/2) do
+				v.spawnRetry(nil, nil, true, nil, nil, 5) -- spawn initial ai
 			end
+			d.print("all initial ai vehicles spawned!")
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -5996,7 +5985,7 @@ local player_commands = {
 			short_desc = "lets you spawn in an ai vehicle",
 			desc = "this lets you spawn in a ai vehicle, if you dont specify one, it will spawn a random ai vehicle, and if you specify \"scout\", it will spawn a scout vehicle if it can spawn. specify x and y to spawn it at a certain location, or \"near\" and then a minimum distance and then a maximum distance",
 			args = "[vehicle_id|vehicle_type|\"scout\"] [x & y|\"near\" & min_range & max_range] ",
-			example = "?impwep sv PLANE_-_EUROFIGHTER\n?impwep sv PLANE_-_EUROFIGHTER -500 500\n?impwep sv PLANE_-_EUROFIGHTER near 1000 5000\n?impwep sv heli",
+			example = "?impwep sv Eurofighter\n?impwep sv Eurofighter -500 500\n?impwep sv Eurofighter near 1000 5000\n?impwep sv heli",
 		},
 		vehicle_list = { -- vehicle list
 			short_desc = "prints a list of all vehicles",
@@ -6117,6 +6106,12 @@ local player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		queueconvoy = {
+			short_desc = "queues a convoy.",
+			desc = "queues a convoy to be sent out, will be sent out once theres not any convoys.",
+			args = "",
+			example = "?icm queue_convoy"
 		}
 	},
 	host = {
@@ -6135,7 +6130,7 @@ local command_aliases = {
 	scoutintel = "si",
 	setintel = "si",
 	vl = "vehiclelist",
-	listvehicles = "vl",
+	listvehicles = "vehiclelist",
 	tp = "teleport",
 	teleport_vehicle = "teleport"
 }
@@ -6853,6 +6848,9 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			d.print("reset all prefabs", false, 0, peer_id)
 		elseif command == "debugmigration" then
 			d.print("is migrated? "..tostring(g_savedata.info.version_history ~= nil), false, 0, peer_id)
+		elseif command == "queueconvoy" then
+			g_savedata.tick_extensions.cargo_vehicle_spawn = RULES.LOGISTICS.CARGO.VEHICLES.spawn_time - g_savedata.tick_counter - 1
+			d.print("Updated convoy tick extension so a convoy will spawn when possible.", false, 0, peer_id)
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -7079,8 +7077,6 @@ function onPlayerJoin(steam_id, name, peer_id)
 			peer_id = peer_id,
 			name = name,
 			object_id = s.getPlayerCharacterID(peer_id),
-			--fully_reloading = false,
-			--do_as_i_say = false,
 			debug = {
 				chat = false,
 				error = false,
@@ -7089,9 +7085,6 @@ function onPlayerJoin(steam_id, name, peer_id)
 				graph_node = false,
 				driving = false
 			},
-			--[[timers = {
-				do_as_i_say = 0
-			},]]
 			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
 
@@ -7379,10 +7372,12 @@ function onObjectLoad(object_id)
 end]]
 
 function onVehicleLoad(vehicle_id)
+	-- return if the addon is disabled
 	if not is_dlc_weapons then
 		return
 	end
 
+	-- if this is the players vehicle, get data on it
 	if g_savedata.player_vehicles[vehicle_id] ~= nil then
 		local player_vehicle_data = s.getVehicleData(vehicle_id)
 		if player_vehicle_data.voxels then
@@ -7392,6 +7387,7 @@ function onVehicleLoad(vehicle_id)
 		return
 	end
 
+	-- set tooltips for main islands, and mark the island as loaded
 	local island, got_island = Island.getDataFromVehicleID(vehicle_id)
 	if got_island then
 		g_savedata.loaded_islands[island.index] = true
@@ -7404,6 +7400,7 @@ function onVehicleLoad(vehicle_id)
 		return
 	end
 
+	-- check if the ai needs to purchase this vehicle
 	local vehicle_object, _, _ = Squad.getVehicle(vehicle_id)
 
 	if vehicle_object then
@@ -7425,6 +7422,8 @@ function onVehicleLoad(vehicle_id)
 		end
 	end
 
+	-- say the vehicle has loaded
+	-- also make sure its not spawning inside another vehicle
 	if vehicle_object then
 		d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
@@ -7463,6 +7462,8 @@ function onVehicleLoad(vehicle_id)
 					Cargo.setTank(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1).."_"..tank_id, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].amount/(vehicle_object.cargo.capacity/large_tank_capacity), true)
 				end
 				Cargo.setKeypad(vehicle_id, "RESOURCE_TYPE_"..(tank_set-1), g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type)
+
+				d.print(("set %sL of %s into tank set %i on cargo vehicle %i"):format(g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].amount, g_savedata.cargo_vehicles[vehicle_id].requested_cargo[tank_set].cargo_type, tank_set, vehicle_id), true, 0)
 			end
 		end
 
@@ -7557,7 +7558,9 @@ function tickGamemode()
 				local capture_radius = island.faction == ISLAND.FACTION.AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
 
 				-- if the ai vehicle is within the capture radius
-				if m.xzDistance(vehicle_object.transform, island.transform) <= capture_radius then
+				-- and the island is not the ai's main island
+				-- and the island is not the player's main island
+				if m.xzDistance(vehicle_object.transform, island.transform) <= capture_radius and island.index ~= g_savedata.ai_base_island.index and island.index ~= g_savedata.player_base_island.index then
 					g_savedata.islands[island.index].ai_capturing = g_savedata.islands[island.index].ai_capturing + 1
 				end
 			else
@@ -9435,7 +9438,7 @@ function tickVehicles()
 							--d.print("Change from last: "..(total_change), true, 0)
 
 							if total_change >= 90 or total_change < 0.001 then
-								d.print("Vehicle "..vehicle_object.name.." ("..vehicle_id..") Crashed!", true, 0)
+								d.print(("Vehicle %s (%i) Crashed! (total_change: %s)"):format(vehicle_object.name, vehicle_id, total_change), true, 0)
 								v.kill(vehicle_id, true)
 							end
 						end
@@ -9927,23 +9930,13 @@ function tickModifiers()
 	d.stopProfiler("tickModifiers()", true, "onTick()")
 end
 
+--[[ no longer has a use, replaced by automatic migration in 0.3.0.78
 function tickOther()
 	d.startProfiler("tickOther()", true)
-	--[[ no longer has a use, replaced by automatic migration in 0.3.0.78
-	local steam_id = pl.getSteamID(0)
-	if steam_id then
-		if g_savedata.player_data[steam_id] and g_savedata.player_data[steam_id].do_as_i_say then
-			-- if its been 15 or more seconds since player did the ?impwep full_reload
-			-- then cancel the command
-			if (g_savedata.tick_counter - g_savedata.player_data[steam_id].timers.do_as_i_say) >= time.second*15 then
-				d.print("Automatically cancelled full reload!", false, 0, 0)
-				g_savedata.player_data[steam_id].fully_reloading[0] = nil
-				g_savedata.player_data[steam_id].timers.do_as_i_say = 0
-			end
-		end
-	end]]
+	
 	d.stopProfiler("tickOther()", true, "onTick()")
 end
+-]]
 
 function tickCargo()
 	d.startProfiler("tickCargo()", true)
@@ -10283,10 +10276,10 @@ function tickCargoVehicles()
 						else
 							-- if it does exist
 							local transfer_complete, transfer_complete_reason = Cargo.transfer(new_cargo_vehicle.vehicle_data, cargo_vehicle.vehicle_data, new_cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
-							if transfer_complete then
+							if transfer_complete and not cargo_vehicle.vehicle.data.is_killed then
 								d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
 								-- kill old cargo vehicle
-								v.kill(cargo_vehicle.vehicle_data.id) -- kills the vehicle thats now empty
+								v.kill(cargo_vehicle.vehicle_data.id, true) -- kills the vehicle thats now empty
 
 								-- tell new cargo vehicle to go on its route
 
@@ -10306,9 +10299,9 @@ function tickCargoVehicles()
 					else
 						local transfer_complete, transfer_complete_reason = Cargo.transfer(cargo_vehicle.resupply_island, cargo_vehicle.vehicle_data, cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
 						
-						if transfer_complete then
+						if transfer_complete and not cargo_vehicle.vehicle.data.is_killed then
 							d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
-							v.kill(cargo_vehicle.vehicle_data.id) -- kills the vehicle thats now empty
+							v.kill(cargo_vehicle.vehicle_data.id, true) -- kills the vehicle thats now empty
 						end
 					end
 				end
@@ -10608,7 +10601,7 @@ function onTick()
 		tickCargo()
 		tickIslands()
 		tickModifiers()
-		tickOther()
+		-- tickOther()
 
 		d.stopProfiler("onTick()", true, "onTick()")
 		d.showProfilers()
@@ -10630,14 +10623,14 @@ function refuel(vehicle_id)
 	repeat
 		local tank_data, success = s.getVehicleTank(vehicle_id, "Diesel "..i) -- checks if the next diesel container exists
 		if success then
-			s.setVehicleTank(vehicle_id, "Diesel "..i, tank_data.capacity, 1) -- refuel the jet fuel container
+			s.setVehicleTank(vehicle_id, "Diesel "..i, tank_data.capacity, 1) -- refuel the diesel container
 		end
 		i = i + 1
 	until (not success)
 	-- batteries
 	local i = 1
 	repeat
-		local batt_data, success = s.getVehicleBattery(vehicle_id, "Diesel "..i) -- check if the next battery exists
+		local batt_data, success = s.getVehicleBattery(vehicle_id, "Battery "..i) -- check if the next battery exists
 		if success then
 			s.setVehicleBattery(vehicle_id, "Battery "..i, 1) -- charge the battery
 		end

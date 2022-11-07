@@ -473,16 +473,18 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			local islands_needing_checked = {}
 
 			for island_index, island in pairs(g_savedata.islands) do
-				if is.canSpawn(island, selected_prefab) and (not lowest_defenders or island.defenders < lowest_defenders) then -- choose the island with the least amount of defence (A)
-					lowest_defenders = island.defenders -- set the new lowest defender amount on an island
-					selected_spawn_transform = island.transform
-					selected_spawn = island_index
-					check_last_seen = false -- say that we dont need to do a tie breaker
-					islands_needing_checked = {}
-				elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
-					islands_needing_checked[selected_spawn] = selected_spawn_transform
-					islands_needing_checked[island_index] = island.transform
-					check_last_seen = true -- we need a tie breaker
+				if is.canSpawn(island, selected_prefab) then
+					if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
+						lowest_defenders = island.defenders -- set the new lowest defender amount on an island
+						selected_spawn_transform = island.transform
+						selected_spawn = island_index
+						check_last_seen = false -- say that we dont need to do a tie breaker
+						islands_needing_checked = {}
+					elseif lowest_defenders == island.defenders then -- if two islands have the same amount of defenders
+						islands_needing_checked[selected_spawn] = selected_spawn_transform
+						islands_needing_checked[island_index] = island.transform
+						check_last_seen = true -- we need a tie breaker
+					end
 				end
 			end
 
@@ -503,7 +505,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 					for island_index, island_transform in pairs(islands_needing_checked) do
 						for player_island_index, player_island in pairs(g_savedata.islands) do
 							if player_island.faction == ISLAND.FACTION.PLAYER then
-								if m.xzDistance(selected_spawn_transform, island_transform) > m.xzDistance(player_island.transform, island_transform) then
+								if m.xzDistance(player_island.transform, selected_spawn_transform) > m.xzDistance(player_island.transform, island_transform) then
 									selected_spawn_transform = island_transform
 									selected_spawn = island_index
 								end
