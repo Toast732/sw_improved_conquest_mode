@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.84)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.85)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -1104,6 +1104,7 @@ local command_aliases = {
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
+	kill = "deletevehicle",
 	capturepoint = "cp",
 	capture = "cp",
 	captureisland = "cp",
@@ -2396,7 +2397,7 @@ function onVehicleLoad(vehicle_id)
 			local cost, cost_existed, was_purchased = v.purchaseVehicle(vehicle_object.name, vehicle_object.home_island.name, vehicle_object.costs.purchase_type)
 			if was_purchased then
 				vehicle_object.costs.buy_on_load = false
-			else
+			elseif vehicle_object.costs.purchase_type == 0 then
 				d.print("(onVehicleLoad) unable to afford "..vehicle_object.name..", killing vehicle "..vehicle_id, true, 0)
 				v.kill(vehicle_id, true, true)
 			end

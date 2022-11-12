@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.84)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.85)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -3554,11 +3554,11 @@ function Cargo.getTank(vehicle_id)
 			local tank_data, got_data = s.getVehicleTank(vehicle_id, "RESOURCE_TYPE_"..tank_set.."_"..tank_index)
 
 			if got_data then
-				if tank_data.value <= 0 then
+				if tank_data.value > 0 then
 					cargo[tank_set + 1].amount = cargo[tank_set + 1].amount + tank_data.value
-					--d.print("(Cargo.getTank) Got Tank.", true, 0)
+					--[[d.print(("(Cargo.getTank) Got Tank. tank_set: %i tank_index: %i amount in tank: %s"):format(tank_set, tank_index, tank_data.value), true, 0)
 				else
-					--d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)
+					d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)]]
 				end
 			else
 				d.print("(Cargo.getTank) Error getting tank data for "..vehicle_id.." Tank set: "..tank_set.." Tank index: "..tank_index, true, 1)
@@ -7415,7 +7415,7 @@ function onVehicleLoad(vehicle_id)
 			local cost, cost_existed, was_purchased = v.purchaseVehicle(vehicle_object.name, vehicle_object.home_island.name, vehicle_object.costs.purchase_type)
 			if was_purchased then
 				vehicle_object.costs.buy_on_load = false
-			else
+			elseif vehicle_object.costs.purchase_type == 0 then
 				d.print("(onVehicleLoad) unable to afford "..vehicle_object.name..", killing vehicle "..vehicle_id, true, 0)
 				v.kill(vehicle_id, true, true)
 			end

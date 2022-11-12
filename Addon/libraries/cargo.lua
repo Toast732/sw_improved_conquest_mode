@@ -267,11 +267,11 @@ function Cargo.getTank(vehicle_id)
 			local tank_data, got_data = s.getVehicleTank(vehicle_id, "RESOURCE_TYPE_"..tank_set.."_"..tank_index)
 
 			if got_data then
-				if tank_data.value <= 0 then
+				if tank_data.value > 0 then
 					cargo[tank_set + 1].amount = cargo[tank_set + 1].amount + tank_data.value
-					--d.print("(Cargo.getTank) Got Tank.", true, 0)
+					--[[d.print(("(Cargo.getTank) Got Tank. tank_set: %i tank_index: %i amount in tank: %s"):format(tank_set, tank_index, tank_data.value), true, 0)
 				else
-					--d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)
+					d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)]]
 				end
 			else
 				d.print("(Cargo.getTank) Error getting tank data for "..vehicle_id.." Tank set: "..tank_set.." Tank index: "..tank_index, true, 1)
