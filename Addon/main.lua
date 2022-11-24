@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.85)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.86)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -5258,7 +5258,7 @@ function tickCargoVehicles()
 						else
 							-- if it does exist
 							local transfer_complete, transfer_complete_reason = Cargo.transfer(new_cargo_vehicle.vehicle_data, cargo_vehicle.vehicle_data, new_cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
-							if transfer_complete and not cargo_vehicle.vehicle.data.is_killed then
+							if transfer_complete and not cargo_vehicle.vehicle_data.is_killed then
 								d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
 								-- kill old cargo vehicle
 								v.kill(cargo_vehicle.vehicle_data.id, true) -- kills the vehicle thats now empty
@@ -5281,7 +5281,7 @@ function tickCargoVehicles()
 					else
 						local transfer_complete, transfer_complete_reason = Cargo.transfer(cargo_vehicle.resupply_island, cargo_vehicle.vehicle_data, cargo_vehicle.requested_cargo, RULES.LOGISTICS.CARGO.transfer_time, cargo_vehicle_tickrate)
 						
-						if transfer_complete and not cargo_vehicle.vehicle.data.is_killed then
+						if transfer_complete and not cargo_vehicle.vehicle_data.is_killed then
 							d.print("transfer completed? "..tostring(transfer_complete).."\nreason: "..transfer_complete_reason, true, 0)
 							v.kill(cargo_vehicle.vehicle_data.id, true) -- kills the vehicle thats now empty
 						end
