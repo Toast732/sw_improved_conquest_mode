@@ -3505,7 +3505,7 @@ function tickSquadrons()
 								end
 							end
 							i = i + 1
-						until (not success)
+						until (not successed)
 						if successed then
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
