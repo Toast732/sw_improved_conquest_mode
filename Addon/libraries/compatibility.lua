@@ -280,9 +280,12 @@ function Compatibility.getVersionData(version)
 			d.print("found new minor version: "..version_name.." current version: "..version_data.data_version, false, 0)
 		
 		-- (4.4) check if commit version is outdated (#.#.#.x)
-		elseif (math.tointeger(string.match(version_name, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new commit version: "..version_name.." current version: "..version_data.data_version, false, 0)
+		-- if commit version is not specified for our current version, we're newer than the ones that do, so dont go forwards.
+		elseif math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) then
+			if (math.tointeger(string.match(version_name, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) then
+				table.insert(version_data.newer_versions, version_name)
+				d.print("found new commit version: "..version_name.." current version: "..version_data.data_version, false, 0)
+			end
 		end
 	end
 
