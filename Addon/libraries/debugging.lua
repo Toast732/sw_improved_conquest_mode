@@ -94,6 +94,10 @@ function Debugging.getDebug(debug_type, peer_id)
 			if g_savedata.debug.driving then
 				return true
 			end
+		elseif debug_type == 6 then
+			if g_savedata.debug.vehicle then
+				return true
+			end
 		else
 			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type!", true, 1)
 		end
@@ -122,6 +126,10 @@ function Debugging.getDebug(debug_type, peer_id)
 				end
 			elseif debug_type == 5 then
 				if g_savedata.player_data[steam_id].debug.driving then
+					return true
+				end
+			elseif debug_type == 6 then
+				if g_savedata.player_data[steam_id].debug.vehicle then
 					return true
 				end
 			else
@@ -242,6 +250,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
 			end
 		end
 		return (enabled and "Enabled" or "Disabled").." Driving Debug"
+
+	elseif debug_type == "vehicle" then
+		if not enabled then
+			-- remove vehicle debug
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					s.removePopup(peer_id, vehicle_object.ui_id)
+				end
+			end
+		end
+		return (enabled and "Enabled" or "Disabled").." Vehicle Debug"
 	end
 end
 
@@ -266,7 +285,8 @@ function Debugging.setDebug(d_type, peer_id)
 		[2] = "profiler",
 		[3] = "map",
 		[4] = "graph_node",
-		[5] = "driving"
+		[5] = "driving",
+		[6] = "vehicle"
 	}
 
 	local ignore_all = { -- debug types to ignore from enabling and/or disabling with ?impwep debug all

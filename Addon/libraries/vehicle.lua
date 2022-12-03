@@ -557,11 +557,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		end
 	end
 
-
 	-- if it still was unable to find a island to spawn at
 	if not g_savedata.islands[selected_spawn] and selected_spawn ~= g_savedata.ai_base_island.index then
 		if Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "scout" then -- make the scout spawn at the ai's main base
 			selected_spawn_transform = g_savedata.ai_base_island.transform
+			selected_spawn = g_savedata.ai_base_island.index
 		else
 			d.print("(Vehicle.spawn) was unable to find island to spawn at!\nIsland Index: "..selected_spawn.."\nVehicle Type: "..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "").."\nVehicle Role: "..Tags.getValue(selected_prefab.vehicle.tags, "role", true), true, 1)
 			return false, "was unable to find island to spawn at"
@@ -569,6 +569,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	local island = g_savedata.ai_base_island.index == selected_spawn and g_savedata.ai_base_island or g_savedata.islands[selected_spawn]
+
+	if not island then
+		d.print(("(Vehicle.spawn) no island found with the selected spawn of: %s. \nVehicle type: %s Vehicle role: %s"):format(tostring(selected_spawn), string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", ""), Tags.getValue(selected_prefab.vehicle.tags, "role", true)), false, 1)
+		return false, ("(Vehicle.spawn) no island found with the selected spawn of: %s. \nVehicle type: %s Vehicle role: %s"):format(tostring(selected_spawn), string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", ""), Tags.getValue(selected_prefab.vehicle.tags, "role", true))
+	end
 
 	d.print("(Vehicle.spawn) island: "..island.name, true, 0)
 
@@ -697,6 +702,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
 			role = Tags.getValue(selected_prefab.vehicle.tags, "role", true) or "general",
 			size = spawned_objects.spawned_vehicle.size or "small",
+			main_body = Tags.getValue(selected_prefab.vehicle.tags, "main_body") or 0,
 			holding_index = 1,
 			holding_target = m.translation(home_x, home_y, home_z),
 			spawnbox_index = spawnbox_index,
@@ -717,7 +723,9 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0 * stats_multiplier,
 				convoy_modifier = 0
 			},
-			driving = {}, -- used for driving the vehicle itself, holds special data depending on the vehicle type
+			driving = { -- used for driving the vehicle itself, holds special data depending on the vehicle type
+				ui_id = s.getMapID()
+			},
 			capabilities = {
 				gps_target = Tags.has(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
 				gps_missile = Tags.has(selected_prefab.vehicle.tags, "GPS_MISSILE"), -- used to press a button to fire the missiles
@@ -879,10 +887,10 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 		return false
 	end
 
-	if vehicle_object.is_killed ~= true and not kill_instantly then
+	--[[if vehicle_object.is_killed ~= true and not kill_instantly then
 		d.print(debug_prefix.."Vehicle "..tostring(vehicle_id).." is already killed!", true, 1)
 		return false
-	end
+	end]]
 
 	d.print(debug_prefix..vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
 

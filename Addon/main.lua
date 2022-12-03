@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0.86)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.0.87)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -121,6 +121,7 @@ local built_locations = {}
 local flag_prefab = nil
 local is_dlc_weapons = false
 local g_debug_speed_multiplier = 1
+local g_air_vehicles_kamikaze = false
 
 local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
 
@@ -286,7 +287,8 @@ g_savedata = {
 		profiler = false,
 		map = false,
 		graph_node = false,
-		driving = false
+		driving = false,
+		vehicle = false
 	},
 	tick_extensions = {
 		cargo_vehicle_spawn = 0
@@ -463,6 +465,7 @@ function warningChecks(peer_id)
 	-- if they are in a development verison
 	if IS_DEVELOPMENT_VERSION then
 		d.print("Hey! Thanks for using and testing a development version! Just note you will very likely experience errors!", false, 0, peer_id)
+		--d.print("VERY COOL DEBUG VERSION!", false, 0, peer_id)
 	end
 
 	-- get version data, to check if world is outdated
@@ -485,7 +488,7 @@ end
 -- checkbox settings
 local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
 local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
-local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs and transports resources to make more vehicles)", "true")
+local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs to transport resources to make more vehicles)", "true")
 local AIR_CRASH_MODE_BOX = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
 
 function onCreate(is_world_create)
@@ -681,6 +684,16 @@ function onCreate(is_world_create)
 
 			-- set the ai's main base as a random one of the furthest 25% of the islands
 			local ai_base_index = possible_ai_islands[math.random(math.ceil(#possible_ai_islands * 0.25))].index
+
+			-- haha harbour base override go brr
+			--[[
+			for island_index, island in pairs(islands) do
+				if island.name == "Harbour Base" then
+					ai_base_index = island_index
+					d.print("haha harbour base override go brr", false, 0)
+				end
+			end
+			]]
 
 			d.print("AI base index:"..tostring(ai_base_index), true, 0)
 
@@ -1093,11 +1106,15 @@ local player_commands = {
 			desc = "queues a convoy to be sent out, will be sent out once theres not any convoys.",
 			args = "",
 			example = "?icm queue_convoy"
+		},
+		airvehicleskamikaze = {
+			short_desc = "kamikaze.",
+			desc = "forces all air vehicles to have their target coordinates set to the target's position, when they have a target.",
+			args = "",
+			example = "?icm air_vehicles_kamikaze"
 		}
 	},
-	host = {
-
-	}
+	host = {}
 }
 
 local command_aliases = {
@@ -1114,7 +1131,8 @@ local command_aliases = {
 	vl = "vehiclelist",
 	listvehicles = "vehiclelist",
 	tp = "teleport",
-	teleport_vehicle = "teleport"
+	teleport_vehicle = "teleport",
+	kamikaze = "airvehicleskamikaze"
 }
 
 function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
@@ -1431,7 +1449,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				profiler = 2,
 				map = 3,
 				graphnode = 4,
-				driving = 5
+				driving = 5,
+				vehicle = 6
 			}
 
 			if not arg[1] then
@@ -1833,6 +1852,9 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "queueconvoy" then
 			g_savedata.tick_extensions.cargo_vehicle_spawn = RULES.LOGISTICS.CARGO.VEHICLES.spawn_time - g_savedata.tick_counter - 1
 			d.print("Updated convoy tick extension so a convoy will spawn when possible.", false, 0, peer_id)
+		elseif command == "airvehicleskamikaze" then
+			g_air_vehicles_kamikaze = not g_air_vehicles_kamikaze
+			d.print(("g_air_vehicles_kamikaze set to %s"):format(tostring(g_air_vehicles_kamikaze)))
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -2065,7 +2087,8 @@ function onPlayerJoin(steam_id, name, peer_id)
 				profiler = false,
 				map = false,
 				graph_node = false,
-				driving = false
+				driving = false,
+				vehicle = false
 			},
 			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
@@ -2145,10 +2168,19 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 		local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
 
 		if vehicle_object and squad_index then
+
+			--d.print(("body_id: %i\ndamage: %s\nmain_body_id: %i"):format(body_id, amount, vehicle_object.main_body), true, 0)
+
 			if body_id == 0 or body_id == vehicle_object.main_body then -- makes sure the damage was on the ai's main body
-				if vehicle_object.current_damage == nil then vehicle_object.current_damage = 0 end
+				if vehicle_object.current_damage == nil then 
+					vehicle_object.current_damage = 0 
+					d.print("reset damage", true, 0)
+				end
+
 				local damage_prev = vehicle_object.current_damage
 				vehicle_object.current_damage = vehicle_object.current_damage + amount
+
+				--d.print("current damage: "..vehicle_object.current_damage)
 
 				local enemy_hp = vehicle_object.health * g_savedata.settings.ENEMY_HP_MODIFIER
 
@@ -2230,21 +2262,23 @@ function cleanVehicle(squad_index, vehicle_id)
 	local vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
 
 	d.print("cleaning vehicle: "..vehicle_id, true, 0)
-	if d.getDebug(3) then
-		s.removeMapObject(-1, vehicle_object.ui_id)
-		s.removeMapLabel(-1, vehicle_object.ui_id)
-		s.removeMapLine(-1, vehicle_object.ui_id)
-		for i = 0, #vehicle_object.path - 1 do
-			local waypoint = vehicle_object.path[i]
-			if waypoint then
-				s.removeMapLine(-1, waypoint.ui_id)
-			end
+
+	s.removeMapObject(-1, vehicle_object.ui_id)
+	s.removeMapLabel(-1, vehicle_object.ui_id)
+	s.removeMapLine(-1, vehicle_object.ui_id)
+	for i = 0, #vehicle_object.path - 1 do
+		local waypoint = vehicle_object.path[i]
+		if waypoint then
+			s.removeMapLine(-1, waypoint.ui_id)
 		end
 	end
 
-	if d.getDebug(5) then
-		s.removeMapLine(-1, vehicle_object.driving.ui_id)
-	end
+	s.removeMapLine(-1, vehicle_object.driving.ui_id)
+
+	s.removePopup(-1, vehicle_object.ui_id)
+
+	s.removeMapID(-1, vehicle_object.ui_id)
+	s.removeMapID(-1, vehicle_object.driving.ui_id)
 
 	-- remove it from the sweep and prune pairs
 	g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
@@ -4077,12 +4111,29 @@ function tickSquadrons()
 						-- make sure we have a target position and target id
 						if target_pos and target_id then
 
-							if #vehicle_object.path < 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE and target_pos[14] <= 50 and vehicle_object.state.is_simulating then -- if we dont have any more paths
+							if g_air_vehicles_kamikaze and (vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or vehicle_object.vehicle_type == VEHICLE.TYPE.HELI) then
+
+								p.resetPath(vehicle_object)
+								p.addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
+								s.setAITarget(vehicle_object.survivors[1].id, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
+
+								if m.xzDistance(vehicle_object.transform, m.translation(target_pos[13], target_pos[14], target_pos[15])) < 100 then
+									s.setAIState(vehicle_object.survivors[1].id, 0)
+									s.setCharacterData(vehicle_object.survivors[1].id, 1, true, false)
+									--d.print("murder.")
+								else
+									s.setAIState(vehicle_object.survivors[1].id, 2)
+								end
+								
+
+							elseif #vehicle_object.path < 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE and target_pos[14] <= 50 and vehicle_object.state.is_simulating then -- if we dont have any more paths
 								
 								-- reset its path
 								if #vehicle_object.path < 1 then
 									p.resetPath(vehicle_object)
 								end
+
+								
 
 								if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE then -- if this vehicle is a plane
 									if vehicle_object.strategy == "strafing" then -- if the plane has a strategy of strafing
@@ -4169,7 +4220,9 @@ function tickSquadrons()
 								end
 	
 								if i ~= 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
-									s.setAIState(char.id, 1)
+									if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
+										s.setAIState(char.id, 1)
+									end
 								end
 							end
 						end
@@ -4327,9 +4380,98 @@ function tickVehicles()
 		debug_mode_blinker = not debug_mode_blinker
 	end
 
+	-- save vehicle transform, and update vehicle debug
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+
+			if not vehicle_object.state.is_simulating then
+				goto continue_tickVehicles_updateTransform
+			end
+
+			vehicle_object.transform, is_success = s.getVehiclePos(vehicle_id)
+
+			vehicle_object.transform_history[getTickID(vehicle_id, 120)] = vehicle_object.transform
+
+			if d.getDebug(6) then
+				local text = ""
+
+				-- name
+				text = text..vehicle_object.name
+				
+				-- Vehicle ID
+				text = text..("\nVehicle ID: %s"):format(vehicle_id)
+
+				local pos_last = vehicle_object.transform_history[getTickID(vehicle_id - 30, 120)]
+
+				if pos_last then
+					-- velocity
+					local velocity = m.velocity(server.getVehiclePos(vehicle_id), pos_last, 30)
+
+					text = text..("\n\nVel: %0.3f"):format(velocity)
+
+					local pos_second_last = vehicle_object.transform_history[getTickID(vehicle_id - 60, 120)]
+					if pos_second_last then
+						-- acceleration
+						local acceleration = m.acceleration(s.getVehiclePos(vehicle_id), pos_last, pos_second_last, 30)
+
+						text = text..("\nAccel: %0.3f"):format(acceleration)
+					end
+				end
+
+				for peer_index, peer in pairs(s.getPlayers()) do
+					if d.getDebug(6, peer.id) then
+						if pos_last then
+							s.setPopup(peer.id, vehicle_object.ui_id, "", true, text, 0, 0, 0, 2500, vehicle_id)
+						end
+					end
+				end
+			end
+
+			::continue_tickVehicles_updateTransform::
+		end
+	end
+
 	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
 			if isTickID(vehicle_id, vehicle_update_tickrate) then
+
+				-- if air crash mode is enabled
+				-- then we want to check if this vehicle is a plane or heli
+				-- if it is, we want to see how much its moved
+				-- and compare it to the previous time we checked, if its a large difference, then we make it explode.
+				if g_savedata.settings.AIR_CRASH_MODE and vehicle_object.state.is_simulating then
+					if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
+
+						-- get its previous positions
+
+						-- position from 30 (vehicle_update_tickrate) ticks ago
+						local last_pos = vehicle_object.transform_history[getTickID(vehicle_id - vehicle_update_tickrate, 120)]
+
+						-- position from 60 (vehicle_update_tickrate*2) ticks ago
+						local second_last_pos = vehicle_object.transform_history[getTickID(vehicle_id - vehicle_update_tickrate * 2, 120)]
+
+						-- make sure they both exist
+						if last_pos and second_last_pos then
+
+							local total_vel_change = math.abs(m.acceleration(vehicle_object.transform, last_pos, second_last_pos, vehicle_update_tickrate))
+
+							--[[
+								if its velocity changed too much from the last, then it likely crashed
+								as well, if it's position changed too little from previous, then it also likely crashed
+							]]
+
+							local total_pos_change = m.distance(second_last_pos, vehicle_object.transform)*(vehicle_update_tickrate*2)/60
+
+							--d.print("Pos change from last: "..(total_pos_change), true, 0)
+
+							if total_vel_change >= 50 or total_pos_change < 0.012 then
+								d.print(("Vehicle %s (%i) Crashed! (total_vel_change: %s total_pos_change: %s)"):format(vehicle_object.name, vehicle_id, total_vel_change, total_pos_change), true, 0)
+								v.kill(vehicle_id, true)
+								goto break_vehicle
+							end
+						end
+					end
+				end
 
 				-- make sure the vehicle isn't killed
 				if vehicle_object.is_killed then
@@ -4397,36 +4539,6 @@ function tickVehicles()
 						end
 					end
 					goto break_vehicle
-				end
-
-				-- if air crash mode is enabled
-				-- then we want to check if this vehicle is a plane or heli
-				-- if it is, we want to see how much its moved
-				-- and compare it to the previous time we checked, if its a large difference, then we make it explode.
-				if g_savedata.settings.AIR_CRASH_MODE and vehicle_object.state.is_simulating then
-					if vehicle_object.vehicle_type == VEHICLE.TYPE.PLANE or vehicle_object.vehicle_type == VEHICLE.TYPE.HELI then
-
-						-- get its previous positions
-						local last_pos = vehicle_object.transform_history[getTickID(vehicle_id - vehicle_update_tickrate, vehicle_update_tickrate*2)/vehicle_update_tickrate]
-						local second_last_pos = vehicle_object.transform_history[getTickID(vehicle_id, vehicle_update_tickrate*2)/vehicle_update_tickrate]
-
-						-- make sure they both exist
-						if last_pos and second_last_pos then
-							local last_change = math.abs(last_pos[13] - second_last_pos[13]) + math.abs(last_pos[14] - second_last_pos[14]) + math.abs(last_pos[15] - second_last_pos[15])
-							local cur_change = math.abs(vehicle_object.transform[13] - last_pos[13]) + math.abs(vehicle_object.transform[14] - last_pos[14]) + math.abs(vehicle_object.transform[15] - last_pos[15])
-
-							local total_change = math.abs(cur_change - last_change)*vehicle_update_tickrate/60
-
-							--d.print("Change from last: "..(total_change), true, 0)
-
-							if total_change >= 90 or total_change < 0.001 then
-								d.print(("Vehicle %s (%i) Crashed! (total_change: %s)"):format(vehicle_object.name, vehicle_id, total_change), true, 0)
-								v.kill(vehicle_id, true)
-							end
-						end
-
-						vehicle_object.transform_history[getTickID(vehicle_id, vehicle_update_tickrate*2)/vehicle_update_tickrate] = vehicle_object.transform
-					end
 				end
 
 				local ai_target = nil
@@ -4580,8 +4692,10 @@ function tickVehicles()
 					--set ai behaviour
 					if ai_target ~= nil then
 						if vehicle_object.state.is_simulating then
-							s.setAITarget(vehicle_object.survivors[1].id, ai_target)
-							s.setAIState(vehicle_object.survivors[1].id, ai_state)
+							if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
+								s.setAITarget(vehicle_object.survivors[1].id, ai_target)
+								s.setAIState(vehicle_object.survivors[1].id, ai_state)
+							end
 						else
 							local exhausted_movement = false
 							local pseudo_speed_modifier = 0
@@ -5378,7 +5492,7 @@ function tickControls()
 					vehicle_object.driving = {
 						old_pos = m.translation(0, 0, 0),
 						reverse_timer = reverse_timer_max/2,
-						ui_id = s.getMapID()
+						ui_id = vehicle_object.driving.ui_id
 					}
 				end
 
