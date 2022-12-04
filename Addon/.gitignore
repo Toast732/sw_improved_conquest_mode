@@ -1,0 +1,7 @@
+!_build/
+_build/*
+!_build/out/
+_build/out/*
+!_build/out/release/
+_build/out/release/*
+!_build/out/release/main.lua
