@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.1.1)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -4467,15 +4467,9 @@ function tickVehicles()
 							if total_vel_change >= 50 or total_pos_change < 0.012 then
 								d.print(("Vehicle %s (%i) Crashed! (total_vel_change: %s total_pos_change: %s)"):format(vehicle_object.name, vehicle_id, total_vel_change, total_pos_change), true, 0)
 								v.kill(vehicle_id, true)
-								goto break_vehicle
 							end
 						end
 					end
-				end
-
-				-- make sure the vehicle isn't killed
-				if vehicle_object.is_killed then
-					goto break_vehicle
 				end
 
 				-- scout vehicles
@@ -4538,7 +4532,7 @@ function tickVehicles()
 							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					end
-					goto break_vehicle
+					goto continue_vehicle
 				end
 
 				local ai_target = nil
@@ -4950,7 +4944,7 @@ function tickVehicles()
 					end
 				end
 			end
-			::break_vehicle::
+			::continue_vehicle::
 		end
 	end
 	d.stopProfiler("tickVehicles()", true, "onTick()")

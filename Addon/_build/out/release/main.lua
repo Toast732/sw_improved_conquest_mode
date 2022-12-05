@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.0)"
+local IMPROVED_CONQUEST_VERSION = "(0.3.1.1)"
 local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
 
 -- valid values:
@@ -2951,6 +2951,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local turret_count = 0
 		local unoccupied_zones = {}
 
+		if #island.zones.turrets == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no turret spawn zones!"):format(island.name), true, 1)
+			return false, ("Island %s has no turret spawn zones!"):format(island.name)
+		end
+
 		-- count the amount of turrets this island has spawned
 		for turret_zone_index = 1, #island.zones.turrets do
 			if island.zones.turrets[turret_zone_index].is_spawned then 
@@ -2969,6 +2974,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				-- add the zone to a list to be picked from for spawning the next turret
 				table.insert(unoccupied_zones, turret_zone_index)
 			end
+		end
+
+		if #unoccupied_zones == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true)), true, 1)
+			return false, ("Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true))
 		end
 
 		-- pick a spawn location out of the list which is unoccupied
@@ -5110,6 +5120,29 @@ function Compatibility.getVersionID(version)
 	return nil, false
 end
 
+--# splits a version into 
+---@param version string the version you want split
+---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
+function Compatibility.splitVersion(version) -- credit to woe
+	local T = {}
+
+	-- remove ( and )
+	version = version:match("[%d.]+")
+
+	for S in version:gmatch("([^%.]*)%.*") do
+		T[#T+1] = tonumber(S) or S
+	end
+
+	T = {
+		T[1], -- release
+		T[2], -- majour
+		T[3], -- minor
+		T[4] -- commit
+	}
+
+	return T
+end
+
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
 ---@return string version the version associated with the id
@@ -5177,13 +5210,48 @@ function Compatibility.getVersionData(version)
 	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
 
 	-- (4) count how many versions out of date the data is
+
+	local current_version = comp.splitVersion(version_data.data_version)
+
+	local ids_to_versions = {
+		"Release",
+		"Majour",
+		"Minor",
+		"Commit"
+	}
+
 	for _, version_name in ipairs(version_updates) do
+
 		--[[
 			first, we want to check if the release version is greater (x.#.#.#)
 			if not, second we want to check if the majour version is greater (#.x.#.#)
 			if not, third we want to check if the minor version is greater (#.#.x.#)
 			if not, lastly we want to check if the commit version is greater (#.#.#.x)
 		]]
+
+		local update_version = comp.splitVersion(version_name)
+
+		--[[
+			go through each version, and check if its newer than our current version
+		]]
+		for i = 1, #current_version do
+			if not current_version[i] or current_version[i] > update_version[i] then
+				--[[
+					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
+					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
+				]]
+				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+				break
+			elseif current_version[i] < update_version[i] then
+				-- current version is older, so we need to migrate data.
+				table.insert(version_data.newer_versions, version_name)
+				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
+				break
+			end
+
+			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+		end
+
 
 		-- (4.1) check if release version is outdated (x.#.#.#)
 		if (math.tointeger(string.match(version_name, "%((%d+)%.")) or 0) > (math.tointeger(string.match(version_data.data_version, "%((%d+)%.")) or 0) then
@@ -9544,15 +9612,9 @@ function tickVehicles()
 							if total_vel_change >= 50 or total_pos_change < 0.012 then
 								d.print(("Vehicle %s (%i) Crashed! (total_vel_change: %s total_pos_change: %s)"):format(vehicle_object.name, vehicle_id, total_vel_change, total_pos_change), true, 0)
 								v.kill(vehicle_id, true)
-								goto break_vehicle
 							end
 						end
 					end
-				end
-
-				-- make sure the vehicle isn't killed
-				if vehicle_object.is_killed then
-					goto break_vehicle
 				end
 
 				-- scout vehicles
@@ -9615,7 +9677,7 @@ function tickVehicles()
 							d.print("Killing Cargo Vehicle "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					end
-					goto break_vehicle
+					goto continue_vehicle
 				end
 
 				local ai_target = nil
@@ -10027,7 +10089,7 @@ function tickVehicles()
 					end
 				end
 			end
-			::break_vehicle::
+			::continue_vehicle::
 		end
 	end
 	d.stopProfiler("tickVehicles()", true, "onTick()")

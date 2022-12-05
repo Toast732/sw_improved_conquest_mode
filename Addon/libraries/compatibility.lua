@@ -189,6 +189,29 @@ function Compatibility.getVersionID(version)
 	return nil, false
 end
 
+--# splits a version into 
+---@param version string the version you want split
+---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
+function Compatibility.splitVersion(version) -- credit to woe
+	local T = {}
+
+	-- remove ( and )
+	version = version:match("[%d.]+")
+
+	for S in version:gmatch("([^%.]*)%.*") do
+		T[#T+1] = tonumber(S) or S
+	end
+
+	T = {
+		T[1], -- release
+		T[2], -- majour
+		T[3], -- minor
+		T[4] -- commit
+	}
+
+	return T
+end
+
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
 ---@return string version the version associated with the id
@@ -256,7 +279,18 @@ function Compatibility.getVersionData(version)
 	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
 
 	-- (4) count how many versions out of date the data is
+
+	local current_version = comp.splitVersion(version_data.data_version)
+
+	local ids_to_versions = {
+		"Release",
+		"Majour",
+		"Minor",
+		"Commit"
+	}
+
 	for _, version_name in ipairs(version_updates) do
+
 		--[[
 			first, we want to check if the release version is greater (x.#.#.#)
 			if not, second we want to check if the majour version is greater (#.x.#.#)
@@ -264,28 +298,27 @@ function Compatibility.getVersionData(version)
 			if not, lastly we want to check if the commit version is greater (#.#.#.x)
 		]]
 
-		-- (4.1) check if release version is outdated (x.#.#.#)
-		if (math.tointeger(string.match(version_name, "%((%d+)%.")) or 0) > (math.tointeger(string.match(version_data.data_version, "%((%d+)%.")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new release version: "..version_name.." current version: "..version_data.data_version, false, 0)
+		local update_version = comp.splitVersion(version_name)
 
-		-- (4.2) check if majour version is outdated (#.x.#.#)
-		elseif (math.tointeger(string.match(version_name, "%(%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.(%d+)")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new majour version: "..version_name.." current version: "..version_data.data_version, false, 0)
-
-		-- (4.3) check if minor version is outdated (#.#.x.#)
-		elseif (math.tointeger(string.match(version_name, "%(%d+%.%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.(%d+)")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new minor version: "..version_name.." current version: "..version_data.data_version, false, 0)
-		
-		-- (4.4) check if commit version is outdated (#.#.#.x)
-		-- if commit version is not specified for our current version, we're newer than the ones that do, so dont go forwards.
-		elseif math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) then
-			if (math.tointeger(string.match(version_name, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) then
+		--[[
+			go through each version, and check if its newer than our current version
+		]]
+		for i = 1, #current_version do
+			if not current_version[i] or current_version[i] > update_version[i] then
+				--[[
+					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
+					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
+				]]
+				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+				break
+			elseif current_version[i] < update_version[i] then
+				-- current version is older, so we need to migrate data.
 				table.insert(version_data.newer_versions, version_name)
-				d.print("found new commit version: "..version_name.." current version: "..version_data.data_version, false, 0)
+				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
+				break
 			end
+
+			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
 		end
 	end
 
