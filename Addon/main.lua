@@ -22,23 +22,16 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-local IMPROVED_CONQUEST_VERSION = "(0.3.1.1)"
-local IS_DEVELOPMENT_VERSION = string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d%.%d)")
+ADDON_VERSION = "(0.3.1.2)"
+IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
--- valid values:
--- "TRUE" if this version will be able to run perfectly fine on old worlds 
--- "FULL_RELOAD" if this version will need to do a full reload to work properly
--- "FALSE" if this version has not been tested or its not compatible with older versions
-local IS_COMPATIBLE_WITH_OLDER_VERSIONS = "FALSE"
-
-local just_migrated = false
+SHORT_ADDON_NAME = "ICM"
 
 -- shortened library names
-local m = matrix
-local s = server
-local LifeBoatAPI = {}
+m = matrix
+s = server
 
-local ISLAND = {
+ISLAND = {
 	FACTION = {
 		NEUTRAL = "neutral",
 		AI = "ai",
@@ -46,7 +39,7 @@ local ISLAND = {
 	}
 }
 
-local VEHICLE = {
+VEHICLE = {
 	STATE = {
 		PATHING = "pathing", -- follow path
 		HOLDING = "holding", -- hold position
@@ -76,37 +69,37 @@ local VEHICLE = {
 	}
 }
 
-local CONVOY = {
+CONVOY = {
 	MOVING = "moving",
 	WAITING = "waiting"
 }
 
-local time = { -- the time unit in ticks, irl time, not in game
+time = { -- the time unit in ticks, irl time, not in game
 	second = 60,
 	minute = 3600,
 	hour = 216000,
 	day = 5184000
 }
 
-local MAX_SQUAD_SIZE = 3
-local MIN_ATTACKING_SQUADS = 2
-local MAX_ATTACKING_SQUADS = 3
+MAX_SQUAD_SIZE = 3
+MIN_ATTACKING_SQUADS = 2
+MAX_ATTACKING_SQUADS = 3
 
-local TARGET_VISIBILITY_VISIBLE = "visible"
-local TARGET_VISIBILITY_INVESTIGATE = "investigate"
+TARGET_VISIBILITY_VISIBLE = "visible"
+TARGET_VISIBILITY_INVESTIGATE = "investigate"
 
-local REWARD = "reward"
-local PUNISH = "punish"
+REWARD = "reward"
+PUNISH = "punish"
 
-local RESUPPLY_SQUAD_INDEX = 1
+RESUPPLY_SQUAD_INDEX = 1
 
-local CAPTURE_RADIUS = 1500
-local RESUPPLY_RADIUS = 200
-local ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
+CAPTURE_RADIUS = 1500
+RESUPPLY_RADIUS = 200
+ISLAND_CAPTURE_AMOUNT_PER_SECOND = 1
 
-local WAYPOINT_CONSUME_DISTANCE = 100
+WAYPOINT_CONSUME_DISTANCE = 100
 
-local explosion_depths = {
+explosion_depths = {
 	plane = -4,
 	land = -4,
 	heli = -4,
@@ -114,21 +107,21 @@ local explosion_depths = {
 	turret = -999
 }
 
-local DEFAULT_SPAWNING_DISTANCE = 10 -- the fallback option for how far a vehicle must be away from another in order to not collide, highly reccomended to set tag
+DEFAULT_SPAWNING_DISTANCE = 10 -- the fallback option for how far a vehicle must be away from another in order to not collide, highly reccomended to set tag
 
-local CRUISE_HEIGHT = 300
-local built_locations = {}
-local flag_prefab = nil
-local is_dlc_weapons = false
-local g_debug_speed_multiplier = 1
-local g_air_vehicles_kamikaze = false
+CRUISE_HEIGHT = 300
+built_locations = {}
+flag_prefab = nil
+is_dlc_weapons = false
+g_debug_speed_multiplier = 1
+g_air_vehicles_kamikaze = false
 
-local debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
+debug_mode_blinker = false -- blinks between showing the vehicle type icon and the vehicle command icon on the map
 
 -- please note: this is not machine learning, this works by making a
 -- vehicle spawn less or more often, depending on the damage it did
 -- compared to the damage it has taken
-local ai_training = {
+ai_training = {
 	punishments = {
 		-0.1,
 		-0.2,
@@ -145,15 +138,15 @@ local ai_training = {
 	}
 }
 
-local scout_requirement = time.minute*40
+scout_requirement = time.minute*40
 
-local capture_speeds = {
+capture_speeds = {
 	1,
 	1.5,
 	1.75
 }
 
-local g_holding_pattern = {
+g_holding_pattern = {
 	{
 		x=500, 
 		z=500
@@ -172,15 +165,13 @@ local g_holding_pattern = {
 	}
 }
 
-local g_is_air_ready = true
-local g_is_boats_ready = false
-local g_count_squads = 0
-local g_count_attack = 0
-local g_count_patrol = 0
+g_is_air_ready = true
+g_is_boats_ready = false
+g_count_squads = 0
+g_count_attack = 0
+g_count_patrol = 0
 
-local tau = math.pi*2
-
-local SQUAD = {
+SQUAD = {
 	COMMAND = {
 		NONE = "no_command", -- no command
 		ATTACK = "attack", -- attack island
@@ -224,7 +215,7 @@ g_savedata = {
 	info = {
 		version_history = {
 			{
-				version = IMPROVED_CONQUEST_VERSION,
+				version = ADDON_VERSION,
 				ticks_played = 0,
 				backup_g_savedata = {}
 			}
@@ -523,11 +514,6 @@ function onCreate(is_world_create)
 
 	is_dlc_weapons = s.dlcWeapons()
 
-	if just_migrated then
-		comp.showSaveMessage()
-		return
-	end
-
 	-- checks for Vanilla Conquest Mode addon
 	local addon_index, is_success = s.getAddonIndex("DLC Weapons AI")
 	if is_success then
@@ -547,17 +533,9 @@ function onCreate(is_world_create)
 
 	warningChecks(-1)
 
-	--[[if g_savedata.info.awaiting_reload ~= false then
-		for i = 1, g_savedata.settings.AI_INITIAL_SPAWN_COUNT * math.min(math.max(g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT, 1), #g_savedata.islands - 1) do
-			v.spawn() -- spawn initial ai
-		end
-		d.print("Lastly, you need to save the world and then load that save to complete the full reload", false, 0)
-		g_savedata.info.awaiting_reload = false
-	end]]
-
 	if is_dlc_weapons then
 
-		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..IMPROVED_CONQUEST_VERSION, 0)
+		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..ADDON_VERSION, 0)
 
 		setupRules()
 		
@@ -584,9 +562,12 @@ function onCreate(is_world_create)
 			d.print("setting up world...", true, 0)
 
 			d.print("getting y level of all graph nodes...", true, 0)
-			-- cause createPathY to execute, which will get the y level of all graph nodes
-			-- otherwise the game would freeze for a bit after the player loaded in, looking like the game froze
-			-- instead it looks like its taking a bit longer to create the world.
+
+			--[[ 
+				cause createPathY to execute, which will get the y level of all graph nodes
+				otherwise the game would freeze for a bit after the player loaded in, looking like the game froze
+				instead it looks like its taking a bit longer to create the world.
+			]]
 			s.pathfind(m.translation(0, 0, 0), m.translation(0, 0, 0), "", "") 
 
 			d.print("setting up spawn zones...", true, 0)
@@ -791,6 +772,7 @@ function onCreate(is_world_create)
 				g_savedata.islands[new_island.index] = new_island
 				d.print("Setup island: "..new_island.index.." \""..island.name.."\"", true, 0)
 
+				-- stop creating new islands if we've reached the island limit
 				if(#g_savedata.islands >= g_savedata.settings.ISLAND_COUNT) then
 					break
 				end
@@ -824,7 +806,7 @@ function onCreate(is_world_create)
 			for i = 1, g_savedata.settings.AI_INITIAL_ISLAND_AMOUNT do
 				if i <= #g_savedata.islands - 2 then
 					local t, a = Objective.getIslandToAttack()
-					t.capture_timer = 0 -- capture nearest ally
+					t.capture_timer = 0 -- causes the AI to capture nearest ally
 					t.faction = ISLAND.FACTION.AI
 					t.cargo = {
 						oil = math.random(350, 1000),
@@ -835,8 +817,6 @@ function onCreate(is_world_create)
 			end
 
 			d.print("completed setting up world!", true, 0)
-
-			-- if the world was just created like normal
 
 			d.print("spawning initial ai vehicles...", true, 0)
 				
@@ -935,7 +915,7 @@ function buildPrefabs(location_index)
 	end
 end
 
-local player_commands = {
+player_commands = {
 	normal = {
 		info = {
 			short_desc = "prints info about the mod",
@@ -1117,7 +1097,7 @@ local player_commands = {
 	host = {}
 }
 
-local command_aliases = {
+command_aliases = {
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
@@ -1144,17 +1124,6 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		return
 	end
 
-	--? if dlc_weapons is disabled or the player does not have it (if in singleplayer)
-	if not is_dlc_weapons then
-
-		--? if vanilla conquest mode was left enabled
-		if g_savedata.info.addons.default_conquest_mode then
-			d.print("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, 1, peer_id)
-		end
-
-		return
-	end
-
 	--? if they didn't enter a command
 	if not command then
 		d.print("you need to specify a command! use\n\"?impwep help\" to get a list of all commands!", false, 1, peer_id)
@@ -1168,6 +1137,32 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	command = string.friendly(command, true) -- makes the command friendly, removing underscores, spaces and captitals
 	local arg = table.pack(...) -- this will supply all the remaining arguments to the function
 
+	--? if dlc_weapons is disabled or the player does not have it (if in singleplayer)
+	if not is_dlc_weapons then
+
+		if not full_message:match("-f") then
+
+			--? if vanilla conquest mode was left enabled
+			if g_savedata.info.addons.default_conquest_mode then
+				d.print("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, 1, peer_id)
+			end
+
+			d.print("Error: Improved Conquest Mode has been disabled.", false, 1, peer_id)
+
+			return
+		end
+
+		d.print("Bypassed addon being disabled!", false, 0, peer_id)
+
+		-- remove -f from the args
+
+		for argument = 1, #arg do
+			if arg[argument] == "-f" then
+				table.remove(arg, argument)
+			end
+		end
+	end
+
 	--? if this command is an alias
 	if command_aliases[command] then
 		command = command_aliases[command]
@@ -1178,7 +1173,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	--
 	if command == "info" then
 		d.print("------ Improved Conquest Mode Info ------", false, 0, peer_id)
-		d.print("Version: "..IMPROVED_CONQUEST_VERSION, false, 0, peer_id)
+		d.print("Version: "..ADDON_VERSION, false, 0, peer_id)
 		if not g_savedata.info.addons.ai_paths then
 			d.print("AI Paths Disabled (will cause ship pathfinding issues)", false, 1, peer_id)
 		end
@@ -1329,9 +1324,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 									local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 									if found_new_location then
 										-- teleport vehicle to new position
-										local veh_x, veh_y, veh_z = m.position(new_location)
 										v.teleport(vehicle_data.id, new_location)
-										d.print("Spawned "..vehicle_data.name.." at x:"..veh_x.." y:"..veh_y.." z:"..veh_z, false, 0, peer_id)
+										d.print("Spawned "..vehicle_data.name.." at x:"..new_location[13].." y:"..new_location[14].." z:"..new_location[15], false, 0, peer_id)
 									else
 										-- delete vehicle as it was unable to find a valid position
 										v.kill(vehicle_data.id, true, true)
@@ -1832,7 +1826,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			d.print("---- addon info ----", false, 0, peer_id)
 
 			-- get the addon name
-			local addon_name = "Improved Conquest Mode (".. string.match(IMPROVED_CONQUEST_VERSION, "(%d%.%d%.%d)")..(IS_DEVELOPMENT_VERSION and ".dev)" or ")")
+			local addon_name = "Improved Conquest Mode (".. string.match(ADDON_VERSION, "(%d%.%d%.%d)")..(IS_DEVELOPMENT_VERSION and ".dev)" or ")")
 
 			-- addon index
 			local true_addon_index, true_is_success = s.getAddonIndex(addon_name)
@@ -2114,13 +2108,11 @@ function onPlayerJoin(steam_id, name, peer_id)
 			updatePeerIslandMapData(peer_id, island)
 		end
 
-		local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
 		s.removeMapObject(peer_id, g_savedata.ai_base_island.ui_id)
-		s.addMapObject(peer_id, g_savedata.ai_base_island.ui_id, 0, 10, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.." ("..g_savedata.ai_base_island.faction..")", 1, "", 255, 0, 0, 255)
+		s.addMapObject(peer_id, g_savedata.ai_base_island.ui_id, 0, 10, g_savedata.ai_base_island.transform[13], g_savedata.ai_base_island.transform[15], 0, 0, 0, 0, g_savedata.ai_base_island.name.." ("..g_savedata.ai_base_island.faction..")", 1, "", 255, 0, 0, 255)
 
-		local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
 		s.removeMapObject(peer_id, g_savedata.player_base_island.ui_id)
-		s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, ts_x, ts_z, 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
+		s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
 	end
 end
 
@@ -2760,8 +2752,6 @@ function tickGamemode()
 	-- update ai's main base island debug
 	if d.getDebug(3) then
 		if isTickID(0, 60) then
-		
-			local ts_x, ts_y, ts_z = m.position(g_savedata.ai_base_island.transform)
 
 			local plane_count = 0
 			local heli_count = 0
@@ -2827,11 +2817,10 @@ function tickGamemode()
 			for peer_index, peer in pairs(player_list) do
 				if d.getDebug(3, peer.id) then
 					s.removeMapObject(peer.id, g_savedata.ai_base_island.ui_id)
-					s.addMapObject(peer.id, g_savedata.ai_base_island.ui_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
+					s.addMapObject(peer.id, g_savedata.ai_base_island.ui_id, 0, 4, g_savedata.ai_base_island.transform[13], g_savedata.ai_base_island.transform[15], 0, 0, 0, 0, g_savedata.ai_base_island.name.."\nAI Base Island\n"..g_savedata.ai_base_island.production_timer.."/"..g_savedata.settings.AI_PRODUCTION_TIME_BASE.."\nIsland Index: "..g_savedata.ai_base_island.index, 1, debug_data, 255, 0, 0, 255)
 
-					local ts_x, ts_y, ts_z = m.position(g_savedata.player_base_island.transform)
 					s.removeMapObject(peer.id, g_savedata.player_base_island.ui_id)
-					s.addMapObject(peer.id, g_savedata.player_base_island.ui_id, 0, 4, ts_x, ts_z, 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
+					s.addMapObject(peer.id, g_savedata.player_base_island.ui_id, 0, 4, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, "Player Base Island", 1, debug_data, 0, 255, 0, 255)
 				end
 			end
 		end
@@ -2845,7 +2834,6 @@ end
 ---@param is_reset boolean if you want it to just reset the map, which will remove the island from the map instead of updating it
 function updatePeerIslandMapData(peer_id, island, is_reset)
 	if is_dlc_weapons then
-		local ts_x, ts_y, ts_z = m.position(island.transform)
 		s.removeMapObject(peer_id, island.ui_id)
 		if not is_reset then
 			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
@@ -2868,7 +2856,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 				b = 0
 			end
 			if not d.getDebug(3, peer_id) then -- checks to see if the player has debug mode disabled
-				s.addMapObject(peer_id, island.ui_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
+				s.addMapObject(peer_id, island.ui_id, 0, 9, island.transform[13], island.transform[15], 0, 0, 0, 0, island.name.." ("..island.faction..")"..extra_title, 1, cap_percent.."%", r, g, b, 255)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
 					local turret_amount = 0
@@ -2892,7 +2880,7 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 						debug_data = debug_data..("%s%.1f%s"):format("Jet Fuel: ", island.cargo.jet_fuel, "\n")
 					end
 
-					s.addMapObject(peer_id, island.ui_id, 0, 9, ts_x, ts_z, 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
+					s.addMapObject(peer_id, island.ui_id, 0, 9, island.transform[13], island.transform[15], 0, 0, 0, 0, island.name.." ("..island.faction..")\nisland.index: "..island.index..extra_title, 1, cap_percent.."%"..debug_data, r, g, b, 255)
 				end
 			end
 		end
@@ -4744,7 +4732,6 @@ function tickVehicles()
 				end
 
 				if d.getDebug(3) then
-					local vehicle_x, vehicle_y, vehicle_z = m.position(vehicle_object.transform)
 					local debug_data = ""
 					debug_data = debug_data.."Movement State: "..vehicle_object.state.s .. "\n"
 					debug_data = debug_data.."Waypoints: "..#vehicle_object.path .."\n\n"
@@ -4822,12 +4809,11 @@ function tickVehicles()
 						debug_data = debug_data.."Terrain Type: "..tostring(vehicle_object.terrain_type).."\n"
 					end
 
-					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_x) .. " ".. math.floor(vehicle_y) .. " ".. math.floor(vehicle_z) .. "]\n"
+					debug_data = debug_data .. "\nPos: [" .. math.floor(vehicle_object.transform[13]) .. " ".. math.floor(vehicle_object.transform[14]) .. " ".. math.floor(vehicle_object.transform[15]) .. "]\n"
 					if ai_target then
-						local ts_x, ts_y, ts_z = m.position(ai_target)
-						debug_data = debug_data .. "Dest: [" .. math.floor(ts_x) .. " ".. math.floor(ts_y) .. " ".. math.floor(ts_z) .. "]\n"
+						debug_data = debug_data .. "Dest: [" .. math.floor(ai_target[13]) .. " ".. math.floor(ai_target[14]) .. " ".. math.floor(ai_target[15]) .. "]\n"
 
-						local dist_to_dest = math.sqrt((ts_x - vehicle_x) ^ 2 + (ts_z - vehicle_z) ^ 2)
+						local dist_to_dest = m.xzDistance(vehicle_object.transform, ai_target)
 						debug_data = debug_data .. "Dist: " .. math.floor(dist_to_dest) .. "m\n"
 					end
 
@@ -4885,21 +4871,43 @@ function tickVehicles()
 						g = math.min(g + escort_modifier, 255)
 						b = math.min(b + escort_modifier, 255)
 					end
-					local player_list = s.getPlayers()
+
+					-- the marker type, aka, the icon of the vehicle on the map
+					local marker_type = vehicle_icon or 3
+
+					--[[
+						the name (title) of the marker when hovered over on the map
+						Format:
+							<Vehicle Name>
+							Vehicle ID: <vehicle_id>
+							Vehicle Type: <vehicle_type>
+					]]
+					local vehicle_name = ("%s\nVehicle ID: %i\nVehicle Type: %s"):format(vehicle_object.name, vehicle_object.id, vehicle_object.vehicle_type)
+
 					s.removeMapLine(-1, vehicle_object.ui_id)
 					s.removeMapObject(-1, vehicle_object.ui_id)
 					s.removeMapLabel(-1, vehicle_object.ui_id)
-					for peer_index, peer in pairs(player_list) do
-						if d.getDebug(3, peer.id) then
-							
-							s.addMapObject(peer.id, vehicle_object.ui_id, 1, vehicle_icon or 3, 0, 0, 0, 0, vehicle_id, 0, vehicle_object.name.."\nVehicle ID: "..vehicle_id.."\nVehicle Type: "..vehicle_object.vehicle_type, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 
+					for _, peer in pairs(s.getPlayers()) do
+						if d.getDebug(3, peer.id) then
+
+							--[[
+								parent it to the vehicle if the player we're drawing it for is the host or if the vehicle is simulating
+								as if a vehicle is unloaded, clients will not recieve the vehicle's position from the server, causing it
+								to instead be drawn at 0, 0
+							]]
+							if peer.id == 0 or vehicle.is_simulating then
+								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							else -- draw at direct coordinates instead
+								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+							end
+							
 							if(#vehicle_object.path >= 1) then
 
 								local waypoint_pos_next = m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)
 
 								-- get colour from angle
-								local angle = math.atan(waypoint_pos_next[13] - vehicle_object.transform[13], waypoint_pos_next[15] - vehicle_object.transform[15])/tau*math.pi
+								local angle = math.atan(waypoint_pos_next[13] - vehicle_object.transform[13], waypoint_pos_next[15] - vehicle_object.transform[15])/math.tau*math.pi
 
 								local colour_modifier = 25
 
@@ -4924,7 +4932,7 @@ function tickVehicles()
 									local waypoint_pos = m.translation(waypoint.x, waypoint.y, waypoint.z)
 									local waypoint_pos_next = m.translation(waypoint_next.x, waypoint_next.y, waypoint_next.z)
 
-									local angle = math.atan(waypoint_pos_next[13] - waypoint_pos[13], waypoint_pos_next[15] - waypoint_pos[15])/tau*math.pi
+									local angle = math.atan(waypoint_pos_next[13] - waypoint_pos[13], waypoint_pos_next[15] - waypoint_pos[15])/math.tau*math.pi
 
 									local line_r = math.floor(math.clamp(math.clamp(r, 0, 200) + (angle*colour_modifier), 0, 255))
 									local line_g = math.floor(math.clamp(math.clamp(g, 0, 200) + (angle*colour_modifier), 0, 255))

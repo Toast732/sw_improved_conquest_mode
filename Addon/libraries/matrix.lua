@@ -1,9 +1,10 @@
 ---@param matrix1 SWMatrix the first matrix
 ---@param matrix2 SWMatrix the second matrix
-function matrix.xzDistance(matrix1, matrix2) -- returns the distance between two matrixes, ignoring the y axis
-	local ox, oy, oz = m.position(matrix1)
-	local tx, ty, tz = m.position(matrix2)
-	return m.distance(m.translation(ox, 0, oz), m.translation(tx, 0, tz))
+---@return number distance the xz distance between the two matrices
+function matrix.xzDistance(matrix1, matrix2) -- returns the euclidean distance between two matrixes, ignoring the y axis
+	local rx = matrix2[13] - matrix1[13] -- relative x
+	local rz = matrix2[15] - matrix1[15] -- relative z
+	return math.sqrt(rx*rx + rz*rz)
 end
 
 ---@param rot_matrix SWMatrix the matrix you want to get the rotation of
