@@ -1,5 +1,52 @@
----@param x number the number to check if is whole
----@return boolean is_whole returns true if x is whole, false if not, nil if x is nil
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+-- (none)
+
+-- library name
+-- (not applicable)
+
+-- shortened library name
+-- (not applicable)
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+-- pre-calculated pi*2
+math.tau = math.pi*2
+-- pre-calculated pi*0.5
+math.half_pi = math.pi*0.5
+
+--[[
+
+
+	Classes
+
+
+]]
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+
+--- @param x number the number to check if is whole
+--- @return boolean is_whole returns true if x is whole, false if not, nil if x is nil
 function math.isWhole(x) -- returns wether x is a whole number or not
 	return math.tointeger(x)
 end
@@ -11,10 +58,10 @@ function math.noNil(x)
 	return x ~= x and 0 or x
 end
 
----@param x number the number to clamp
----@param min number the minimum value
----@param max number the maximum value
----@return number clamped_x the number clamped between the min and max
+--- @param x number the number to clamp
+--- @param min number the minimum value
+--- @param max number the maximum value
+--- @return number clamped_x the number clamped between the min and max
 function math.clamp(x, min, max)
 	return math.noNil(max<x and max or min>x and min or x)
 end

@@ -89,7 +89,7 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 		end
 
 		-- calculates route
-		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, 0, dest_z), "ocean_path", exclude)
+		local path_list = s.pathfind(path_start_pos, m.translation(target_dest[13], 0, target_dest[15]), "ocean_path", exclude)
 
 		for path_index, path in pairs(path_list) do
 			if not path.y then
@@ -138,17 +138,22 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 		local vehicle_list_id = sm.getVehicleListID(vehicle_object.name)
 		local y_modifier = g_savedata.vehicle_list[vehicle_list_id].vehicle.transform[14]
 
-		local path_list = s.pathfind(path_start_pos, m.translation(dest_x, veh_y, dest_z), "land_path", exclude)
-		for path_index, path in pairs(path_list) do
-			veh_x, veh_y, veh_z = m.position(vehicle_object.transform)
-			distance = m.distance(vehicle_object.transform, m.translation(path.x, path.y, path.z))
+		local dest_at_vehicle_y = m.translation(target_dest[13], vehicle_object.transform[14], target_dest[15])
 
-			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, m.translation(dest_x, veh_y, dest_z)) > m.distance(m.translation(dest_x, veh_y, dest_z), m.translation(path.x, path.y, path.z)) and distance >= 7 then
+		local path_list = s.pathfind(path_start_pos, dest_at_vehicle_y, "land_path", exclude)
+		for path_index, path in pairs(path_list) do
+
+			local path_matrix = m.translation(path.x, path.y, path.z)
+
+			local distance = m.distance(vehicle_object.transform, path_matrix)
+
+			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, dest_at_vehicle_y) > m.distance(dest_at_vehicle_y, path_matrix) and distance >= 7 then
 				
 				if not path.y then
 					--d.print("not path.y\npath.x: "..tostring(path.x).."\npath.y: "..tostring(path.y).."\npath.z: "..tostring(path.z), true, 1)
 					break
 				end
+
 				table.insert(vehicle_object.path, { 
 					x =  path.x, 
 					y = (path.y + y_modifier), 
@@ -160,7 +165,8 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 
 		if #vehicle_object.path > 1 then
 			-- remove paths which are a waste (eg, makes the vehicle needlessly go backwards when it could just go to the next waypoint)
-			if m.xzDistance(vehicle_object.transform, m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z)) < m.xzDistance(m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z)) then
+			local next_path_matrix = m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z)
+			if m.xzDistance(vehicle_object.transform, next_path_matrix) < m.xzDistance(m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), next_path_matrix) then
 				p.nextPath(vehicle_object)
 			end
 		end
@@ -233,7 +239,7 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 		local ADDON_DATA = s.getAddonData(addon_index)
 		if ADDON_DATA.location_count and ADDON_DATA.location_count > 0 then
 			for location_index = 0, ADDON_DATA.location_count - 1 do
-				local LOCATION_DATA, gotLocationData = s.getLocationData(addon_index, location_index)
+				local LOCATION_DATA = s.getLocationData(addon_index, location_index)
 				if LOCATION_DATA.env_mod and LOCATION_DATA.component_count > 0 then
 					for component_index = 0, LOCATION_DATA.component_count - 1 do
 						local COMPONENT_DATA, getLocationComponentData = s.getLocationComponentData(

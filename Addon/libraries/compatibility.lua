@@ -29,7 +29,8 @@ comp = Compatibility
 local version_updates = {
 	"(0.3.0.78)",
 	"(0.3.0.79)",
-	"(0.3.0.82)"
+	"(0.3.0.82)",
+	"(0.3.1.2)"
 }
 
 --[[
@@ -189,6 +190,29 @@ function Compatibility.getVersionID(version)
 	return nil, false
 end
 
+--# splits a version into 
+---@param version string the version you want split
+---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
+function Compatibility.splitVersion(version) -- credit to woe
+	local T = {}
+
+	-- remove ( and )
+	version = version:match("[%d.]+")
+
+	for S in version:gmatch("([^%.]*)%.*") do
+		T[#T+1] = tonumber(S) or S
+	end
+
+	T = {
+		T[1], -- release
+		T[2], -- majour
+		T[3], -- minor
+		T[4] -- commit
+	}
+
+	return T
+end
+
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
 ---@return string version the version associated with the id
@@ -256,7 +280,18 @@ function Compatibility.getVersionData(version)
 	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
 
 	-- (4) count how many versions out of date the data is
+
+	local current_version = comp.splitVersion(version_data.data_version)
+
+	local ids_to_versions = {
+		"Release",
+		"Majour",
+		"Minor",
+		"Commit"
+	}
+
 	for _, version_name in ipairs(version_updates) do
+
 		--[[
 			first, we want to check if the release version is greater (x.#.#.#)
 			if not, second we want to check if the majour version is greater (#.x.#.#)
@@ -264,28 +299,27 @@ function Compatibility.getVersionData(version)
 			if not, lastly we want to check if the commit version is greater (#.#.#.x)
 		]]
 
-		-- (4.1) check if release version is outdated (x.#.#.#)
-		if (math.tointeger(string.match(version_name, "%((%d+)%.")) or 0) > (math.tointeger(string.match(version_data.data_version, "%((%d+)%.")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new release version: "..version_name.." current version: "..version_data.data_version, false, 0)
+		local update_version = comp.splitVersion(version_name)
 
-		-- (4.2) check if majour version is outdated (#.x.#.#)
-		elseif (math.tointeger(string.match(version_name, "%(%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.(%d+)")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new majour version: "..version_name.." current version: "..version_data.data_version, false, 0)
-
-		-- (4.3) check if minor version is outdated (#.#.x.#)
-		elseif (math.tointeger(string.match(version_name, "%(%d+%.%d+%.(%d+)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.(%d+)")) or 0) then
-			table.insert(version_data.newer_versions, version_name)
-			d.print("found new minor version: "..version_name.." current version: "..version_data.data_version, false, 0)
-		
-		-- (4.4) check if commit version is outdated (#.#.#.x)
-		-- if commit version is not specified for our current version, we're newer than the ones that do, so dont go forwards.
-		elseif math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) then
-			if (math.tointeger(string.match(version_name, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) > (math.tointeger(string.match(version_data.data_version, "%(%d+%.%d+%.%d+%.*(%d*)%)")) or 0) then
+		--[[
+			go through each version, and check if its newer than our current version
+		]]
+		for i = 1, #current_version do
+			if not current_version[i] or current_version[i] > update_version[i] then
+				--[[
+					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
+					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
+				]]
+				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+				break
+			elseif current_version[i] < update_version[i] then
+				-- current version is older, so we need to migrate data.
 				table.insert(version_data.newer_versions, version_name)
-				d.print("found new commit version: "..version_name.." current version: "..version_data.data_version, false, 0)
+				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
+				break
 			end
+
+			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
 		end
 	end
 
@@ -372,7 +406,7 @@ function Compatibility.update()
 		return
 	end
 
-	d.print("ICM's data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
+	d.print(SHORT_ADDON_NAME.."'s data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
 
 	-- save backup
 	local backup_saved = comp.saveBackup()
@@ -388,7 +422,7 @@ function Compatibility.update()
 
 	-- check for 0.3.0.78 changes
 	if version_data.newer_versions[1] == "(0.3.0.78)" then
-		d.print("Successfully updated ICM data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
 
 		-- clean up old data
 		g_savedata.info.creation_version = nil
@@ -417,7 +451,7 @@ function Compatibility.update()
 			g_savedata.info.version_history.ticked_played = nil
 		end
 
-		d.print("Successfully updated ICM data to "..version_data.newer_versions[1], false, 0)
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 
 	elseif version_data.newer_versions[1] == "(0.3.0.82)" then -- 0.3.0.82 changes
 
@@ -427,18 +461,55 @@ function Compatibility.update()
 			end
 		end
 
-		d.print("Successfully updated ICM data to "..version_data.newer_versions[1], false, 0)
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.1.2)" then -- 0.3.1.2 changes
+
+		d.print(("Migrating %s data..."):format(SHORT_ADDON_NAME), false, 0)
+
+		-- check if we've initialised the graph_node debug before
+		if g_savedata.graph_nodes.init_debug then
+
+			-- generate a global map id for all graph nodes
+			g_savedata.graph_nodes.ui_id = server.getMapID()
+
+			d.print("Cleaning up old data...", false, 0)
+
+			-- go through and remove all of the graph node's map ids from the map
+			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+				for z, z_data in pairs(x_data) do
+					s.removeMapID(-1, z_data.ui_id)
+					z_data.ui_id = nil
+				end
+			end
+
+			-- go through all of the player data and set graph_node debug to false
+			for _, player_data in pairs(g_savedata.player_data) do
+				player_data.debug.graph_node = false
+			end
+
+			-- disable graph_node debug globally
+			g_savedata.debug.graph_node = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
 
-	d.print("ICM data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
 
-	just_migrated = true
+	-- this means that theres still newer versions
+	if #version_data.newer_versions > 1 then
+		-- migrate to the next version
+		comp.update()
+	end
+
+	-- we've finished migrating!
+	comp.showSaveMessage()
 end
 
 --# prints outdated message and starts update
 function Compatibility.outdated()
 	-- print that its outdated
-	d.print("ICM data is outdated! attempting to automatically update...", false, 0)
+	d.print(SHORT_ADDON_NAME.." data is outdated! attempting to automatically update...", false, 0)
 
 	-- start update process
 	comp.update()
@@ -446,7 +517,7 @@ end
 
 --# verifies that the mod is currently up to date
 function Compatibility.verify()
-	d.print("verifying if ICM data is up to date...", false, 0)
+	d.print("verifying if "..SHORT_ADDON_NAME.." data is up to date...", false, 0)
 	--[[
 		first, check if the versioning system is up to date
 	]]
@@ -469,9 +540,7 @@ function Compatibility.verify()
 	end
 end
 
---# shows the message to save the game and then load the save to complete migration
+--# shows the message saying that the addon was fully migrated
 function Compatibility.showSaveMessage()
-	is_dlc_weapons = false
-	d.print("ICM Data has been migrated, to complete the process, please save the world, and then load the saved world. ICM has been disabled until this is done.", false, 0)
-	s.setPopupScreen(-1, s.getMapID(), "ICM Migration", true, "Please save world and then load save to complete data migration process. ICM has been disabled till this is complete.", 0, 0)
+	d.print(SHORT_ADDON_NAME.." Data has been fully migrated!", false, 0)
 end

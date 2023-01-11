@@ -17,7 +17,7 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
-		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", IMPROVED_CONQUEST_VERSION)..suffix
+		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", ADDON_VERSION)..suffix
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
 			if message then
@@ -32,19 +32,18 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 		elseif requires_debug then
 			if pl.isPlayer(peer_id) and peer_id then
-				if g_savedata.player_data.is_Debugging.toPlayer then
+				if d.getDebug(debug_type, peer_id) then
 					s.announce(prefix, message, peer_id)
 				end
 			else
-				local player_list = s.getPlayers()
-				for peer_index, player in pairs(player_list) do
+				for _, player in ipairs(s.getPlayers()) do
 					if d.getDebug(debug_type, player.id) or debug_type == 2 and d.getDebug(0, player.id) then
 						s.announce(prefix, message, player_id)
 					end
 				end
 			end
 		else
-			s.announce(prefix, message, peer_id or "-1")
+			s.announce(prefix, message, peer_id or -1)
 		end
 	end
 end
@@ -213,31 +212,22 @@ function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
 				end
 
 			end
-			Map.addMapCircle(peer_id, ui_id, m.translation(x, 0, z), 5, 1.5, r, g, b, 255, 5)
+			Map.addMapCircle(peer_id, ui_id, m.translation(x, 0, z), 5, 1.5, r, g, b, 255, 3)
 		end
 
 		if enabled then
 			if not g_savedata.graph_nodes.init_debug then
-				for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
-					for z, z_data in pairs(x_data) do
-						z_data.ui_id = s.getMapID()
-						addNode(z_data.ui_id, x, z, z_data.type, z_data.NSO)
-					end
-				end
+				g_savedata.graph_nodes.ui_id = s.getMapID()
 				g_savedata.graph_nodes.init_debug = true
-			else
-				for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
-					for z, z_data in pairs(x_data) do
-						addNode(z_data.ui_id, x, z, z_data.type, z_data.NSO)
-					end
+			end
+
+			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+				for z, z_data in pairs(x_data) do
+					addNode(g_savedata.graph_nodes.ui_id, x, z, z_data.type, z_data.NSO)
 				end
 			end
 		else
-			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
-				for z, z_data in pairs(x_data) do
-					s.removeMapID(peer_id, z_data.ui_id)
-				end
-			end
+			s.removeMapID(peer_id, g_savedata.graph_nodes.ui_id)
 		end
 
 		return (enabled and "Enabled" or "Disabled").." Graph Node Debug"
