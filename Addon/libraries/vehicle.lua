@@ -599,6 +599,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local turret_count = 0
 		local unoccupied_zones = {}
 
+		if #island.zones.turrets == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no turret spawn zones!"):format(island.name), true, 1)
+			return false, ("Island %s has no turret spawn zones!"):format(island.name)
+		end
+
 		-- count the amount of turrets this island has spawned
 		for turret_zone_index = 1, #island.zones.turrets do
 			if island.zones.turrets[turret_zone_index].is_spawned then 
@@ -617,6 +622,11 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				-- add the zone to a list to be picked from for spawning the next turret
 				table.insert(unoccupied_zones, turret_zone_index)
 			end
+		end
+
+		if #unoccupied_zones == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true)), true, 1)
+			return false, ("Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true))
 		end
 
 		-- pick a spawn location out of the list which is unoccupied
