@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.1)"
+ADDON_VERSION = "(0.4.0.1)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -292,6 +292,7 @@ g_savedata = {
 }
 
 -- libraries
+require("libraries.addonCommunication") -- functions for addon to addon communication
 require("libraries.ai") -- functions relating to their AI
 require("libraries.cache") -- functions relating to the custom 
 require("libraries.cargo") -- functions relating to the Convoys and Cargo Vehicles
@@ -483,10 +484,6 @@ local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs to transport reso
 local AIR_CRASH_MODE_BOX = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
 
 function onCreate(is_world_create)
-
-	-- start the timer for when the world has started to be setup
-	local world_setup_time = s.getTimeMillisec()
-
 	-- setup settings
 	if not g_savedata.settings then
 		g_savedata.settings = {
@@ -509,6 +506,24 @@ function onCreate(is_world_create)
 			CARGO_CAPACITY_MULTIPLIER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
 		}
 	end
+
+	ac.executeOnReply( -- setup world after 1 tick, to prevent issues with the addon indexes getting mixed up
+		SHORT_ADDON_NAME, -- addon we're expecting the reply from
+		"onCreate()", -- the message content
+		0, -- the port to recieve this from
+		function() 
+			setupMain(is_world_create)
+		end, -- function to execute when we get the reply
+		1, -- how many times this can be triggered
+		20 -- how many seconds to wait till we expire it
+	)
+
+	ac.sendCommunication("onCreate()", 0)
+end
+
+function setupMain(is_world_create)
+	-- start the timer for when the world has started to be setup
+	local world_setup_time = s.getTimeMillisec()
 
 	comp.verify() -- backwards compatibility check
 
@@ -844,6 +859,7 @@ function onCreate(is_world_create)
 	end
 	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
 end
+
 
 function buildPrefabs(location_index)
 	local location = built_locations[location_index]
