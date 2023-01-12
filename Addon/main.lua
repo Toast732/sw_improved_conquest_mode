@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.1)"
+ADDON_VERSION = "(0.4.0.2)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -5808,7 +5808,12 @@ function build_locations(addon_index, location_index)
 	end
 
 	if is_valid_location then
-		table.insert(built_locations, { location_index = location_index, data = location_data, objects = addon_components} )
+		table.insert(built_locations, { 
+			location_index = location_index,
+			addon_index = addon_index,
+			data = location_data, 
+			objects = addon_components
+		} )
 	end
 end
 

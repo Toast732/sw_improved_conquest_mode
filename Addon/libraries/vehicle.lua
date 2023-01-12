@@ -659,10 +659,13 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	-- spawn objects
+
+	local addon_index = selected_prefab.location.addon_index
+
 	local spawned_objects = {
-		survivors = su.spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, {}),
-		fires = su.spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, {}),
-		spawned_vehicle = su.spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
+		survivors = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.survivors, {}),
+		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.fires, {}),
+		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
 	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)

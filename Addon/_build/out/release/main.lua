@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.1)"
+ADDON_VERSION = "(0.4.0.2)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -2379,20 +2379,20 @@ SpawningUtils = {}
 su = SpawningUtils
 
 -- spawn an individual object descriptor from a playlist location
-function SpawningUtils.spawnObjectType(spawn_transform, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, s.getAddonIndex(), location_index, object_descriptor.index, parent_vehicle_id)
+function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
+	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
-		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..s.getAddonIndex().."\nlocation index: "..location_index, false, 1)
+		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..addon_index.."\nlocation index: "..location_index, false, 1)
 		return nil
 	end
 end
 
-function SpawningUtils.spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), location_index, object, parent_vehicle_id)
+	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
@@ -2438,7 +2438,7 @@ function SpawningUtils.spawnObject(spawn_transform, location_index, object, pare
 	return nil
 end
 
-function SpawningUtils.spawnObjects(spawn_transform, location_index, object_descriptors, out_spawned_objects)
+function SpawningUtils.spawnObjects(spawn_transform, addon_index, location_index, object_descriptors, out_spawned_objects)
 	local spawned_objects = {}
 
 	for _, object in pairs(object_descriptors) do
@@ -2453,7 +2453,7 @@ function SpawningUtils.spawnObjects(spawn_transform, location_index, object_desc
 			end
 		end
 
-		su.spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+		su.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	end
 
 	return spawned_objects
@@ -3223,10 +3223,13 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	-- spawn objects
+
+	local addon_index = selected_prefab.location.addon_index
+
 	local spawned_objects = {
-		survivors = su.spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.survivors, {}),
-		fires = su.spawnObjects(spawn_transform, selected_prefab.location.location_index, selected_prefab.fires, {}),
-		spawned_vehicle = su.spawnObject(spawn_transform, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
+		survivors = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.survivors, {}),
+		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.fires, {}),
+		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
 	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
@@ -5883,14 +5886,14 @@ function onCreate(is_world_create)
 	end
 
 	ac.executeOnReply( -- setup world after 1 tick, to prevent issues with the addon indexes getting mixed up
-		SHORT_ADDON_NAME, 
-		"onCreate()", 
-		0,
+		SHORT_ADDON_NAME, -- addon we're expecting the reply from
+		"onCreate()", -- the message content
+		0, -- the port to recieve this from
 		function() 
 			setupMain(is_world_create)
-		end,
-		1,
-		20
+		end, -- function to execute when we get the reply
+		1, -- how many times this can be triggered
+		20 -- how many seconds to wait till we expire it
 	)
 
 	ac.sendCommunication("onCreate()", 0)
@@ -11183,7 +11186,12 @@ function build_locations(addon_index, location_index)
 	end
 
 	if is_valid_location then
-		table.insert(built_locations, { location_index = location_index, data = location_data, objects = addon_components} )
+		table.insert(built_locations, { 
+			location_index = location_index,
+			addon_index = addon_index,
+			data = location_data, 
+			objects = addon_components
+		} )
 	end
 end
 

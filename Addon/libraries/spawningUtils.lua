@@ -9,20 +9,20 @@ SpawningUtils = {}
 su = SpawningUtils
 
 -- spawn an individual object descriptor from a playlist location
-function SpawningUtils.spawnObjectType(spawn_transform, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, s.getAddonIndex(), location_index, object_descriptor.index, parent_vehicle_id)
+function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
+	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
-		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..s.getAddonIndex().."\nlocation index: "..location_index, false, 1)
+		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..addon_index.."\nlocation index: "..location_index, false, 1)
 		return nil
 	end
 end
 
-function SpawningUtils.spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), location_index, object, parent_vehicle_id)
+	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
@@ -68,7 +68,7 @@ function SpawningUtils.spawnObject(spawn_transform, location_index, object, pare
 	return nil
 end
 
-function SpawningUtils.spawnObjects(spawn_transform, location_index, object_descriptors, out_spawned_objects)
+function SpawningUtils.spawnObjects(spawn_transform, addon_index, location_index, object_descriptors, out_spawned_objects)
 	local spawned_objects = {}
 
 	for _, object in pairs(object_descriptors) do
@@ -83,7 +83,7 @@ function SpawningUtils.spawnObjects(spawn_transform, location_index, object_desc
 			end
 		end
 
-		su.spawnObject(spawn_transform, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+		su.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	end
 
 	return spawned_objects
