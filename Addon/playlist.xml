@@ -6570,7 +6570,7 @@
 			</l>
 			<l id="21" name="BOAT - Corvette" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,GPS_TARGET_POSITION,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
+					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
@@ -33194,7 +33194,7 @@
 			</l>
 			<l id="152" name="BOAT - Griffon" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2843" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=general,visibility_range=1500,spawning_radius=25,radar,GPS_TARGET_POSITION,speed=10,health=3000,sonar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2843.xml" vehicle_file_store="4">
+					<c component_type="3" id="2843" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=general,visibility_range=1500,spawning_radius=25,radar,speed=10,health=3000,sonar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2843.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.013405" 31="4.603729" 32="0.05137"/>
 						<spawn_bounds>
 							<min x="-3.625" y="-3.375" z="-15.375"/>
@@ -33538,13 +33538,13 @@
 			</l>
 			<l id="157" name="TURRET - Guardian" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2886" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=3000,spawning_radius=5,health=1400,GPS_TARGET_POSITION,TARGET_MASS,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2886.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="2886" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=3000,spawning_radius=5,health=1400,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2886.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="0.046147" 31="2.422456" 32="-0.005714"/>
 						<spawn_bounds>
-							<min x="-1.875" y="-1.125" z="-5.875"/>
-							<max x="1.875" y="5.375" z="-2.625"/>
+							<min x="-2.125" y="-1.125" z="-5.875"/>
+							<max x="2.125" y="5.875" z="-2.125"/>
 						</spawn_bounds>
-						<spawn_local_offset y="-2.125" z="4.25"/>
+						<spawn_local_offset y="-2.375" z="4"/>
 						<graph_links/>
 					</c>
 					<c component_type="2" id="2887" name="id_2887" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
@@ -33568,7 +33568,7 @@
 			</l>
 			<l id="158" name="LAND - Rook" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,GPS_TARGET_POSITION,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
+					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.034774" 31="2.382319" 32="0.087677"/>
 						<spawn_bounds>
 							<min x="-2.875" y="-0.625" z="-1.125"/>
@@ -33614,7 +33614,7 @@
 			</l>
 			<l id="159" name="TURRET - Spider" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2914" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=2500,spawning_radius=10,health=1000,GPS_TARGET_POSITION,TARGET_MASS,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2914.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="2914" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=2500,spawning_radius=10,health=1000,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2914.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="-0.240471" 31="1.381314" 32="-0.296938"/>
 						<spawn_bounds>
 							<min x="-3.875" y="-2.125" z="-6.125"/>
@@ -33674,7 +33674,7 @@
 			</l>
 			<l id="163" name="PLANE - Hornet" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="3169" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=attack,visibility_range=2250,spawning_radius=7,strategy=strafing,speed=157,health=1100,GPS_TARGET_POSITION" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_3169.xml" vehicle_file_store="4">
+					<c component_type="3" id="3169" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=attack,visibility_range=2250,spawning_radius=7,strategy=strafing,speed=157,health=1100" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_3169.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.02668" 31="2.883643" 32="0.025698"/>
 						<spawn_bounds>
 							<min x="-6.375" y="-0.875" z="-1.375"/>

@@ -28,7 +28,7 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 							for vehicle_id, v in pairs(strat_data) do
 								if type(v) == "table" then
 									g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].location.data.name.." for adaptive AI", true, 0)
+									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].prefab_data.location_data.name.." for adaptive AI", true, 0)
 								end
 							end
 						end
@@ -44,7 +44,7 @@ end
 ---@param is_specified boolean true to specify what vehicle to spawn, false for random
 ---@param vehicle_list_id any vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
 ---@param vehicle_type string the type of vehicle you want to spawn, such as boat, helicopter, plane or land
----@return prefab_data[] prefab_data the vehicle's prefab data
+---@return PREFAB_DATA prefab_data the vehicle's prefab data
 function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 	local sel_role = nil
 	local sel_veh_type = nil
@@ -129,7 +129,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		return false
 	end
-	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
+	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle].prefab_data
 end
 
 ---@param role string the role of the vehicle, such as attack, general or defend
@@ -163,7 +163,7 @@ function SpawnModifiers.getVehicleListID(vehicle_name)
 	vehicle_name = string.removePrefix(vehicle_name)
 
 	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
-		if string.removePrefix(vehicle_object.location.data.name) == vehicle_name then
+		if string.removePrefix(vehicle_object.location_data.name) == vehicle_name then
 			return vehicle_id
 		end
 	end
@@ -254,7 +254,7 @@ function SpawnModifiers.getStats()
 								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
-										prefab_data = vehicle_data
+										prefab_data = vehicle_data.prefab_data
 									})
 								end
 							end

@@ -14,7 +14,8 @@ function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_in
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
-		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..addon_index.."\nlocation index: "..location_index, false, 1)
+		d.print("this addon index: "..s.getAddonIndex(), false, 0)
+		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
 		return nil
 	end
 end

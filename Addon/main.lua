@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.2)"
+ADDON_VERSION = "(0.4.0.3)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -296,6 +296,7 @@ require("libraries.addonCommunication") -- functions for addon to addon communic
 require("libraries.ai") -- functions relating to their AI
 require("libraries.cache") -- functions relating to the custom 
 require("libraries.cargo") -- functions relating to the Convoys and Cargo Vehicles
+require("libraries.characters") -- functions for characters, such as setting them into seats.
 require("libraries.compatibility") -- functions used for making the mod backwards compatible
 require("libraries.debugging") -- functions for debugging
 require("libraries.island") -- functions relating to islands
@@ -507,6 +508,12 @@ function onCreate(is_world_create)
 		}
 	end
 
+	d.print("setting overrides")
+
+	c.overrides() -- override some functions
+
+	d.print("after setting overrides")
+
 	ac.executeOnReply( -- setup world after 1 tick, to prevent issues with the addon indexes getting mixed up
 		SHORT_ADDON_NAME, -- addon we're expecting the reply from
 		"onCreate()", -- the message content
@@ -556,22 +563,21 @@ function setupMain(is_world_create)
 		
 		p.updatePathfinding()
 
-		d.print("building locations...", true, 0)
+		--d.print("building locations...", true, 0)
 
-		for i in iterPlaylists() do
+		--[[for i in iterPlaylists() do
 			for j in iterLocations(i) do
 				build_locations(i, j)
 			end
-		end
+		end]]
 
-		-- reset vehicle list
-		g_savedata.vehicle_list = {}
+		d.print("building locations and prefabs...", true, 0)
 
-		d.print("building prefabs...", true, 0)
+		sup.createVehiclePrefabs()
 
-		for i = 1, #built_locations do
+		--[[for i = 1, #built_locations do
 			buildPrefabs(i)
-		end
+		end]]
 
 		if is_world_create then
 			d.print("setting up world...", true, 0)
@@ -869,7 +875,8 @@ function buildPrefabs(location_index)
 	for key, vehicle in pairs(location.objects.vehicles) do
 
 		local prefab_data = {
-			location = location, 
+			location = location,
+			addon_index = built_locations[location_index].addon_index,
 			vehicle = vehicle, 
 			survivors = {}, 
 			fires = {}
@@ -922,7 +929,11 @@ function buildPrefabs(location_index)
 				end
 				
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
-				d.print("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, 0)
+
+				local prefab = g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]]
+
+				d.print(prefab)
+				d.print("set id: "..vehicle_index.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].prefab_data.location_data.name.." from addon with index: "..prefab.addon_index, true, 0)
 			else
 				Tables.tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
@@ -1245,8 +1256,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "target" then
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					for i, char in  pairs(vehicle_object.survivors) do
-						s.setAITargetVehicle(char.id, arg[1])
+					for _, object_id in  pairs(vehicle_object.survivors) do
+						s.setAITargetVehicle(object_id, arg[1])
 					end
 				end
 			end
@@ -1446,7 +1457,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "vehiclelist" then --vehicle list
 			d.print("Valid Vehicles:", false, 0, peer_id)
 			for vehicle_index, vehicle_object in ipairs(g_savedata.vehicle_list) do
-				d.print("\nName: \""..string.removePrefix(vehicle_object.location.data.name, true).."\"\nType: "..(string.gsub(Tags.getValue(vehicle_object.vehicle.tags, "vehicle_type", true), "wep_", ""):gsub("^%l", string.upper)), false, 0, peer_id)
+				d.print("\nName: \""..string.removePrefix(vehicle_object.location_data.name, true).."\"\nType: "..(string.gsub(Tags.getValue(vehicle_object.vehicle.tags, "vehicle_type", true), "wep_", ""):gsub("^%l", string.upper)), false, 0, peer_id)
 			end
 
 
@@ -1786,11 +1797,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			else
 				d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.best) do
-					d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 				d.print("Bottom 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.worst) do
-					d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 			end
 		
@@ -2245,6 +2256,8 @@ function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 			death_pos = nil, 
 			ui_id = s.getMapID()
 		}
+
+		return
 	end
 end
 
@@ -2303,8 +2316,8 @@ function cleanVehicle(squad_index, vehicle_id)
 		end
 	end
 
-	for _, survivor in pairs(vehicle_object.survivors) do
-		s.despawnObject(survivor.id, true)
+	for _, object_id in pairs(vehicle_object.survivors) do
+		s.despawnObject(object_id, true)
 	end
 
 	if vehicle_object.fire_id ~= nil then
@@ -2354,35 +2367,31 @@ function onVehicleUnload(vehicle_id)
 	end
 end
 
-function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
+function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
 	
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-		if vehicle_object.capabilities.target_mass then
-			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
-			if is_success then
-				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
-			end
+
+		local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+
+		if is_success then -- target vehicle's mass
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
 		end
+
 	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50) -- player's mass
+
 	else
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0) -- no target
 	end
-	if target then
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", target.last_known_pos[13])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", target.last_known_pos[14])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", target.last_known_pos[15])
-		if vehicle_object.capabilities.gps_missile then
-			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
-		end
+	if target then -- set the target's position on keypads
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_X", target.last_known_pos[13])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Y", target.last_known_pos[14])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Z", target.last_known_pos[15])
 	end
 end
 
@@ -2394,6 +2403,25 @@ end
 function onObjectLoad(object_id)
 	d.print("(onObjectLoad) object_id: "..object_id, true, 0)
 end]]
+
+--[[function onCharacterSit(object_id, vehicle_id, seat_name)
+	d.print(("(onCharacterSit) object_id: %i\nvehicle_id: %i\nseat_name: %s"):format(object_id, vehicle_id, seat_name))
+end]]
+
+-- called whenever an AI is properly spawned, data set, and set into seat.
+function onCharacterPrepared(object_id, vehicle_id, seat_name)
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	vehicle_object._prepared_survivors = vehicle_object._prepared_survivors or {}
+	table.insert(vehicle_object._prepared_survivors, object_id)
+
+	-- if we've prepared all of our survivors
+	if #vehicle_object._prepared_survivors == #vehicle_object.survivors then
+		vehicle_object._prepared_survivors = nil
+		d.print("(onCharacterPrepared) all characters prepared!", true, 0)
+		squadInitVehicleCommand(squad, vehicle_object) -- init their commands
+	end
+end
 
 function onVehicleLoad(vehicle_id)
 	-- return if the addon is disabled
@@ -2447,11 +2475,15 @@ function onVehicleLoad(vehicle_id)
 	end
 
 	-- say the vehicle has loaded
-	-- also make sure its not spawning inside another vehicle
+	-- spawn the AI npcs if they've not yet been spawned
+	-- and make sure its not spawning inside another vehicle
 	if vehicle_object then
 		d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 		vehicle_object.state.is_simulating = true
+
+		vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+
 		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
 		for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
 			for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
@@ -2497,46 +2529,6 @@ function onVehicleLoad(vehicle_id)
 		end
 
 		d.print("(onVehicleLoad) #of survivors: "..tostring(#vehicle_object.survivors), true, 0)
-
-		for i, char in pairs(vehicle_object.survivors) do
-			if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
-				--Gunners
-				s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
-				local c = s.getCharacterData(char.id)
-				if c then
-					s.setCharacterData(char.id, c.hp, true, true)
-				end
-			else
-				if i == 1 then
-					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-						s.setCharacterSeated(char.id, vehicle_id, "Captain")
-					elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-						s.setCharacterSeated(char.id, vehicle_id, "Driver")
-					else
-						s.setCharacterSeated(char.id, vehicle_id, "Pilot")
-					end
-					local c = s.getCharacterData(char.id)
-					if c then
-						if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-							s.setCharacterData(char.id, c.hp, true, false)
-						else
-							s.setCharacterData(char.id, c.hp, true, true)
-						end
-					else
-						d.print("(onVehicleLoad) (Non Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-					end
-				else
-					--Gunners
-					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
-					local c = s.getCharacterData(char.id)
-					if c then
-						s.setCharacterData(char.id, c.hp, true, true)
-					else
-						d.print("(onVehicleLoad) (Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-					end
-				end
-			end
-		end
 		refuel(vehicle_id)
 	end
 end
@@ -3449,7 +3441,7 @@ function tickSquadrons()
 				end
 
 				-- if pilot is incapacitated
-				local c = s.getCharacterData(vehicle_object.survivors[1].id)
+				local c = s.getCharacterData(vehicle_object.survivors[1])
 
 				--[[
 					if npc exists
@@ -4119,14 +4111,14 @@ function tickSquadrons()
 
 								p.resetPath(vehicle_object)
 								p.addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
-								s.setAITarget(vehicle_object.survivors[1].id, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
+								s.setAITarget(vehicle_object.survivors[1], m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
 
 								if m.xzDistance(vehicle_object.transform, m.translation(target_pos[13], target_pos[14], target_pos[15])) < 100 then
-									s.setAIState(vehicle_object.survivors[1].id, 0)
-									s.setCharacterData(vehicle_object.survivors[1].id, 1, true, false)
+									s.setAIState(vehicle_object.survivors[1], 0)
+									s.setCharacterData(vehicle_object.survivors[1], 1, true, false)
 									--d.print("murder.")
 								else
-									s.setAIState(vehicle_object.survivors[1].id, 2)
+									s.setAIState(vehicle_object.survivors[1], 2)
 								end
 								
 
@@ -4216,16 +4208,16 @@ function tickSquadrons()
 								end
 							end
 								
-							for i, char in pairs(vehicle_object.survivors) do
+							for i, object_id in pairs(vehicle_object.survivors) do
 								if target_type == "character" then
-									s.setAITargetCharacter(char.id, target_id)
+									s.setAITargetCharacter(object_id, target_id)
 								elseif target_type == "vehicle" then
-									s.setAITargetVehicle(char.id, target_id)
+									s.setAITargetVehicle(object_id, target_id)
 								end
 	
 								if i ~= 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
 									if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
-										s.setAIState(char.id, 1)
+										s.setAIState(object_id, 1)
 									end
 								end
 							end
@@ -4235,13 +4227,6 @@ function tickSquadrons()
 
 				if squad_vision:is_engage() == false then
 					setSquadCommand(squad, SQUAD.COMMAND.NONE)
-				end
-			end
-			if squad.command ~= SQUAD.COMMAND.RETREAT then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
-						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
-					end
 				end
 			end
 		end
@@ -4272,104 +4257,110 @@ function tickVision()
 
 	-- analyse player vehicles
 	for player_vehicle_id, player_vehicle in pairs(g_savedata.player_vehicles) do
-		if isTickID(player_vehicle_id, 30) then
-			local player_vehicle_transform = player_vehicle.transform
+		local player_vehicle_transform = player_vehicle.transform
 
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					-- reset target visibility state to investigate
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad_index ~= RESUPPLY_SQUAD_INDEX then
+				-- reset target visibility state to investigate
 
-					if squad.target_vehicles[player_vehicle_id] ~= nil then
-						if player_vehicle.death_pos == nil then
-							squad.target_vehicles[player_vehicle_id].state = TARGET_VISIBILITY_INVESTIGATE
-						else
-							squad.target_vehicles[player_vehicle_id] = nil
-						end
+				if squad.target_vehicles[player_vehicle_id] ~= nil then
+					if player_vehicle.death_pos == nil then
+						squad.target_vehicles[player_vehicle_id].state = TARGET_VISIBILITY_INVESTIGATE
+					else
+						squad.target_vehicles[player_vehicle_id] = nil
 					end
+				end
 
-					-- check if target is visible to any vehicles
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						local vehicle_transform = vehicle_object.transform
+				-- check if target is visible to any vehicles
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					local vehicle_transform = vehicle_object.transform
 
-						if vehicle_transform ~= nil and player_vehicle_transform ~= nil then
-							local distance = m.distance(player_vehicle_transform, vehicle_transform)
+					if vehicle_transform ~= nil and player_vehicle_transform ~= nil then
+						local distance = m.distance(player_vehicle_transform, vehicle_transform)
 
-							local local_vision_radius = vehicle_object.vision.radius
+						local local_vision_radius = vehicle_object.vision.radius
 
-							if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
-								-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
-								local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
+						if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
+							-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
+							local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
+						end
+						
+						if distance < local_vision_radius and player_vehicle.death_pos == nil then
+							if squad.target_vehicles[player_vehicle_id] == nil then
+								squad.target_vehicles[player_vehicle_id] = {
+									state = TARGET_VISIBILITY_VISIBLE,
+									last_known_pos = player_vehicle_transform,
+								}
+							else
+								local target_vehicle = squad.target_vehicles[player_vehicle_id]
+								target_vehicle.state = TARGET_VISIBILITY_VISIBLE
+								target_vehicle.last_known_pos = player_vehicle_transform
 							end
-							
-							if distance < local_vision_radius and player_vehicle.death_pos == nil then
-								if squad.target_vehicles[player_vehicle_id] == nil then
-									squad.target_vehicles[player_vehicle_id] = {
-										state = TARGET_VISIBILITY_VISIBLE,
-										last_known_pos = player_vehicle_transform,
-									}
-								else
-									local target_vehicle = squad.target_vehicles[player_vehicle_id]
-									target_vehicle.state = TARGET_VISIBILITY_VISIBLE
-									target_vehicle.last_known_pos = player_vehicle_transform
-								end
 
-								break
-							end
+							break
 						end
 					end
 				end
 			end
+		end
 
-			if player_vehicle.death_pos ~= nil then
-				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
-					local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
-					player_vehicle.death_pos = nil
-					if is_success and player_vehicle_data.voxels then
-						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
-					end
+		if player_vehicle.death_pos ~= nil then
+			if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
+				local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
+				player_vehicle.death_pos = nil
+				if is_success and player_vehicle_data.voxels then
+					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
 				end
 			end
 		end
 	end
 
 	-- analyse players
-	local player_list = s.getPlayers()
-	for player_index, player in pairs(player_list) do
-		if isTickID(player_index, 30) then
-			local player_steam_id = tostring(player.steam_id)
-			if player_steam_id then
-				local player_transform = s.getPlayerPos(player.id)
-				
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					if squad_index ~= RESUPPLY_SQUAD_INDEX then
-						-- reset target visibility state to investigate
+	for _, player in ipairs(s.getPlayers()) do
+		local player_steam_id = tostring(player.steam_id)
+		if player_steam_id then
+			local player_transform = s.getPlayerPos(player.id)
+			
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad_index ~= RESUPPLY_SQUAD_INDEX then
+					-- reset target visibility state to investigate
 
-						if squad.target_players[player_steam_id] ~= nil then
-							squad.target_players[player_steam_id].state = TARGET_VISIBILITY_INVESTIGATE
-						end
+					if squad.target_players[player_steam_id] ~= nil then
+						squad.target_players[player_steam_id].state = TARGET_VISIBILITY_INVESTIGATE
+					end
 
-						-- check if target is visible to any vehicles
+					-- check if target is visible to any vehicles
 
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							local distance = m.distance(player_transform, vehicle_object.transform)
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						local distance = m.distance(player_transform, vehicle_object.transform)
 
-							if distance <= vehicle_object.vision.radius then
-								g_savedata.ai_knowledge.last_seen_positions[player_steam_id] = player_transform
-								if squad.target_players[player_steam_id] == nil then
-									squad.target_players[player_steam_id] = {
-										state = TARGET_VISIBILITY_VISIBLE,
-										last_known_pos = player_transform,
-									}
-								else
-									local target_player = squad.target_players[player_steam_id]
-									target_player.state = TARGET_VISIBILITY_VISIBLE
-									target_player.last_known_pos = player_transform
-								end
-								
-								break
+						if distance <= vehicle_object.vision.radius then
+							g_savedata.ai_knowledge.last_seen_positions[player_steam_id] = player_transform
+							if squad.target_players[player_steam_id] == nil then
+								squad.target_players[player_steam_id] = {
+									state = TARGET_VISIBILITY_VISIBLE,
+									last_known_pos = player_transform,
+								}
+							else
+								local target_player = squad.target_players[player_steam_id]
+								target_player.state = TARGET_VISIBILITY_VISIBLE
+								target_player.last_known_pos = player_transform
 							end
+							
+							break
 						end
 					end
+				end
+			end
+		end
+	end
+
+	-- update all of the keypads on the AI vehicles which are loaded
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if vehicle_object.state.is_simulating then
+				if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+					setVehicleKeypads(vehicle_id, vehicle_object, squad)
 				end
 			end
 		end
@@ -4691,8 +4682,8 @@ function tickVehicles()
 					if ai_target ~= nil then
 						if vehicle_object.state.is_simulating then
 							if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
-								s.setAITarget(vehicle_object.survivors[1].id, ai_target)
-								s.setAIState(vehicle_object.survivors[1].id, ai_state)
+								s.setAITarget(vehicle_object.survivors[1], ai_target)
+								s.setAIState(vehicle_object.survivors[1], ai_state)
 							end
 						else
 							local exhausted_movement = false
@@ -4724,8 +4715,8 @@ function tickVehicles()
 									s.setVehiclePos(vehicle_id, new_pos)
 									vehicle_object.transform = new_pos
 
-									for npc_index, npc_object in pairs(vehicle_object.survivors) do
-										s.setObjectPos(npc_object.id, new_pos)
+									for _, object_id in pairs(vehicle_object.survivors) do
+										s.setObjectPos(object_id, new_pos)
 									end
 
 									if vehicle_object.fire_id ~= nil then
@@ -5453,8 +5444,8 @@ function tickControls()
 			end
 
 			--? is the driver incapcitated, dead or non existant
-			local driver_data = s.getCharacterData(vehicle_object.survivors[1].id)
-			if not driver_data or driver_data.dead or driver_data.incapcitated then
+			local driver_data = s.getCharacterData(vehicle_object.survivors[1])
+			if not driver_data or driver_data.dead or driver_data.incapacitated then
 				goto break_control_vehicle
 			end
 
@@ -5465,7 +5456,7 @@ function tickControls()
 			end
 
 			for seat_id, seat_data in pairs(vehicle_data.components.seats) do
-				if seat_data.name == "Driver" and seat_data.seated_id ~= vehicle_object.survivors[1].id then
+				if seat_data.name == "Driver" and seat_data.seated_id ~= vehicle_object.survivors[1] then
 
 					if d.getDebug(5) then
 						if vehicle_object.driving.ui_id then
@@ -5770,6 +5761,8 @@ end
 function build_locations(addon_index, location_index)
 	local location_data = s.getLocationData(addon_index, location_index)
 
+	d.print("build_locations | building location with name: "..location_data.name.." and from addon: "..addon_index)
+
 	local addon_components = {
 		vehicles = {},
 		survivors = {},
@@ -5808,6 +5801,9 @@ function build_locations(addon_index, location_index)
 	end
 
 	if is_valid_location then
+
+		d.print("build_locations | building VALID location with name: "..location_data.name.." and from addon: "..addon_index)
+
 		table.insert(built_locations, { 
 			location_index = location_index,
 			addon_index = addon_index,

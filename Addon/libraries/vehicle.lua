@@ -418,7 +418,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
-	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location_data.name, true, 0)
 
 	if not requested_prefab then
 		if Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
@@ -650,7 +650,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	d.print("(Vehicle.spawn) calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
 	-- check if we can afford the vehicle
-	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
+	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location_data.name), island.name, purchase_type, true)
 
 	d.print("(Vehicle.spawn) cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
 
@@ -660,25 +660,16 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	-- spawn objects
 
-	local addon_index = selected_prefab.location.addon_index
+	local addon_index = selected_prefab.addon_index
 
 	local spawned_objects = {
-		survivors = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.survivors, {}),
-		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.fires, {}),
-		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
+		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location_index, selected_prefab.fires, {}),
+		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
-	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location_data.name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
-		local vehicle_survivors = {}
-		for key, char in pairs(spawned_objects.survivors) do
-			local c = s.getCharacterData(char.id)
-			s.setCharacterData(char.id, c.hp, true, true)
-			s.setAIState(char.id, 1)
-			s.setAITargetVehicle(char.id, nil)
-			table.insert(vehicle_survivors, char)
-		end
 
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
@@ -688,9 +679,9 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		---@class vehicle_object
 		local vehicle_data = { 
 			id = spawned_objects.spawned_vehicle.id,
-			name = selected_prefab.location.data.name,
+			name = selected_prefab.location_data.name,
 			home_island = g_savedata.islands[selected_spawn] or g_savedata.ai_base_island,
-			survivors = vehicle_survivors, 
+			survivors = {},
 			path = { 
 				[0] = {
 					x = home_x, 
@@ -738,11 +729,6 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			},
 			driving = { -- used for driving the vehicle itself, holds special data depending on the vehicle type
 				ui_id = s.getMapID()
-			},
-			capabilities = {
-				gps_target = Tags.has(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
-				gps_missile = Tags.has(selected_prefab.vehicle.tags, "GPS_MISSILE"), -- used to press a button to fire the missiles
-				target_mass = Tags.has(selected_prefab.vehicle.tags, "TARGET_MASS") -- sends mass of targeted vehicle mass to the creation
 			},
 			cargo = {
 				capacity = Tags.getValue(selected_prefab.vehicle.tags, "cargo_per_type") or 0,
@@ -792,14 +778,14 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			setSquadCommand(squad, SQUAD.COMMAND.CARGO)
 		end
 
-		local prefab, got_prefab = v.getPrefab(selected_prefab.location.data.name)
+		local prefab, got_prefab = v.getPrefab(selected_prefab.location_data.name)
 
 		if not got_prefab then
 			v.createPrefab(spawned_objects.spawned_vehicle.id)
 		end
 
 		if cost_existed then
-			local cost, cost_existed, was_purchased = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), (g_savedata.islands[selected_spawn].name or g_savedata.ai_base_island.name), purchase_type)
+			local cost, cost_existed, was_purchased = v.purchaseVehicle(string.removePrefix(selected_prefab.location_data.name), (g_savedata.islands[selected_spawn].name or g_savedata.ai_base_island.name), purchase_type)
 			if not was_purchased then
 				vehicle_data.costs.buy_on_load = true
 			end
@@ -857,10 +843,10 @@ function Vehicle.teleport(vehicle_id, transform)
 	local none_failed = true
 
 	-- set char pos
-	for i, char in ipairs(vehicle_object.survivors) do
-		local is_success = s.setObjectPos(char.id, transform)
+	for _, object_id in ipairs(vehicle_object.survivors) do
+		local is_success = s.setObjectPos(object_id, transform)
 		if not is_success then
-			d.print("(Vehicle.teleport) failed to set character position! char.id: "..char.id, true, 1)
+			d.print("(Vehicle.teleport) failed to set character position! char.id: "..object_id, true, 1)
 			none_failed = false
 		end
 	end
@@ -988,8 +974,8 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 		s.despawnVehicle(vehicle_id, kill_instantly)
 
 		-- despawn all of the enemy AI NPCs
-		for _, survivor in pairs(vehicle_object.survivors) do
-			s.despawnObject(survivor.id, kill_instantly)
+		for _, object_id in pairs(vehicle_object.survivors) do
+			s.despawnObject(object_id, kill_instantly)
 		end
 
 		-- despawn its vehicle fire if it had one

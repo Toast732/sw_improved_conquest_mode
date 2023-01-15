@@ -11,7 +11,7 @@ is = Island
 
 -- checks if this island can spawn the specified vehicle
 ---@param island ISLAND the island you want to check if AI can spawn there
----@param selected_prefab selected_prefab[] the selected_prefab you want to check with the island
+---@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
 ---@return boolean can_spawn if the AI can spawn there
 function Island.canSpawn(island, selected_prefab)
 

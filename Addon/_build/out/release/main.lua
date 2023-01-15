@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.2)"
+ADDON_VERSION = "(0.4.0.3)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1657,7 +1657,7 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 							for vehicle_id, v in pairs(strat_data) do
 								if type(v) == "table" then
 									g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].location.data.name.." for adaptive AI", true, 0)
+									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].prefab_data.location_data.name.." for adaptive AI", true, 0)
 								end
 							end
 						end
@@ -1673,7 +1673,7 @@ end
 ---@param is_specified boolean true to specify what vehicle to spawn, false for random
 ---@param vehicle_list_id any vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
 ---@param vehicle_type string the type of vehicle you want to spawn, such as boat, helicopter, plane or land
----@return prefab_data[] prefab_data the vehicle's prefab data
+---@return PREFAB_DATA prefab_data the vehicle's prefab data
 function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 	local sel_role = nil
 	local sel_veh_type = nil
@@ -1758,7 +1758,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		return false
 	end
-	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
+	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle].prefab_data
 end
 
 ---@param role string the role of the vehicle, such as attack, general or defend
@@ -1792,7 +1792,7 @@ function SpawnModifiers.getVehicleListID(vehicle_name)
 	vehicle_name = string.removePrefix(vehicle_name)
 
 	for vehicle_id, vehicle_object in pairs(g_savedata.vehicle_list) do
-		if string.removePrefix(vehicle_object.location.data.name) == vehicle_name then
+		if string.removePrefix(vehicle_object.location_data.name) == vehicle_name then
 			return vehicle_id
 		end
 	end
@@ -1883,7 +1883,7 @@ function SpawnModifiers.getStats()
 								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
-										prefab_data = vehicle_data
+										prefab_data = vehicle_data.prefab_data
 									})
 								end
 							end
@@ -2238,7 +2238,7 @@ is = Island
 
 -- checks if this island can spawn the specified vehicle
 ---@param island ISLAND the island you want to check if AI can spawn there
----@param selected_prefab selected_prefab[] the selected_prefab you want to check with the island
+---@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
 ---@return boolean can_spawn if the AI can spawn there
 function Island.canSpawn(island, selected_prefab)
 
@@ -2384,7 +2384,8 @@ function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_in
 	if is_success then
 		return component.id
 	else -- then it failed to spawn the addon component
-		d.print("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: "..component.."\naddon_index: "..addon_index.."\nlocation index: "..location_index, false, 1)
+		d.print("this addon index: "..s.getAddonIndex(), false, 0)
+		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
 		return nil
 	end
 end
@@ -2982,7 +2983,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
-	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location_data.name, true, 0)
 
 	if not requested_prefab then
 		if Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") and boat_count >= g_savedata.settings.MAX_BOAT_AMOUNT then
@@ -3214,7 +3215,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	d.print("(Vehicle.spawn) calculating cost of vehicle... (purchase type: "..tostring(purchase_type)..")", true, 0)
 	-- check if we can afford the vehicle
-	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), island.name, purchase_type, true)
+	local cost, cost_existed, was_purchased, stats_multiplier = v.purchaseVehicle(string.removePrefix(selected_prefab.location_data.name), island.name, purchase_type, true)
 
 	d.print("(Vehicle.spawn) cost: "..tostring(cost).." Purchase Type: "..purchase_type, true, 0)
 
@@ -3224,25 +3225,16 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 
 	-- spawn objects
 
-	local addon_index = selected_prefab.location.addon_index
+	local addon_index = selected_prefab.addon_index
 
 	local spawned_objects = {
-		survivors = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.survivors, {}),
-		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.fires, {}),
-		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location.location_index, selected_prefab.vehicle, 0, nil, {}),
+		fires = su.spawnObjects(spawn_transform, addon_index, selected_prefab.location_index, selected_prefab.fires, {}),
+		spawned_vehicle = su.spawnObject(spawn_transform, addon_index, selected_prefab.location_index, selected_prefab.vehicle, 0, nil, {}),
 	}
 
-	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location.data.name, true, 0)
+	d.print("(Vehicle.spawn) setting up enemy vehicle: "..selected_prefab.location_data.name, true, 0)
 
 	if spawned_objects.spawned_vehicle ~= nil then
-		local vehicle_survivors = {}
-		for key, char in pairs(spawned_objects.survivors) do
-			local c = s.getCharacterData(char.id)
-			s.setCharacterData(char.id, c.hp, true, true)
-			s.setAIState(char.id, 1)
-			s.setAITargetVehicle(char.id, nil)
-			table.insert(vehicle_survivors, char)
-		end
 
 		local home_x, home_y, home_z = m.position(spawn_transform)
 
@@ -3252,9 +3244,9 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		---@class vehicle_object
 		local vehicle_data = { 
 			id = spawned_objects.spawned_vehicle.id,
-			name = selected_prefab.location.data.name,
+			name = selected_prefab.location_data.name,
 			home_island = g_savedata.islands[selected_spawn] or g_savedata.ai_base_island,
-			survivors = vehicle_survivors, 
+			survivors = {},
 			path = { 
 				[0] = {
 					x = home_x, 
@@ -3302,11 +3294,6 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			},
 			driving = { -- used for driving the vehicle itself, holds special data depending on the vehicle type
 				ui_id = s.getMapID()
-			},
-			capabilities = {
-				gps_target = Tags.has(selected_prefab.vehicle.tags, "GPS_TARGET_POSITION"), -- if it needs to have gps coords sent for where the player is
-				gps_missile = Tags.has(selected_prefab.vehicle.tags, "GPS_MISSILE"), -- used to press a button to fire the missiles
-				target_mass = Tags.has(selected_prefab.vehicle.tags, "TARGET_MASS") -- sends mass of targeted vehicle mass to the creation
 			},
 			cargo = {
 				capacity = Tags.getValue(selected_prefab.vehicle.tags, "cargo_per_type") or 0,
@@ -3356,14 +3343,14 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			setSquadCommand(squad, SQUAD.COMMAND.CARGO)
 		end
 
-		local prefab, got_prefab = v.getPrefab(selected_prefab.location.data.name)
+		local prefab, got_prefab = v.getPrefab(selected_prefab.location_data.name)
 
 		if not got_prefab then
 			v.createPrefab(spawned_objects.spawned_vehicle.id)
 		end
 
 		if cost_existed then
-			local cost, cost_existed, was_purchased = v.purchaseVehicle(string.removePrefix(selected_prefab.location.data.name), (g_savedata.islands[selected_spawn].name or g_savedata.ai_base_island.name), purchase_type)
+			local cost, cost_existed, was_purchased = v.purchaseVehicle(string.removePrefix(selected_prefab.location_data.name), (g_savedata.islands[selected_spawn].name or g_savedata.ai_base_island.name), purchase_type)
 			if not was_purchased then
 				vehicle_data.costs.buy_on_load = true
 			end
@@ -3421,10 +3408,10 @@ function Vehicle.teleport(vehicle_id, transform)
 	local none_failed = true
 
 	-- set char pos
-	for i, char in ipairs(vehicle_object.survivors) do
-		local is_success = s.setObjectPos(char.id, transform)
+	for _, object_id in ipairs(vehicle_object.survivors) do
+		local is_success = s.setObjectPos(object_id, transform)
 		if not is_success then
-			d.print("(Vehicle.teleport) failed to set character position! char.id: "..char.id, true, 1)
+			d.print("(Vehicle.teleport) failed to set character position! char.id: "..object_id, true, 1)
 			none_failed = false
 		end
 	end
@@ -3552,8 +3539,8 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 		s.despawnVehicle(vehicle_id, kill_instantly)
 
 		-- despawn all of the enemy AI NPCs
-		for _, survivor in pairs(vehicle_object.survivors) do
-			s.despawnObject(survivor.id, kill_instantly)
+		for _, object_id in pairs(vehicle_object.survivors) do
+			s.despawnObject(object_id, kill_instantly)
 		end
 
 		-- despawn its vehicle fire if it had one
@@ -4869,7 +4856,7 @@ function Cargo.getTransportVehicle(vehicle_type)
 		d.print("(Cargo.getTransportVehicle) vehicle_prefab is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
 		vehicle_prefab = nil
 	else
-		vehicle_prefab.name = vehicle_prefab.location.data.name
+		vehicle_prefab.name = vehicle_prefab.prefab_data.location_data.name
 	end
 	return vehicle_prefab
 end
@@ -5044,6 +5031,188 @@ end
 
 ]]
 
+s = s or Server
+
+-- required libraries
+
+-- library name
+Characters = {}
+
+-- shortened library name
+c = Characters
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+Characters.valid_seats = { -- configure to select which are the valid seats, select which seat group.
+	enemy_ai = {
+		{
+			name = "Driver",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = false,
+			ai_state = 0
+		},
+		{
+			name = "Captain",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
+		},
+		{
+			name = "Pilot",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
+		},
+		{
+			name = "Gunner %d+",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
+		}
+	}
+}
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class VALID_SEAT
+---@field name string a lua pattern of the name of the valid seat
+---@field outfit_id SWOutfitTypeEnum the outfit type the character will wear in that seat
+---@field is_interactable boolean if the character is interactable
+---@field is_ai boolean if the character has AI to use seat controls
+---@field ai_state integer the state of the AI
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+function Characters.overrides()
+
+	-- populate g_savedata with the table we will be using, 
+	Tables.tabulate(g_savedata, "libraries", "characters", "characters_to_seat")
+
+	-- onObjectLoad override
+	local old_onObjectLoad = onObjectLoad or function() end
+	function onObjectLoad(object_id)
+		if g_savedata.libraries.characters.characters_to_seat[object_id] then
+			Characters.setIntoSeat(object_id)
+		end
+
+		old_onObjectLoad(object_id)
+	end
+
+	-- onCharacterSit override
+	local old_onCharacterSit = onCharacterSit or function() end
+	function onCharacterSit(object_id, vehicle_id, seat_name)
+		if g_savedata.libraries.characters.characters_to_seat[object_id] then
+			g_savedata.libraries.characters.characters_to_seat[object_id] = nil
+			d.print(("(Characters.onCharacterSit) Successfully set object %i into seat %s on vehicle %i"):format(object_id, seat_name, vehicle_id), true, 0)
+
+			if onCharacterPrepared then
+				onCharacterPrepared(object_id, vehicle_id, seat_name)
+			end
+		end
+
+		old_onCharacterSit(object_id, vehicle_id, seat_name)
+	end
+end
+
+function Characters.setIntoSeat(object_id)
+	local seat_char_data = g_savedata.libraries.characters.characters_to_seat[object_id]
+
+	local seat_pos = seat_char_data.seat_data.pos
+
+	s.setCharacterSeated(object_id, seat_char_data.vehicle_id, seat_pos.x, seat_pos.y, seat_pos.z)
+
+	s.setCharacterData(object_id, s.getCharacterData(object_id).hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
+	s.setAIState(object_id, seat_char_data.char_config.ai_state)
+	s.setAITargetVehicle(object_id, nil)
+end
+
+--# spawns the characters for all of the valid seats on the vehicle, and will later add them to the 
+---@param vehicle_id integer the vehicle to spawn the characters for, the vehicle must be loaded in or previously been loaded in.
+---@param valid_seats table<integer, VALID_SEAT> the valid seat names along with the outfit_id to use for them, set groups up in characters.lua in the valid_seats variable and then use them here
+function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
+	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+	-- failed to get vehicle data
+	if not is_success then
+		d.print("(Characters.setupVehicle) failed to get vehicle data for vehicle_id: "..vehicle_id, true, 1)
+		return {}, false
+	end
+
+	-- vehicle has never loaded
+	if not vehicle_data.components then
+		d.print(("(Characters.setupVehicle) vehicle_id: %i has not been loaded yet!"):format(vehicle_id), true, 1)
+		return {}, false
+	end
+
+	-- vehicle has no seats
+	if not vehicle_data.components.seats[1] then
+		d.print(("(Characters.setupVehicle) vehicle_id: %i has no seats!"):format(vehicle_id), true, 1)
+		return {}, false
+	end
+
+	-- make sure it's overriding the callback functions
+	Characters.overrides()
+
+	local characters = {}
+
+	-- go through all valid seat types, and for each, go through all of the seats, this way the output table is sorted in the order the valid seats table is ordered.
+	for valid_seat_id = 1, #valid_seats do
+		local valid_seat = valid_seats[valid_seat_id]
+		for seat_id = 1, #vehicle_data.components.seats do
+			local seat_data = vehicle_data.components.seats[seat_id]
+			if string.find(seat_data.name, valid_seat.name) then
+				-- this is a valid seat
+				local object_id, is_success = s.spawnCharacter(vehicle_data.transform, valid_seat.outfit_id)
+				if not is_success then
+					d.print(("(Characters.setupVehicle) failed to spawn character for vehicle_id: %i!"):format(vehicle_id), true, 1)
+				else 
+					s.setCharacterData(object_id, s.getCharacterData(object_id).hp, valid_seat.is_interactable, valid_seat.is_ai)
+					s.setAIState(object_id, valid_seat.ai_state)
+					s.setAITargetVehicle(object_id, nil)
+					table.insert(characters, object_id)
+					g_savedata.libraries.characters.characters_to_seat[object_id] = {
+						seat_data = seat_data,
+						vehicle_id = vehicle_id,
+						char_config = valid_seat
+					}
+				end
+			end
+		end
+	end 
+
+	return characters, true
+end
+ -- functions for characters, such as setting them into seats.
+--[[
+
+
+	Library Setup
+
+
+]]
+
 -- required libraries
 --[[
 
@@ -5074,6 +5243,12 @@ sup = Setup
 ---@field land table<number, SWZone> the land vehicle spawn zones
 ---@field sea table<number, SWZone> the sea vehicle spawn zones
 
+---@class PREFAB_DATA
+---@field addon_index integer, Addon index the vehicle is from
+---@field location_index integer, Location index the vehicle is in
+---@field location_data SWLocationData, the data of the mission location which the vehicle is in
+---@field vehicle SWAddonComponentData the data of the vehicle
+---@field fires table<number, SWAddonComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
 
 --[[
 
@@ -5154,6 +5329,142 @@ function Setup.sortSpawnZones(spawn_zones)
 	end
 
 	return tile_zones
+end
+
+--# setups the vehicle prefabs
+function Setup.createVehiclePrefabs()
+
+	-- reset vehicle list
+	g_savedata.vehicle_list = {}
+
+	-- remove all existing vehicle data in constructable_vehicles
+	for role, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
+		if type(vehicles_with_role) == "table" then
+			for vehicle_type, vehicles_with_type in pairs(vehicles_with_role) do
+				if type(vehicles_with_type) == "table" then
+					for strategy, vehicles_with_strategy in pairs(vehicles_with_type) do
+						if type(vehicles_with_strategy) == "table" then
+							for i = 1, #vehicles_with_type do
+								vehicles_with_type[i].prefab_data = nil
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- iterate through all addons
+	for addon_index = 0, s.getAddonCount() - 1 do
+		local addon_data = s.getAddonData(addon_index)
+
+		if not addon_data.location_count or addon_data.location_count <= 0 then
+			goto createVehiclePrefabs_continue_addon
+		end
+
+		-- iterate through all locations in this addon
+		for location_index = 0, addon_data.location_count - 1 do
+			local location_data = s.getLocationData(addon_index, location_index)
+
+			-- iterate through all components in this location
+			for component_index = 0, location_data.component_count do
+
+				local component_data, is_success = s.getLocationComponentData(addon_index, location_index, component_index)
+
+				if not is_success then
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- check if this is the flag
+				if not flag_prefab and Tags.has(component_data.tags, "type=dlc_weapons_flag") and component_data.type == "vehicle" then
+					flag_prefab = { 
+						addon_index = addon_index,
+						location_index = location_index,
+						component_index = component_index
+					}
+
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- if this component is not an enemy AI vehicle
+				if not Tags.has(component_data.tags, "type=dlc_weapons") then
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- there is an enemy AI vehicle here
+
+				---@type PREFAB_DATA
+				local prefab_data = {
+					addon_index = addon_index, -- addon index the vehicle is from
+					location_index = location_index, -- the location index the vehicle is in
+					location_data = location_data, -- the data of the location
+					vehicle = component_data, -- the vehicle itself
+					fires = {} -- the fires attached to this vehicle
+				}
+
+				-- add any fires that are attached to this vehicle
+				for valid_component_index = 0, location_data.component_count - 1 do
+					local valid_component_data, is_success = s.getLocationComponentData(addon_index, location_index, valid_component_index)
+
+					if is_success then
+						-- if this is a fire, and its parented to this vehicle, then add it to the prefab
+						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == component_index then
+							table.insert(prefab_data.fires, valid_component_data)
+						end
+					end
+				end
+
+				-- get the role of the vehicle
+				local role = Tags.getValue(component_data.tags, "role", true) or "general"
+				-- get the type of the vehicle
+				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true), "wep_", "") or "unknown"
+				-- get the strategy of the vehicle
+				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
+
+				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
+				Tables.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
+
+				local vehicle_list_data = prefab_data
+				vehicle_list_data.role = role
+				vehicle_list_data.vehicle_type = vehicle_type
+				vehicle_list_data.strategy = strategy
+
+				-- add vehicle list data to the vehicle list
+				g_savedata.vehicle_list[#g_savedata.vehicle_list + 1] = vehicle_list_data
+
+				--[[ 
+					check if this vehicle exists within the constructable vehicles already
+					if it does, then just update it's prefab data
+					otherwise, create a new one
+				]]
+				for i = math.min(1, #g_savedata.constructable_vehicles[role][vehicle_type][strategy]), #g_savedata.constructable_vehicles[role][vehicle_type][strategy] do
+					local constructable_vehicle_data = g_savedata.constructable_vehicles[role][vehicle_type][strategy][i]
+
+					if constructable_vehicle_data and constructable_vehicle_data.name == location_data.name then
+						-- this vehicle already exists
+
+						-- update prefab data
+						constructable_vehicle_data.prefab_data = prefab_data
+
+						-- update id
+						constructable_vehicle_data.id = #g_savedata.vehicle_list
+					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
+						-- this vehicle does not exist
+						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
+							prefab_data = prefab_data,
+							name = location_data.name,
+							mod = 1,
+							id = #g_savedata.vehicle_list
+						})
+					end
+				end
+				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
+				::createVehiclePrefabs_continue_component::
+			end
+		end
+
+		::createVehiclePrefabs_continue_addon::
+	end
 end
 
 
@@ -5885,6 +6196,12 @@ function onCreate(is_world_create)
 		}
 	end
 
+	d.print("setting overrides")
+
+	c.overrides() -- override some functions
+
+	d.print("after setting overrides")
+
 	ac.executeOnReply( -- setup world after 1 tick, to prevent issues with the addon indexes getting mixed up
 		SHORT_ADDON_NAME, -- addon we're expecting the reply from
 		"onCreate()", -- the message content
@@ -5934,22 +6251,21 @@ function setupMain(is_world_create)
 		
 		p.updatePathfinding()
 
-		d.print("building locations...", true, 0)
+		--d.print("building locations...", true, 0)
 
-		for i in iterPlaylists() do
+		--[[for i in iterPlaylists() do
 			for j in iterLocations(i) do
 				build_locations(i, j)
 			end
-		end
+		end]]
 
-		-- reset vehicle list
-		g_savedata.vehicle_list = {}
+		d.print("building locations and prefabs...", true, 0)
 
-		d.print("building prefabs...", true, 0)
+		sup.createVehiclePrefabs()
 
-		for i = 1, #built_locations do
+		--[[for i = 1, #built_locations do
 			buildPrefabs(i)
-		end
+		end]]
 
 		if is_world_create then
 			d.print("setting up world...", true, 0)
@@ -6247,7 +6563,8 @@ function buildPrefabs(location_index)
 	for key, vehicle in pairs(location.objects.vehicles) do
 
 		local prefab_data = {
-			location = location, 
+			location = location,
+			addon_index = built_locations[location_index].addon_index,
 			vehicle = vehicle, 
 			survivors = {}, 
 			fires = {}
@@ -6300,7 +6617,11 @@ function buildPrefabs(location_index)
 				end
 				
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
-				d.print("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, 0)
+
+				local prefab = g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]]
+
+				d.print(prefab)
+				d.print("set id: "..vehicle_index.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].prefab_data.location_data.name.." from addon with index: "..prefab.addon_index, true, 0)
 			else
 				Tables.tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
@@ -6623,8 +6944,8 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "target" then
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					for i, char in  pairs(vehicle_object.survivors) do
-						s.setAITargetVehicle(char.id, arg[1])
+					for _, object_id in  pairs(vehicle_object.survivors) do
+						s.setAITargetVehicle(object_id, arg[1])
 					end
 				end
 			end
@@ -6824,7 +7145,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "vehiclelist" then --vehicle list
 			d.print("Valid Vehicles:", false, 0, peer_id)
 			for vehicle_index, vehicle_object in ipairs(g_savedata.vehicle_list) do
-				d.print("\nName: \""..string.removePrefix(vehicle_object.location.data.name, true).."\"\nType: "..(string.gsub(Tags.getValue(vehicle_object.vehicle.tags, "vehicle_type", true), "wep_", ""):gsub("^%l", string.upper)), false, 0, peer_id)
+				d.print("\nName: \""..string.removePrefix(vehicle_object.location_data.name, true).."\"\nType: "..(string.gsub(Tags.getValue(vehicle_object.vehicle.tags, "vehicle_type", true), "wep_", ""):gsub("^%l", string.upper)), false, 0, peer_id)
 			end
 
 
@@ -7164,11 +7485,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			else
 				d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.best) do
-					d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 				d.print("Bottom 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.worst) do
-					d.print(_..": "..vehicle_data.prefab_data.location.data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 			end
 		
@@ -7623,6 +7944,8 @@ function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 			death_pos = nil, 
 			ui_id = s.getMapID()
 		}
+
+		return
 	end
 end
 
@@ -7681,8 +8004,8 @@ function cleanVehicle(squad_index, vehicle_id)
 		end
 	end
 
-	for _, survivor in pairs(vehicle_object.survivors) do
-		s.despawnObject(survivor.id, true)
+	for _, object_id in pairs(vehicle_object.survivors) do
+		s.despawnObject(object_id, true)
 	end
 
 	if vehicle_object.fire_id ~= nil then
@@ -7732,35 +8055,31 @@ function onVehicleUnload(vehicle_id)
 	end
 end
 
-function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
+function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
 	
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-		if vehicle_object.capabilities.target_mass then
-			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
-			if is_success then
-				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
-			end
+
+		local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+
+		if is_success then -- target vehicle's mass
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
 		end
+
 	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50) -- player's mass
+
 	else
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0) -- no target
 	end
-	if target then
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", target.last_known_pos[13])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", target.last_known_pos[14])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", target.last_known_pos[15])
-		if vehicle_object.capabilities.gps_missile then
-			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
-		end
+	if target then -- set the target's position on keypads
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_X", target.last_known_pos[13])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Y", target.last_known_pos[14])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Z", target.last_known_pos[15])
 	end
 end
 
@@ -7772,6 +8091,25 @@ end
 function onObjectLoad(object_id)
 	d.print("(onObjectLoad) object_id: "..object_id, true, 0)
 end]]
+
+--[[function onCharacterSit(object_id, vehicle_id, seat_name)
+	d.print(("(onCharacterSit) object_id: %i\nvehicle_id: %i\nseat_name: %s"):format(object_id, vehicle_id, seat_name))
+end]]
+
+-- called whenever an AI is properly spawned, data set, and set into seat.
+function onCharacterPrepared(object_id, vehicle_id, seat_name)
+	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+
+	vehicle_object._prepared_survivors = vehicle_object._prepared_survivors or {}
+	table.insert(vehicle_object._prepared_survivors, object_id)
+
+	-- if we've prepared all of our survivors
+	if #vehicle_object._prepared_survivors == #vehicle_object.survivors then
+		vehicle_object._prepared_survivors = nil
+		d.print("(onCharacterPrepared) all characters prepared!", true, 0)
+		squadInitVehicleCommand(squad, vehicle_object) -- init their commands
+	end
+end
 
 function onVehicleLoad(vehicle_id)
 	-- return if the addon is disabled
@@ -7825,11 +8163,15 @@ function onVehicleLoad(vehicle_id)
 	end
 
 	-- say the vehicle has loaded
-	-- also make sure its not spawning inside another vehicle
+	-- spawn the AI npcs if they've not yet been spawned
+	-- and make sure its not spawning inside another vehicle
 	if vehicle_object then
 		d.print("(onVehicleLoad) set vehicle simulating: "..vehicle_id, true, 0)
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 		vehicle_object.state.is_simulating = true
+
+		vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+
 		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
 		for checking_squad_index, checking_squad in pairs(g_savedata.ai_army.squadrons) do
 			for checking_vehicle_id, checking_vehicle_object in pairs(checking_squad.vehicles) do
@@ -7875,46 +8217,6 @@ function onVehicleLoad(vehicle_id)
 		end
 
 		d.print("(onVehicleLoad) #of survivors: "..tostring(#vehicle_object.survivors), true, 0)
-
-		for i, char in pairs(vehicle_object.survivors) do
-			if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
-				--Gunners
-				s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. i)
-				local c = s.getCharacterData(char.id)
-				if c then
-					s.setCharacterData(char.id, c.hp, true, true)
-				end
-			else
-				if i == 1 then
-					if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-						s.setCharacterSeated(char.id, vehicle_id, "Captain")
-					elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-						s.setCharacterSeated(char.id, vehicle_id, "Driver")
-					else
-						s.setCharacterSeated(char.id, vehicle_id, "Pilot")
-					end
-					local c = s.getCharacterData(char.id)
-					if c then
-						if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-							s.setCharacterData(char.id, c.hp, true, false)
-						else
-							s.setCharacterData(char.id, c.hp, true, true)
-						end
-					else
-						d.print("(onVehicleLoad) (Non Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-					end
-				else
-					--Gunners
-					s.setCharacterSeated(char.id, vehicle_id, "Gunner ".. (i - 1))
-					local c = s.getCharacterData(char.id)
-					if c then
-						s.setCharacterData(char.id, c.hp, true, true)
-					else
-						d.print("(onVehicleLoad) (Gunner) Failed to get character data for "..tostring(char.id), true, 1)
-					end
-				end
-			end
-		end
 		refuel(vehicle_id)
 	end
 end
@@ -8827,7 +9129,7 @@ function tickSquadrons()
 				end
 
 				-- if pilot is incapacitated
-				local c = s.getCharacterData(vehicle_object.survivors[1].id)
+				local c = s.getCharacterData(vehicle_object.survivors[1])
 
 				--[[
 					if npc exists
@@ -9497,14 +9799,14 @@ function tickSquadrons()
 
 								p.resetPath(vehicle_object)
 								p.addPath(vehicle_object, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
-								s.setAITarget(vehicle_object.survivors[1].id, m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
+								s.setAITarget(vehicle_object.survivors[1], m.translation(target_pos[13], target_pos[14] - 5, target_pos[15]))
 
 								if m.xzDistance(vehicle_object.transform, m.translation(target_pos[13], target_pos[14], target_pos[15])) < 100 then
-									s.setAIState(vehicle_object.survivors[1].id, 0)
-									s.setCharacterData(vehicle_object.survivors[1].id, 1, true, false)
+									s.setAIState(vehicle_object.survivors[1], 0)
+									s.setCharacterData(vehicle_object.survivors[1], 1, true, false)
 									--d.print("murder.")
 								else
-									s.setAIState(vehicle_object.survivors[1].id, 2)
+									s.setAIState(vehicle_object.survivors[1], 2)
 								end
 								
 
@@ -9594,16 +9896,16 @@ function tickSquadrons()
 								end
 							end
 								
-							for i, char in pairs(vehicle_object.survivors) do
+							for i, object_id in pairs(vehicle_object.survivors) do
 								if target_type == "character" then
-									s.setAITargetCharacter(char.id, target_id)
+									s.setAITargetCharacter(object_id, target_id)
 								elseif target_type == "vehicle" then
-									s.setAITargetVehicle(char.id, target_id)
+									s.setAITargetVehicle(object_id, target_id)
 								end
 	
 								if i ~= 1 or vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
 									if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
-										s.setAIState(char.id, 1)
+										s.setAIState(object_id, 1)
 									end
 								end
 							end
@@ -9613,13 +9915,6 @@ function tickSquadrons()
 
 				if squad_vision:is_engage() == false then
 					setSquadCommand(squad, SQUAD.COMMAND.NONE)
-				end
-			end
-			if squad.command ~= SQUAD.COMMAND.RETREAT then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
-						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
-					end
 				end
 			end
 		end
@@ -9650,104 +9945,110 @@ function tickVision()
 
 	-- analyse player vehicles
 	for player_vehicle_id, player_vehicle in pairs(g_savedata.player_vehicles) do
-		if isTickID(player_vehicle_id, 30) then
-			local player_vehicle_transform = player_vehicle.transform
+		local player_vehicle_transform = player_vehicle.transform
 
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-				if squad_index ~= RESUPPLY_SQUAD_INDEX then
-					-- reset target visibility state to investigate
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			if squad_index ~= RESUPPLY_SQUAD_INDEX then
+				-- reset target visibility state to investigate
 
-					if squad.target_vehicles[player_vehicle_id] ~= nil then
-						if player_vehicle.death_pos == nil then
-							squad.target_vehicles[player_vehicle_id].state = TARGET_VISIBILITY_INVESTIGATE
-						else
-							squad.target_vehicles[player_vehicle_id] = nil
-						end
+				if squad.target_vehicles[player_vehicle_id] ~= nil then
+					if player_vehicle.death_pos == nil then
+						squad.target_vehicles[player_vehicle_id].state = TARGET_VISIBILITY_INVESTIGATE
+					else
+						squad.target_vehicles[player_vehicle_id] = nil
 					end
+				end
 
-					-- check if target is visible to any vehicles
-					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-						local vehicle_transform = vehicle_object.transform
+				-- check if target is visible to any vehicles
+				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+					local vehicle_transform = vehicle_object.transform
 
-						if vehicle_transform ~= nil and player_vehicle_transform ~= nil then
-							local distance = m.distance(player_vehicle_transform, vehicle_transform)
+					if vehicle_transform ~= nil and player_vehicle_transform ~= nil then
+						local distance = m.distance(player_vehicle_transform, vehicle_transform)
 
-							local local_vision_radius = vehicle_object.vision.radius
+						local local_vision_radius = vehicle_object.vision.radius
 
-							if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
-								-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
-								local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
+						if not vehicle_object.vision.is_sonar and player_vehicle_transform[14] < -1 then
+							-- if the player is in the water, and the player is below y -1, then reduce the player's sight level depending on the player's depth
+							local_vision_radius = local_vision_radius * math.min(0.15 / (math.abs(player_vehicle_transform[14]) * 0.2), 0.15)
+						end
+						
+						if distance < local_vision_radius and player_vehicle.death_pos == nil then
+							if squad.target_vehicles[player_vehicle_id] == nil then
+								squad.target_vehicles[player_vehicle_id] = {
+									state = TARGET_VISIBILITY_VISIBLE,
+									last_known_pos = player_vehicle_transform,
+								}
+							else
+								local target_vehicle = squad.target_vehicles[player_vehicle_id]
+								target_vehicle.state = TARGET_VISIBILITY_VISIBLE
+								target_vehicle.last_known_pos = player_vehicle_transform
 							end
-							
-							if distance < local_vision_radius and player_vehicle.death_pos == nil then
-								if squad.target_vehicles[player_vehicle_id] == nil then
-									squad.target_vehicles[player_vehicle_id] = {
-										state = TARGET_VISIBILITY_VISIBLE,
-										last_known_pos = player_vehicle_transform,
-									}
-								else
-									local target_vehicle = squad.target_vehicles[player_vehicle_id]
-									target_vehicle.state = TARGET_VISIBILITY_VISIBLE
-									target_vehicle.last_known_pos = player_vehicle_transform
-								end
 
-								break
-							end
+							break
 						end
 					end
 				end
 			end
+		end
 
-			if player_vehicle.death_pos ~= nil then
-				if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
-					local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
-					player_vehicle.death_pos = nil
-					if is_success and player_vehicle_data.voxels then
-						player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
-					end
+		if player_vehicle.death_pos ~= nil then
+			if m.distance(player_vehicle.death_pos, player_vehicle_transform) > 500 then
+				local player_vehicle_data, is_success = s.getVehicleData(player_vehicle_id)
+				player_vehicle.death_pos = nil
+				if is_success and player_vehicle_data.voxels then
+					player_vehicle.damage_threshold = player_vehicle.damage_threshold + player_vehicle_data.voxels / 10
 				end
 			end
 		end
 	end
 
 	-- analyse players
-	local player_list = s.getPlayers()
-	for player_index, player in pairs(player_list) do
-		if isTickID(player_index, 30) then
-			local player_steam_id = tostring(player.steam_id)
-			if player_steam_id then
-				local player_transform = s.getPlayerPos(player.id)
-				
-				for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-					if squad_index ~= RESUPPLY_SQUAD_INDEX then
-						-- reset target visibility state to investigate
+	for _, player in ipairs(s.getPlayers()) do
+		local player_steam_id = tostring(player.steam_id)
+		if player_steam_id then
+			local player_transform = s.getPlayerPos(player.id)
+			
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad_index ~= RESUPPLY_SQUAD_INDEX then
+					-- reset target visibility state to investigate
 
-						if squad.target_players[player_steam_id] ~= nil then
-							squad.target_players[player_steam_id].state = TARGET_VISIBILITY_INVESTIGATE
-						end
+					if squad.target_players[player_steam_id] ~= nil then
+						squad.target_players[player_steam_id].state = TARGET_VISIBILITY_INVESTIGATE
+					end
 
-						-- check if target is visible to any vehicles
+					-- check if target is visible to any vehicles
 
-						for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-							local distance = m.distance(player_transform, vehicle_object.transform)
+					for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+						local distance = m.distance(player_transform, vehicle_object.transform)
 
-							if distance <= vehicle_object.vision.radius then
-								g_savedata.ai_knowledge.last_seen_positions[player_steam_id] = player_transform
-								if squad.target_players[player_steam_id] == nil then
-									squad.target_players[player_steam_id] = {
-										state = TARGET_VISIBILITY_VISIBLE,
-										last_known_pos = player_transform,
-									}
-								else
-									local target_player = squad.target_players[player_steam_id]
-									target_player.state = TARGET_VISIBILITY_VISIBLE
-									target_player.last_known_pos = player_transform
-								end
-								
-								break
+						if distance <= vehicle_object.vision.radius then
+							g_savedata.ai_knowledge.last_seen_positions[player_steam_id] = player_transform
+							if squad.target_players[player_steam_id] == nil then
+								squad.target_players[player_steam_id] = {
+									state = TARGET_VISIBILITY_VISIBLE,
+									last_known_pos = player_transform,
+								}
+							else
+								local target_player = squad.target_players[player_steam_id]
+								target_player.state = TARGET_VISIBILITY_VISIBLE
+								target_player.last_known_pos = player_transform
 							end
+							
+							break
 						end
 					end
+				end
+			end
+		end
+	end
+
+	-- update all of the keypads on the AI vehicles which are loaded
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if vehicle_object.state.is_simulating then
+				if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+					setVehicleKeypads(vehicle_id, vehicle_object, squad)
 				end
 			end
 		end
@@ -10069,8 +10370,8 @@ function tickVehicles()
 					if ai_target ~= nil then
 						if vehicle_object.state.is_simulating then
 							if not g_air_vehicles_kamikaze or (vehicle_object.vehicle_type ~= VEHICLE.TYPE.PLANE and vehicle_object.vehicle_type ~= VEHICLE.TYPE.HELI) then 
-								s.setAITarget(vehicle_object.survivors[1].id, ai_target)
-								s.setAIState(vehicle_object.survivors[1].id, ai_state)
+								s.setAITarget(vehicle_object.survivors[1], ai_target)
+								s.setAIState(vehicle_object.survivors[1], ai_state)
 							end
 						else
 							local exhausted_movement = false
@@ -10102,8 +10403,8 @@ function tickVehicles()
 									s.setVehiclePos(vehicle_id, new_pos)
 									vehicle_object.transform = new_pos
 
-									for npc_index, npc_object in pairs(vehicle_object.survivors) do
-										s.setObjectPos(npc_object.id, new_pos)
+									for _, object_id in pairs(vehicle_object.survivors) do
+										s.setObjectPos(object_id, new_pos)
 									end
 
 									if vehicle_object.fire_id ~= nil then
@@ -10831,8 +11132,8 @@ function tickControls()
 			end
 
 			--? is the driver incapcitated, dead or non existant
-			local driver_data = s.getCharacterData(vehicle_object.survivors[1].id)
-			if not driver_data or driver_data.dead or driver_data.incapcitated then
+			local driver_data = s.getCharacterData(vehicle_object.survivors[1])
+			if not driver_data or driver_data.dead or driver_data.incapacitated then
 				goto break_control_vehicle
 			end
 
@@ -10843,7 +11144,7 @@ function tickControls()
 			end
 
 			for seat_id, seat_data in pairs(vehicle_data.components.seats) do
-				if seat_data.name == "Driver" and seat_data.seated_id ~= vehicle_object.survivors[1].id then
+				if seat_data.name == "Driver" and seat_data.seated_id ~= vehicle_object.survivors[1] then
 
 					if d.getDebug(5) then
 						if vehicle_object.driving.ui_id then
@@ -11148,6 +11449,8 @@ end
 function build_locations(addon_index, location_index)
 	local location_data = s.getLocationData(addon_index, location_index)
 
+	d.print("build_locations | building location with name: "..location_data.name.." and from addon: "..addon_index)
+
 	local addon_components = {
 		vehicles = {},
 		survivors = {},
@@ -11186,6 +11489,9 @@ function build_locations(addon_index, location_index)
 	end
 
 	if is_valid_location then
+
+		d.print("build_locations | building VALID location with name: "..location_data.name.." and from addon: "..addon_index)
+
 		table.insert(built_locations, { 
 			location_index = location_index,
 			addon_index = addon_index,

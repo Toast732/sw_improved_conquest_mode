@@ -1300,7 +1300,7 @@ function Cargo.getTransportVehicle(vehicle_type)
 		d.print("(Cargo.getTransportVehicle) vehicle_prefab is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
 		vehicle_prefab = nil
 	else
-		vehicle_prefab.name = vehicle_prefab.location.data.name
+		vehicle_prefab.name = vehicle_prefab.prefab_data.location_data.name
 	end
 	return vehicle_prefab
 end
