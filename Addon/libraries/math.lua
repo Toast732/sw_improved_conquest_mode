@@ -48,7 +48,7 @@ math.half_pi = math.pi*0.5
 --- @param x number the number to check if is whole
 --- @return boolean is_whole returns true if x is whole, false if not, nil if x is nil
 function math.isWhole(x) -- returns wether x is a whole number or not
-	return math.tointeger(x)
+	return math.type(x) == "integer"
 end
 
 --- if a number is nil, it sets it to 0
@@ -128,4 +128,26 @@ function math.randChance(t)
 		end
 	end
 	return win_name
+end
+
+---@param x1 number x coordinate of position 1
+---@param x2 number x coordinate of position 2
+---@param z1 number z coordinate of position 1
+---@param z2 number z coordinate of position 2
+---@param y1 number? y coordinate of position 1 (exclude for 2D distance, include for 3D distance)
+---@param y2 number? y coordinate of position 2 (exclude for 2D distance, include for 3D distance)
+---@return number distance the euclidean distance between position 1 and position 2
+function math.euclideanDistance(...)
+	local c = table.pack(...)
+
+	local rx = c[1] - c[2]
+	local rz = c[3] - c[4]
+	if #c == 4 then
+		-- 2D distance
+		return math.sqrt(rx*rx+rz*rz)
+	else
+		-- 3D distance
+		local ry = c[5] - c[6]
+		return math.sqrt(rx*rx+ry*ry+rz*rz)
+	end
 end

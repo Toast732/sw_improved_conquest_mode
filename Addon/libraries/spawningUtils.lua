@@ -46,14 +46,14 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 			l_vehicle_type = "flag"
 		end
 
-		local l_size = "small"
-		for tag_index, tag_object in pairs(object.tags) do
-			if string.find(tag_object, "size=") ~= nil then
-				l_size = string.sub(tag_object, 6)
-			end
-		end
-
-		local object_data = { name = object.display_name, type = object.type, id = spawned_object_id, component_id = object.id, vehicle_type = l_vehicle_type, size = l_size }
+		local object_data = { 
+			name = object.display_name, 
+			type = object.type, 
+			id = spawned_object_id, 
+			component_id = object.id, 
+			vehicle_type = l_vehicle_type, 
+			size = Tags.getValue(object.tags, "size", true) or "small"
+		}
 
 		if spawned_objects ~= nil then
 			table.insert(spawned_objects, object_data)

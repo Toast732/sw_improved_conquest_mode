@@ -1,3 +1,12 @@
+--[[
+
+
+	Library Setup
+
+
+]]
+
+
 -- required libraries
 require("libraries.debugging")
 require("libraries.ai")
@@ -11,6 +20,37 @@ Pathfinding = {}
 -- shortened library name
 p = Pathfinding
 
+--[[
+
+
+	Variables
+   
+
+]]
+
+s = s or server
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class ICMPathfindPoint
+---@field x number the x coordinate of the graph node
+---@field y number the y coordinate of the graph node
+---@field z number the z coordinate of the graph node
+
+--[[
+
+
+	Functions         
+
+
+]]
+
 function Pathfinding.resetPath(vehicle_object)
 	for _, v in pairs(vehicle_object.path) do
 		s.removeMapID(-1, v.ui_id)
@@ -21,7 +61,7 @@ end
 
 -- makes the vehicle go to its next path
 ---@param vehicle_object vehicle_object the vehicle object which is going to its next path
----@return number more_paths the number of paths left
+---@return number|nil more_paths the number of paths left, nil if error
 ---@return boolean is_success if it successfully went to the next path
 function Pathfinding.nextPath(vehicle_object)
 
@@ -53,7 +93,7 @@ function Pathfinding.nextPath(vehicle_object)
 	return #vehicle_object.path, true
 end
 
----@param vehicle_object vehicle_object[] the vehicle you want to add the path for
+---@param vehicle_object vehicle_object the vehicle you want to add the path for
 ---@param target_dest SWMatrix the destination for the path
 function Pathfinding.addPath(vehicle_object, target_dest)
 

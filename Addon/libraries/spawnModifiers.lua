@@ -41,10 +41,10 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 	end
 end
 
----@param is_specified boolean true to specify what vehicle to spawn, false for random
----@param vehicle_list_id any vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
----@param vehicle_type string the type of vehicle you want to spawn, such as boat, helicopter, plane or land
----@return PREFAB_DATA prefab_data the vehicle's prefab data
+---@param is_specified boolean? true to specify what vehicle to spawn, false for random
+---@param vehicle_list_id string|integer? vehicle to spawn if is_specified is true, integer to specify exact vehicle, string to specify the role of the vehicle you want
+---@param vehicle_type string? the type of vehicle you want to spawn, such as boat, helicopter, plane or land
+---@return PREFAB_DATA|nil prefab_data the vehicle's prefab data
 function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 	local sel_role = nil
 	local sel_veh_type = nil
@@ -54,13 +54,13 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		sel_role = g_savedata.vehicle_list[vehicle_list_id].role
 		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
 		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
-		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
+		for vehicle_id, _ in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
 			if not sel_vehicle and vehicle_list_id == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
 				sel_vehicle = vehicle_id
 			end
 		end
 		if not sel_vehicle then
-			return false
+			return
 		end
 	elseif is_specified == false and g_savedata.constructable_vehicles or type(vehicle_list_id) == "string" and g_savedata.constructable_vehicles then
 		local role_chances = {}
@@ -90,14 +90,14 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 				sel_veh_type = math.randChance(veh_type_chances)
 			else
 				d.print("There are no vehicles with the role \""..sel_role.."\"", true, 1)
-				return false
+				return
 			end
 		else -- then use the vehicle type which was selected
 			if g_savedata.constructable_vehicles[sel_role] and g_savedata.constructable_vehicles[sel_role][vehicle_type] then -- makes sure it actually exists
 				sel_veh_type = vehicle_type
 			else
 				d.print("There are no vehicles with the role \""..sel_role.."\" and with the type \""..vehicle_type.."\"", true, 1)
-				return false
+				return
 			end
 		end
 		--d.print("selected vehicle type: "..tostring(sel_veh_type), true, 0)
@@ -117,7 +117,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 			end
 		else
 			d.print("There are no vehicles with the role \""..sel_role.."\", with the type \""..sel_veh_type.."\" and with the strat \""..sel_strat.."\"", true, 1)
-			return false
+			return
 		end
 		sel_vehicle = math.randChance(vehicle_chances)
 		--d.print("selected vehicle: "..tostring(sel_vehicle), true, 0)
@@ -127,20 +127,20 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		else
 			d.print("g_savedata.constructable_vehicles is nil! This may be directly after a full reload, if so, ignore this error", true, 1)
 		end
-		return false
+		return
 	end
 	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle].prefab_data
 end
 
 ---@param role string the role of the vehicle, such as attack, general or defend
----@param type string the vehicle type, such as boat, plane, heli, land or turret
+---@param vehicle_type string the vehicle type, such as boat, plane, heli, land or turret
 ---@param strategy string the strategy of the vehicle, such as strafe, bombing or general
 ---@param vehicle_list_id integer the index of the vehicle in the vehicle list
----@return integer constructable_vehicle_id the index of the vehicle in the constructable vehicle list, returns nil if not found
+---@return integer|nil constructable_vehicle_id the index of the vehicle in the constructable vehicle list, returns nil if not found
 function SpawnModifiers.getConstructableVehicleID(role, vehicle_type, strategy, vehicle_list_id)
 	local constructable_vehicle_id = nil
 	if g_savedata.constructable_vehicles[role] and g_savedata.constructable_vehicles[role][vehicle_type] and g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
-		for vehicle_id, vehicle_object in pairs(g_savedata.constructable_vehicles[role][vehicle_type][strategy]) do
+		for vehicle_id, _ in pairs(g_savedata.constructable_vehicles[role][vehicle_type][strategy]) do
 			if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][vehicle_type][strategy][vehicle_id].id then
 				constructable_vehicle_id = vehicle_id
 			end
@@ -152,7 +152,7 @@ function SpawnModifiers.getConstructableVehicleID(role, vehicle_type, strategy, 
 end
 
 ---@param vehicle_name string the name of the vehicle
----@return integer vehicle_list_id the vehicle list id from the vehicle's name, returns nil if not found
+---@return integer|nil vehicle_list_id the vehicle list id from the vehicle's name, returns nil if not found
 function SpawnModifiers.getVehicleListID(vehicle_name)
 
 	if not vehicle_name then
@@ -173,12 +173,12 @@ end
 ---@param reinforcement_type string \"punish\" to make it less likely to spawn, \"reward\" to make it more likely to spawn
 ---@param role string the role of the vehicle, such as attack, general or defend
 ---@param role_reinforcement integer how much to reinforce the role of the vehicle, 1-5
----@param type string the vehicle type, such as boat, plane, heli, land or turret
----@param type_reinforcement integer how much to reinforce the type of the vehicle, 1-5
----@param strategy string strategy of the vehicle, such as strafe, bombing or general
----@param strategy_reinforcement integer how much to reinforce the strategy of the vehicle, 1-5
----@param constructable_vehicle_id integer the index of the vehicle in the constructable vehicle list
----@param vehicle_reinforcement integer how much to reinforce the vehicle, 1-5
+---@param type string? the vehicle type, such as boat, plane, heli, land or turret
+---@param type_reinforcement integer? how much to reinforce the type of the vehicle, 1-5
+---@param strategy string? strategy of the vehicle, such as strafe, bombing or general
+---@param strategy_reinforcement integer? how much to reinforce the strategy of the vehicle, 1-5
+---@param constructable_vehicle_id integer? the index of the vehicle in the constructable vehicle list
+---@param vehicle_reinforcement integer? how much to reinforce the vehicle, 1-5
 function SpawnModifiers.train(reinforcement_type, role, role_reinforcement, type, type_reinforcement, strategy, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
 	if reinforcement_type == PUNISH then
 		if role and role_reinforcement then
@@ -250,7 +250,7 @@ function SpawnModifiers.getStats()
 					for strat, strat_data in pairs(veh_data) do
 						if type(strat_data) == "table" then
 							g_savedata.constructable_vehicles[role][veh_type][strat].mod = 1
-							for vehicle_id, vehicle_data in pairs(strat_data) do
+							for _, vehicle_data in pairs(strat_data) do
 								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,

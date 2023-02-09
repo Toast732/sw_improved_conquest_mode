@@ -119,7 +119,7 @@ end
 
 --# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
 ---@param island_name string the island name you want to get
----@return island[] island the island data from the name
+---@return ISLAND island the island data from the name
 ---@return boolean island_found returns true if the island was found
 function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
 	if island_name then

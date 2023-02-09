@@ -38,7 +38,7 @@ Objective = {}
 
 ]]
 
----@param ignore_scouted boolean true if you want to ignore islands that are already fully scouted
+---@param ignore_scouted boolean? true if you want to ignore islands that are already fully scouted
 ---@return table target_island returns the island which the ai should target
 ---@return table origin_island returns the island which the ai should attack from
 function Objective.getIslandToAttack(ignore_scouted)
@@ -47,11 +47,11 @@ function Objective.getIslandToAttack(ignore_scouted)
 	local target_best_distance = nil
 
 	-- go through all non enemy owned islands
-	for island_index, island in pairs(g_savedata.islands) do
+	for _, island in pairs(g_savedata.islands) do
 		if island.faction ~= ISLAND.FACTION.AI then
 
 			-- go through all enemy owned islands, to check if we should attack from there
-			for ai_island_index, ai_island in pairs(g_savedata.islands) do
+			for _, ai_island in pairs(g_savedata.islands) do
 				if ai_island.faction == ISLAND.FACTION.AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
 					if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
 						if not target_island then
@@ -86,7 +86,7 @@ function Objective.getIslandToAttack(ignore_scouted)
 
 	if not target_island then
 		origin_island = g_savedata.ai_base_island
-		for island_index, island in pairs(g_savedata.islands) do
+		for _, island in pairs(g_savedata.islands) do
 			if island.faction ~= ISLAND.FACTION.AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
 				if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
 					if not target_island then

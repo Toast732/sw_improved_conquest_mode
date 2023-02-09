@@ -7,6 +7,7 @@
 ]]
 
 -- required libraries
+require("libraries.addonLocationUtils")
 require("libraries.debugging")
 require("libraries.tables")
 require("libraries.tags")
@@ -107,7 +108,7 @@ function Setup.sortSpawnZones(spawn_zones)
 				goto sup_sortSpawnZones_continueZone
 			end
 
-			Tables.tabulate(tile_zones, tile_name, zone_type)
+			table.tabulate(tile_zones, tile_name, zone_type)
 
 			table.insert(tile_zones[tile_name][zone_type], zone)
 
@@ -141,6 +142,46 @@ function Setup.createVehiclePrefabs()
 		end
 	end
 
+	local before_processing_vehicle_pack_API_configs = s.getTimeMillisec()
+
+	local vehicle_pack_API_configs = {}
+
+	local ai_vehicle_configs = alu.getMissionComponents(nil, nil, "ICM | CONFIG", "AI_VEHICLES_CONFIG")
+
+	if ai_vehicle_configs then
+		for _, component_data in ipairs(ai_vehicle_configs) do
+			local tabled_config = table.fromString(component_data.tags_full)
+			if tabled_config then
+				vehicle_pack_API_configs[component_data.addon_index] = vehicle_pack_API_configs[component_data.addon_index] or {}
+				table.insert(vehicle_pack_API_configs[component_data.addon_index], tabled_config)
+			end
+		end
+	end
+	d.print(("Processed Vehicle Pack API Configs (took %0.2fs, for %0.0f configs)"):format((s.getTimeMillisec() - before_processing_vehicle_pack_API_configs)*0.001, #ai_vehicle_configs), true, 0)
+
+
+	--# checks if this vehicle is within the configs, returns false if its fine, returns true if its violating a config.
+	local function vehicleViolatesConfigs(addon_index, addon_data, location_data)
+		for config_addon_index, configs in pairs(vehicle_pack_API_configs) do
+			if config_addon_index ~= addon_index then
+				for _, config_data in ipairs(configs) do
+					for target_addon_name, vehicles_to_remove in pairs(config_data) do
+						if addon_data.name:match(target_addon_name) then
+							for _, vehicle_name in ipairs(vehicles_to_remove) do
+								if location_data.name:match(vehicle_name) then
+									d.print(("Removed Vehicle \"%s\" from AI's arsenal, due to a Vehicle Pack API Config from the addon \"%s\""):format(location_data.name, s.getAddonData(config_addon_index).name), false, 0)
+									return true
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return false
+	end
+
 	-- iterate through all addons
 	for addon_index = 0, s.getAddonCount() - 1 do
 		local addon_data = s.getAddonData(addon_index)
@@ -152,6 +193,10 @@ function Setup.createVehiclePrefabs()
 		-- iterate through all locations in this addon
 		for location_index = 0, addon_data.location_count - 1 do
 			local location_data = s.getLocationData(addon_index, location_index)
+
+			if location_data.env_mod then
+				goto createVehiclePrefabs_continue_location
+			end
 
 			-- iterate through all components in this location
 			for component_index = 0, location_data.component_count do
@@ -176,6 +221,11 @@ function Setup.createVehiclePrefabs()
 				-- if this component is not an enemy AI vehicle
 				if not Tags.has(component_data.tags, "type=dlc_weapons") then
 					goto createVehiclePrefabs_continue_component
+				end
+
+				-- if this vehicle violates one of the configs
+				if vehicleViolatesConfigs(addon_index, addon_data, location_data) then
+					break
 				end
 
 				-- there is an enemy AI vehicle here
@@ -209,7 +259,7 @@ function Setup.createVehiclePrefabs()
 				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
 
 				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
-				Tables.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
+				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 
 				local vehicle_list_data = prefab_data
 				vehicle_list_data.role = role
@@ -235,6 +285,9 @@ function Setup.createVehiclePrefabs()
 
 						-- update id
 						constructable_vehicle_data.id = #g_savedata.vehicle_list
+
+						-- break, as we found a match.
+						break
 					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
 						-- this vehicle does not exist
 						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
@@ -248,6 +301,7 @@ function Setup.createVehiclePrefabs()
 				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
 				::createVehiclePrefabs_continue_component::
 			end
+			::createVehiclePrefabs_continue_location::
 		end
 
 		::createVehiclePrefabs_continue_addon::

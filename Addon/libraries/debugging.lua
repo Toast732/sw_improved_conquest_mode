@@ -10,9 +10,9 @@ Debugging = {}
 d = Debugging 
 
 ---@param message string the message you want to print
----@param requires_debug boolean if it requires <debug_type> debug to be enabled
----@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler) 
----@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
+---@param requires_debug ?boolean if it requires <debug_type> debug to be enabled
+---@param debug_type ?integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler) 
+---@param peer_id ?integer if you want to send it to a specific player, leave empty to send to all players
 function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glorious debug function" - senty, 2022
 
 	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
@@ -21,24 +21,24 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
 			if message then
-				debug.log("SW IMPWEP "..suffix.." | "..string.gsub(message, "\n", " \\n "))
+				debug.log(("SW %s %s | %s"):format(SHORT_ADDON_NAME, suffix, string.gsub(message, "\n", " \\n ")))
 			else
-				debug.log("SW IMPWEP "..suffix.." | (d.print) message is nil!")
+				debug.log(("SW %s %s | (d.print) message is nil!"):format(SHORT_ADDON_NAME, suffix))
 			end
 		end
 		
-		if type(message) == "table" then
+		if type(message) == "table" then -- print the message as a table.
 			d.printTable(message, requires_debug, debug_type, peer_id)
 
-		elseif requires_debug then
-			if pl.isPlayer(peer_id) and peer_id then
-				if d.getDebug(debug_type, peer_id) then
-					s.announce(prefix, message, peer_id)
+		elseif requires_debug then -- if this message requires debug to be enabled
+			if pl.isPlayer(peer_id) and peer_id then -- if its being sent to a specific peer id
+				if d.getDebug(debug_type, peer_id) then -- if this peer has debug enabled
+					s.announce(prefix, message, peer_id) -- send it to them
 				end
 			else
-				for _, player in ipairs(s.getPlayers()) do
-					if d.getDebug(debug_type, player.id) or debug_type == 2 and d.getDebug(0, player.id) then
-						s.announce(prefix, message, player_id)
+				for _, peer in ipairs(s.getPlayers()) do -- if this is being sent to all players with the debug enabled
+					if d.getDebug(debug_type, peer.id) or debug_type == 2 and d.getDebug(0, peer.id) then -- if this player has debug enabled
+						s.announce(prefix, message, peer.id) -- send the message to them
 					end
 				end
 			end
@@ -48,93 +48,118 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 	end
 end
 
---# prints all data which is in a table (use d.print instead of this)
----@param t table the table of which you want to print
----@param requires_debug boolean if it requires <debug_type> debug to be enabled
----@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler)
----@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
-function Debugging.printTable(t, requires_debug, debug_type, peer_id)
-	for k, v in pairs(t) do
-		if type(v) == "table" then
-			d.print("Table: "..tostring(k), requires_debug, debug_type, peer_id)
-			d.printTable(v, requires_debug, debug_type, peer_id)
-		else
-			d.print("k: "..tostring(k).." v: "..tostring(v), requires_debug, debug_type, peer_id)
+function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
+	return debug_types[debug_id]
+end
+
+function Debugging.debugIDFromType(debug_type)
+	for debug_id, d_type in ipairs(debug_types) do
+		if debug_type == d_type then
+			return debug_id
 		end
 	end
 end
 
----@param debug_type integer the type of debug | 0 = debug | 1 = error | 2 = profiler | 3 = map
+--# prints all data which is in a table (use d.print instead of this)
+---@param T table the table of which you want to print
+---@param requires_debug boolean if it requires <debug_type> debug to be enabled
+---@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler)
+---@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
+function Debugging.printTable(T, requires_debug, debug_type, peer_id)
+
+	local function tableoString(T, S, ind)
+
+		S = S or "{"
+		ind = ind or "  "
+
+		local table_length = table.length(T)
+		local table_counter = 0
+
+		for index, value in pairs(T) do
+
+			table_counter = table_counter + 1
+			if type(index) == "number" then
+				S = ("%s\n%s[%s] = "):format(S, ind, tostring(index))
+			elseif type(index) == "string" and tonumber(index) and math.isWhole(tonumber(index)) then
+				S = ("%s\n%s\"%s\" = "):format(S, ind, index)
+			else
+				S = ("%s\n%s%s = "):format(S, ind, tostring(index))
+			end
+
+			if type(value) == "table" then
+				S = ("%s{"):format(S)
+				S = tableoString(value, S, ind.."  ")
+			elseif type(value) == "string" then
+				S = ("%s\"%s\""):format(S, tostring(value))
+			else
+				S = ("%s%s"):format(S, tostring(value))
+			end
+
+			S = ("%s%s"):format(S, table_counter == table_length and "" or ",")
+		end
+
+		S = ("%s\n%s}"):format(S, string.gsub(ind, "  ", "", 1))
+
+		return S
+	end
+
+	d.print(tableoString(T), requires_debug, debug_type, peer_id)
+
+	--[[for k, v in pairs(t) do
+
+		table_counter = table_counter + 1
+		if type(v) == "table" then
+			local new_indent = indent.."  "
+			d.print(("%s[%s] = {"):format(indent, k), requires_debug, debug_type, peer_id)
+			--d.print("Table: "..tostring(k), requires_debug, debug_type, peer_id)
+			d.printTable(v, requires_debug, debug_type, peer_id)
+		else
+			d.print(("%s[%s] = %s%s"):format(indent, tostring(k), tostring(v), table_counter ~= table_length and ",")..tostring(k).." v: "..tostring(v), requires_debug, debug_type, peer_id)
+		end
+	end
+
+	d.print(("%s}"):format(indent), requires_debug, debug_type, peer_id)]]
+end
+
+---@param debug_id integer the type of debug | 0 = debug | 1 = error | 2 = profiler | 3 = map
 ---@param peer_id ?integer the peer_id of the player you want to check if they have it enabled, leave blank to check globally
 ---@return boolean enabled if the specified type of debug is enabled
-function Debugging.getDebug(debug_type, peer_id)
+function Debugging.getDebug(debug_id, peer_id)
 	if not peer_id or not pl.isPlayer(peer_id) then -- if any player has it enabled
-		if debug_type == -1 then -- any debug
+		if debug_id == -1 then -- any debug
+			for _, enabled in pairs(g_savedata.debug) do
+				if enabled then 
+					return true 
+				end
+			end
 			if g_savedata.debug.chat or g_savedata.debug.profiler or g_savedata.debug.map then
 				return true
 			end
-		elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
-			if g_savedata.debug.chat then
-				return true
-			end
-		elseif debug_type == 2 then -- profiler debug
-			if g_savedata.debug.profiler then
-				return true
-			end
-		elseif debug_type == 3 then -- map debug
-			if g_savedata.debug.map then
-				return true
-			end
-		elseif debug_type == 4 then -- graph node debug
-			if g_savedata.debug.graph_node then
-				return true
-			end
-		elseif debug_type == 5 then
-			if g_savedata.debug.driving then
-				return true
-			end
-		elseif debug_type == 6 then
-			if g_savedata.debug.vehicle then
-				return true
-			end
-		else
-			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type!", true, 1)
+			return false
 		end
+
+		-- make sure this debug type is valid
+		if not debug_types[debug_id] then
+			d.print("(d.getDebug) debug_type "..tostring(debug_id).." is not a valid debug type!", true, 1)
+			return false
+		end
+
+		-- check a specific debug
+		return g_savedata.debug[debug_types[debug_id]]
+
 	else -- if a specific player has it enabled
-		local steam_id = pl.getSteamID(peer_id)
-		if steam_id and g_savedata.player_data[steam_id] then -- makes sure the steam id and player data exists
-			if debug_type == -1 then -- any debug
-				if g_savedata.player_data[steam_id].debug.chat or g_savedata.player_data[steam_id].debug.profiler or g_savedata.player_data[steam_id].debug.map then
-					return true
-				end
-			elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
-				if g_savedata.player_data[steam_id].debug.chat then
-					return true
-				end
-			elseif debug_type == 2 then -- profiler debug
-				if g_savedata.player_data[steam_id].debug.profiler then
-					return true
-				end
-			elseif debug_type == 3 then -- map debug
-				if g_savedata.player_data[steam_id].debug.map then
-					return true
-				end
-			elseif debug_type == 4 then -- graph node debug
-				if g_savedata.player_data[steam_id].debug.graph_node then
-					return true
-				end
-			elseif debug_type == 5 then
-				if g_savedata.player_data[steam_id].debug.driving then
-					return true
-				end
-			elseif debug_type == 6 then
-				if g_savedata.player_data[steam_id].debug.vehicle then
-					return true
-				end
-			else
-				d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
-			end
+		local player = pl.dataByPID(peer_id)
+		
+		-- ensure the data for this player exists
+		if not player then
+			return false
 		end
+
+		if type(player.getDebug) ~= "function" then -- update the OOP functions.
+			player = pl.updateData(player)
+		end
+
+		return player:getDebug(debug_id)
 	end
 	return false
 end
@@ -254,30 +279,19 @@ function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
 	end
 end
 
-function Debugging.setDebug(d_type, peer_id)
+function Debugging.setDebug(debug_id, peer_id)
 
 	if not peer_id then
 		d.print("(Debugging.setDebug) peer_id is nil!", true, 1)
 		return "peer_id was nil"
 	end
 
-	local steam_id = pl.getSteamID(peer_id)
+	local player_data = pl.dataByPID(peer_id)
 
-	if not d_type then
-		d.print("(Debugging.setDebug) d_type is nil!", true, 1)
-		return "d_type was nil"
+	if not debug_id then
+		d.print("(Debugging.setDebug) debug_id is nil!", true, 1)
+		return "debug_id was nil"
 	end
-
-	local debug_types = {
-		[-1] = "all",
-		[0] = "chat",
-		[1] = "error",
-		[2] = "profiler",
-		[3] = "map",
-		[4] = "graph_node",
-		[5] = "driving",
-		[6] = "vehicle"
-	}
 
 	local ignore_all = { -- debug types to ignore from enabling and/or disabling with ?impwep debug all
 		[-1] = "all",
@@ -285,13 +299,13 @@ function Debugging.setDebug(d_type, peer_id)
 	}
 
 	
-	if debug_types[d_type] then
-		if d_type == -1 then
+	if debug_types[debug_id] then
+		if debug_id == -1 then
 			local none_true = true
 			for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
-				if g_savedata.player_data[steam_id].debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
+				if player_data.debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
 					none_true = false
-					g_savedata.player_data[steam_id].debug[debug_type_data] = false
+					player_data.debug[debug_type_data] = false
 				end
 			end
 
@@ -299,7 +313,7 @@ function Debugging.setDebug(d_type, peer_id)
 				for d_id, debug_type_data in pairs(debug_types) do -- enable all debug
 					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
 						g_savedata.debug[debug_type_data] = none_true
-						g_savedata.player_data[steam_id].debug[debug_type_data] = none_true
+						player_data.debug[debug_type_data] = none_true
 						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
 					end
 				end
@@ -313,18 +327,18 @@ function Debugging.setDebug(d_type, peer_id)
 			end
 			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
-			g_savedata.player_data[steam_id].debug[debug_types[d_type]] = not g_savedata.player_data[steam_id].debug[debug_types[d_type]]
+			player_data.debug[debug_types[debug_id]] = not player_data.debug[debug_types[debug_id]]
 
-			if g_savedata.player_data[steam_id].debug[debug_types[d_type]] then
-				g_savedata.debug[debug_types[d_type]] = true
+			if player_data.debug[debug_types[debug_id]] then
+				g_savedata.debug[debug_types[debug_id]] = true
 			else
 				d.checkDebug()
 			end
 
-			return d.handleDebug(debug_types[d_type], g_savedata.player_data[steam_id].debug[debug_types[d_type]], peer_id, steam_id)
+			return d.handleDebug(debug_types[debug_id], player_data.debug[debug_types[debug_id]], peer_id, steam_id)
 		end
 	else
-		return "Unknown debug type: "..tostring(d_type)
+		return "Unknown debug type: "..tostring(debug_id)
 	end
 end
 
@@ -333,9 +347,9 @@ function Debugging.checkDebug() -- checks all debugging types to see if anybody 
 
 	-- check all debug types for all players to see if they have it enabled or disabled
 	local player_list = s.getPlayers()
-	for peer_index, peer in pairs(player_list) do
-		local steam_id = pl.getSteamID(peer.id)
-		for debug_type, debug_type_enabled in pairs(g_savedata.player_data[steam_id].debug) do
+	for _, peer in pairs(player_list) do
+		local player_data = pl.dataByPID(peer.id)
+		for debug_type, debug_type_enabled in pairs(player_data.debug) do
 			-- if nobody's known to have it enabled
 			if not keep_enabled[debug_type] then
 				-- then set it to whatever this player's value was
@@ -379,7 +393,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
 		if unique_name then
 			if g_savedata.profiler.working[unique_name] then
-				Tables.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
+				table.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][g_savedata.tick_counter] = s.getTimeMillisec()-g_savedata.profiler.working[unique_name]
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-60)] = nil
 				g_savedata.profiler.working[unique_name] = nil

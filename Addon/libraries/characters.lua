@@ -6,7 +6,7 @@
 
 ]]
 
-s = s or Server
+s = s or server
 
 -- required libraries
 require("libraries.debugging")
@@ -85,7 +85,7 @@ Characters.valid_seats = { -- configure to select which are the valid seats, sel
 function Characters.overrides()
 
 	-- populate g_savedata with the table we will be using, 
-	Tables.tabulate(g_savedata, "libraries", "characters", "characters_to_seat")
+	table.tabulate(g_savedata, "libraries", "characters", "characters_to_seat")
 
 	-- onObjectLoad override
 	local old_onObjectLoad = onObjectLoad or function() end

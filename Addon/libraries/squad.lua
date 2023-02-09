@@ -1,12 +1,52 @@
+--[[
+
+
+	Library Setup
+
+
+]]
+
 -- required libraries
 require("libraries.debugging")
 
 -- library name
 Squad = {}
 
+--[[
+
+
+	Variables
+   
+
+]]
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class SQUAD
+---@field command string the command the squad is following.
+---@field vehicle_type string the vehicle_type this squad is composed of.
+---@field role string the role of this squad.
+---@field vehicles table<integer, vehicle_object> the vehicles in this squad.
+---@field target_island ISLAND the island they're targetting.
+
+
+--[[
+
+
+	Functions         
+
+
+]]
+
 ---@param vehicle_id integer the id of the vehicle you want to get the squad ID of
----@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
----@return squad[] squad the info of the squad, if not found, then returns nil
+---@return integer|nil squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return SQUAD|nil squad the info of the squad, if not found, then returns nil
 function Squad.getSquad(vehicle_id) -- input a vehicle's id, and it will return the squad index its from and the squad's data
 	local squad_index = g_savedata.ai_army.squad_vehicles[vehicle_id]
 	if squad_index then
@@ -22,30 +62,33 @@ function Squad.getSquad(vehicle_id) -- input a vehicle's id, and it will return 
 end
 
 ---@param vehicle_id integer the vehicle's id
----@return vehicle_object vehicle_object the vehicle object, nil if not found
----@return integer squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
----@return squad[] squad the info of the squad, if not found, then returns nil
+---@return vehicle_object? vehicle_object the vehicle object, nil if not found
+---@return integer? squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return SQUAD? squad the info of the squad, if not found, then returns nil
 function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
 
+	local vehicle_object = nil
 	local squad_index = nil
 	local squad = nil
 
 	if not vehicle_id then -- makes sure vehicle id was provided
 		d.print("(Squad.getVehicle) vehicle_id is nil!", true, 1)
-		return nil, nil, nil
+		return vehicle_object, squad_index, squad
 	else
 		squad_index, squad = Squad.getSquad(vehicle_id)
 	end
 
 	if not squad_index or not squad then -- if we were not able to get a squad index then return nil
-		return nil, nil, nil
+		return vehicle_object, squad_index, squad
 	end
 
-	if not g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id] then
+	vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
+
+	if not vehicle_object then
 		d.print("(Squad.getVehicle) failed to get vehicle_object for vehicle with id "..tostring(vehicle_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
 	end
 
-	return g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], squad_index, squad
+	return vehicle_object, squad_index, squad
 end
 
 ---@param squad_index integer the squad's index which you want to create it under, if not specified it will use the next available index

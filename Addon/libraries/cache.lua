@@ -5,8 +5,8 @@ require("libraries.tables")
 -- library name
 Cache = {}
 
----@param location g_savedata.cache[] where to reset the data, if left blank then resets all cache data
----@param boolean success returns true if successfully cleared the cache
+---@param location string where to reset the data, if left blank then resets all cache data
+---@return boolean is_success returns true if successfully cleared the cache
 function Cache.reset(location) -- resets the cache
 	if not location then
 		g_savedata.cache = {}
@@ -26,7 +26,7 @@ function Cache.reset(location) -- resets the cache
 	return true
 end
 
----@param location g_savedata.cache[] where to write the data
+---@param location string where to write the data
 ---@param data any the data to write at the location
 ---@return boolean write_successful if writing the data to the cache was successful
 function Cache.write(location, data)
@@ -54,7 +54,7 @@ function Cache.write(location, data)
 	end
 end
 
----@param location g_savedata.cache[] where to read the data from
+---@param location string where to read the data from
 ---@return any data the data that was at the location
 function Cache.read(location)
 	g_savedata.cache_stats.reads = g_savedata.cache_stats.reads + 1
@@ -66,10 +66,10 @@ function Cache.read(location)
 	return g_savedata.cache[location]
 end
 
----@param location g_savedata.cache[] where to check
+---@param location string where to check
 ---@return boolean exists if the data exists at the location
 function Cache.exists(location)
-	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and (type(g_savedata.cache[location]) ~= "table" or Tables.length(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
+	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and (type(g_savedata.cache[location]) ~= "table" or table.length(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
 		d.print("g_savedata.Cache."..location.." exists", true, 0)
 
 		return true
