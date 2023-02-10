@@ -1,4 +1,4 @@
-require("libraries.math")
+require("libraries.utils.math")
 
 ---@param matrix1 SWMatrix the first matrix
 ---@param matrix2 SWMatrix the second matrix

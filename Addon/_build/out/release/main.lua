@@ -1072,6 +1072,125 @@ end
 function Players.isPlayer(peer_id)
 	return (peer_id and peer_id ~= -1 and peer_id ~= 65535)
 end
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+
+-- library name
+Map = {}
+
+-- shortened library name
+-- (not applicable)
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+--[[
+
+
+	Classes
+
+
+]]
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+--# draws a search area within the specified radius at the coordinates provided
+---@param x number the x coordinate of where the search area will be drawn around (required)
+---@param z number the z coordinate of where the search area will be drawn around (required)
+---@param radius number the radius of the search area (required)
+---@param ui_id integer the ui_id of the search area (required)
+---@param peer_id integer the peer_id of the player which you want to draw the search area for (defaults to -1)
+---@param label string The text that appears when mousing over the icon. Appears like a title (defaults to "")
+---@param hover_label string The text that appears when mousing over the icon. Appears like a subtitle or description (defaults to "")
+---@param r integer 0-255, the red value of the search area (defaults to 255)
+---@param g integer 0-255, the green value of the search area (defaults to 255)
+---@param b integer 0-255, the blue value of the search area (defaults to 255)
+---@param a integer 0-255, the alpha value of the search area (defaults to 255)
+---@return number x the x coordinate of where the search area was drawn
+---@return number z the z coordinate of where the search area was drawn
+---@return boolean success if the search area was drawn
+function Map.drawSearchArea(x, z, radius, ui_id, peer_id, label, hover_label, r, g, b, a)
+
+	if not x then -- if the x position of the target was not provided
+		d.print("(Map.drawSearchArea) x is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	if not z then -- if the z position of the target was not provided
+		d.print("(Map.drawSearchArea) z is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	if not radius then -- if the radius of the search area was not provided
+		d.print("(Map.drawSearchArea) radius is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	if not ui_id then -- if the ui_id was not provided
+		d.print("(Map.drawSearchArea) ui_id is nil!", true, 1)
+		return nil, nil, false
+	end
+
+	-- default values (if not specified)
+
+	local peer_id = peer_id or -1 -- makes the peer_id default to -1 if not provided (-1 = everybody)
+
+	local label = label or "" -- defaults the label to "" if it was not specified
+	local hover_label = hover_label or "" -- defaults the hover_label to "" if it was not specified
+
+	local r = r or 255 -- makes the red colour default to 255 if not provided
+	local g = g or 255 -- makes the green colour default to 255 if not provided
+	local b = b or 255 -- makes the blue colour default to 255 if not provided
+	local a = a or 255 -- makes the alpha default to 255 if not provided
+
+	local angle = math.random() * math.pi * 2 -- gets a random angle to put the search radius focus around
+	local dist = math.sqrt(math.randomDecimals(0.1, 0.9)) * radius -- gets a random distance from the target to put the search radius at
+
+	local x_pos = dist * math.sin(angle) + x -- uses the distance and angle to make the x pos of the search radius
+	local z_pos = dist * math.cos(angle) + z -- uses the distance and angle to make the z pos of the search radius
+
+	s.addMapObject(peer_id, ui_id, 0, 2, x_pos, z_pos, 0, 0, 0, 0, label, radius, hover_label, r, g, b, a) -- draws the search radius to the map
+
+	return x_pos, z_pos, true -- returns the x pos and z pos of the drawn search radius, and returns true that it was drawn.
+end
+
+function Map.addMapCircle(peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines) -- credit to woe
+	peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines = peer_id or -1, ui_id or 0, center_matrix or m.translation(0, 0, 0), radius or 500, width or 0.25, r or 255, g or 0, b or 0, a or 255, lines or 16
+	local center_x, center_z = center_matrix[13], center_matrix[15]
+
+	local angle_per_line = math.tau/lines
+
+	local last_angle = 0
+
+	for i = 1, lines + 1 do
+		local new_angle = angle_per_line*i
+
+		local x1, z1 = center_x+radius*math.cos(last_angle), center_z+radius*math.sin(last_angle)
+		local x2, z2 = center_x+radius*math.cos(new_angle), center_z+radius*math.sin(new_angle)
+		
+		local start_matrix, end_matrix = m.translation(x1, 0, z1), m.translation(x2, 0, z2)
+		s.addMapLine(peer_id, ui_id, start_matrix, end_matrix, width, r, g, b, a)
+		last_angle = new_angle
+	end
+end
 -- required libraries
 
 --# check for if none of the inputted variables are nil
@@ -1201,125 +1320,6 @@ function table.fromString(S)
 	end
 
 	return table.pack(stringToTable(S, 1))[1]
-end
---[[
-
-
-	Library Setup
-
-
-]]
-
--- required libraries
-
--- library name
-Map = {}
-
--- shortened library name
--- (not applicable)
-
---[[
-
-
-	Variables
-   
-
-]]
-
---[[
-
-
-	Classes
-
-
-]]
-
---[[
-
-
-	Functions         
-
-
-]]
-
---# draws a search area within the specified radius at the coordinates provided
----@param x number the x coordinate of where the search area will be drawn around (required)
----@param z number the z coordinate of where the search area will be drawn around (required)
----@param radius number the radius of the search area (required)
----@param ui_id integer the ui_id of the search area (required)
----@param peer_id integer the peer_id of the player which you want to draw the search area for (defaults to -1)
----@param label string The text that appears when mousing over the icon. Appears like a title (defaults to "")
----@param hover_label string The text that appears when mousing over the icon. Appears like a subtitle or description (defaults to "")
----@param r integer 0-255, the red value of the search area (defaults to 255)
----@param g integer 0-255, the green value of the search area (defaults to 255)
----@param b integer 0-255, the blue value of the search area (defaults to 255)
----@param a integer 0-255, the alpha value of the search area (defaults to 255)
----@return number x the x coordinate of where the search area was drawn
----@return number z the z coordinate of where the search area was drawn
----@return boolean success if the search area was drawn
-function Map.drawSearchArea(x, z, radius, ui_id, peer_id, label, hover_label, r, g, b, a)
-
-	if not x then -- if the x position of the target was not provided
-		d.print("(Map.drawSearchArea) x is nil!", true, 1)
-		return nil, nil, false
-	end
-
-	if not z then -- if the z position of the target was not provided
-		d.print("(Map.drawSearchArea) z is nil!", true, 1)
-		return nil, nil, false
-	end
-
-	if not radius then -- if the radius of the search area was not provided
-		d.print("(Map.drawSearchArea) radius is nil!", true, 1)
-		return nil, nil, false
-	end
-
-	if not ui_id then -- if the ui_id was not provided
-		d.print("(Map.drawSearchArea) ui_id is nil!", true, 1)
-		return nil, nil, false
-	end
-
-	-- default values (if not specified)
-
-	local peer_id = peer_id or -1 -- makes the peer_id default to -1 if not provided (-1 = everybody)
-
-	local label = label or "" -- defaults the label to "" if it was not specified
-	local hover_label = hover_label or "" -- defaults the hover_label to "" if it was not specified
-
-	local r = r or 255 -- makes the red colour default to 255 if not provided
-	local g = g or 255 -- makes the green colour default to 255 if not provided
-	local b = b or 255 -- makes the blue colour default to 255 if not provided
-	local a = a or 255 -- makes the alpha default to 255 if not provided
-
-	local angle = math.random() * math.pi * 2 -- gets a random angle to put the search radius focus around
-	local dist = math.sqrt(math.randomDecimals(0.1, 0.9)) * radius -- gets a random distance from the target to put the search radius at
-
-	local x_pos = dist * math.sin(angle) + x -- uses the distance and angle to make the x pos of the search radius
-	local z_pos = dist * math.cos(angle) + z -- uses the distance and angle to make the z pos of the search radius
-
-	s.addMapObject(peer_id, ui_id, 0, 2, x_pos, z_pos, 0, 0, 0, 0, label, radius, hover_label, r, g, b, a) -- draws the search radius to the map
-
-	return x_pos, z_pos, true -- returns the x pos and z pos of the drawn search radius, and returns true that it was drawn.
-end
-
-function Map.addMapCircle(peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines) -- credit to woe
-	peer_id, ui_id, center_matrix, radius, width, r, g, b, a, lines = peer_id or -1, ui_id or 0, center_matrix or m.translation(0, 0, 0), radius or 500, width or 0.25, r or 255, g or 0, b or 0, a or 255, lines or 16
-	local center_x, center_z = center_matrix[13], center_matrix[15]
-
-	local angle_per_line = math.tau/lines
-
-	local last_angle = 0
-
-	for i = 1, lines + 1 do
-		local new_angle = angle_per_line*i
-
-		local x1, z1 = center_x+radius*math.cos(last_angle), center_z+radius*math.sin(last_angle)
-		local x2, z2 = center_x+radius*math.cos(new_angle), center_z+radius*math.sin(new_angle)
-		
-		local start_matrix, end_matrix = m.translation(x1, 0, z1), m.translation(x2, 0, z2)
-		s.addMapLine(peer_id, ui_id, start_matrix, end_matrix, width, r, g, b, a)
-		last_angle = new_angle
-	end
 end
 
 
@@ -1815,139 +1815,6 @@ end
 
 
 -- library name
-AddonCommunication = {}
-
--- shortened library name
-ac = AddonCommunication
-
---[[
-
-
-	Variables
-   
-
-]]
-
-replies_awaiting = {}
-
---[[
-
-
-	Classes
-
-
-]]
-
---[[
-
-
-	Functions         
-
-
-]]
-
-function AddonCommunication.executeOnReply(short_addon_name, message, port, execute_function, count, timeout)
-	short_addon_name = short_addon_name or SHORT_ADDON_NAME-- default to this addon's short name
-	if not message then
-		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
-		return
-	end
-
-	port = port or 0
-
-	if not execute_function then
-		d.print("(AddonCommunication.executeOnReply) execute_function was left blank!", true, 1)
-		return
-	end
-
-	count = count or 1
-
-	timeout = timeout or -1
-
-	local expiry = -1
-	if timeout ~= -1 then
-		expiry = s.getTimeMillisec() + timeout*60
-	end
-
-	table.insert(replies_awaiting, {
-		short_addon_name = short_addon_name,
-		message = message,
-		port = port,
-		execute_function = execute_function,
-		count = count,
-		expiry = expiry
-	})
-end
-
-function AddonCommunication.tick()
-	for reply_index, reply in ipairs(replies_awaiting) do
-		-- check if this reply has expired
-		if reply.expiry ~= -1 and s.getTimeMillisec() > reply.expiry then
-			-- it has expired
-			d.print(("A function awaiting a reply of %s from %s has expired."):format(reply.message, reply.short_addon_name), true, 0)
-			table.remove(replies_awaiting, reply_index)
-		end
-	end
-end
-
-function AddonCommunication.sendCommunication(message, port)
-	if not message then
-		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
-		return
-	end
-
-	port = port or 0
-
-	-- add this addon's short name to the list
-	local prepared_message = ("%s:%s"):format(SHORT_ADDON_NAME, message)
-
-	-- send the message
-	s.httpGet(port, prepared_message)
-end
-
-function httpReply(port, message)
-	-- check if we're waiting to execute a function from this reply
-	for reply_index, reply in ipairs(replies_awaiting) do
-		-- check if this is the same port
-		if reply.port ~= port then
-			goto httpReply_continue_reply
-		end
-
-		-- check if the message content is the one we're looking for
-		if ("%s:%s"):format(reply.short_addon_name, reply.message) ~= message then
-			goto httpReply_continue_reply
-		end
-
-		-- this is the one we're looking for!
-
-		-- remove 1 from count
-		reply.count = math.max(reply.count - 1, -1)
-
-		-- execute the function
-		reply.execute_function()
-
-		-- if count == 0 then remove this from the replies awaiting
-		if reply.count == 0 then
-			table.remove(replies_awaiting, reply_index)
-		end
-
-		break
-
-		::httpReply_continue_reply::
-	end
-end
- -- functions for addon to addon communication
---[[
-
-
-	Library Setup
-
-
-]]
-
--- required libraries
-
--- library name
 AddonLocationUtils = {}
 
 -- shortened library name
@@ -2085,89 +1952,276 @@ function AddonLocationUtils.getMissionComponents(addon_index, addon_pattern, loc
 	return components
 end
  -- functions for addon locations and environment mods
--- This library is for controlling or getting things about the Enemy AI.
+-- required libraries
+-- required libraries
+
+-- library name
+Tags = {}
+
+function Tags.has(tags, tag, decrement)
+	if type(tags) ~= "table" then
+		d.print("(Tags.has) was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
+		return false
+	end
+
+	if not decrement then
+		for tag_index = 1, #tags do
+			if tags[tag_index] == tag then
+				return true
+			end
+		end
+	else
+		for tag_index = #tags, 1, -1 do
+			if tags[tag_index] == tag then
+				return true
+			end 
+		end
+	end
+
+	return false
+end
+
+-- gets the value of the specifed tag, returns nil if tag not found
+function Tags.getValue(tags, tag, as_string)
+	if type(tags) ~= "table" then
+		d.print("(Tags.getValue) was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
+	end
+
+	for k, v in pairs(tags) do
+		if string.match(v, tag.."=") then
+			if not as_string then
+				return tonumber(tostring(string.gsub(v, tag.."=", "")))
+			else
+				return tostring(string.gsub(v, tag.."=", ""))
+			end
+		end
+	end
+	
+	return nil
+end
+
+
+-- library name
+SpawningUtils = {}
+
+-- shortened library name
+su = SpawningUtils
+
+-- spawn an individual object descriptor from a playlist location
+function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
+	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
+	if is_success then
+		return component.id
+	else -- then it failed to spawn the addon component
+		d.print("this addon index: "..s.getAddonIndex(), false, 0)
+		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
+		return nil
+	end
+end
+
+function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+	-- spawn object
+
+	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
+
+	-- add object to spawned object tables
+
+	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
+
+		local l_vehicle_type = VEHICLE.TYPE.HELI
+		if Tags.has(object.tags, "vehicle_type=wep_plane") then
+			l_vehicle_type = VEHICLE.TYPE.PLANE
+		end
+		if Tags.has(object.tags, "vehicle_type=wep_boat") then
+			l_vehicle_type = VEHICLE.TYPE.BOAT
+		end
+		if Tags.has(object.tags, "vehicle_type=wep_land") then
+			l_vehicle_type = VEHICLE.TYPE.LAND
+		end
+		if Tags.has(object.tags, "vehicle_type=wep_turret") then
+			l_vehicle_type = VEHICLE.TYPE.TURRET
+		end
+		if Tags.has(object.tags, "type=dlc_weapons_flag") then
+			l_vehicle_type = "flag"
+		end
+
+		local object_data = { 
+			name = object.display_name, 
+			type = object.type, 
+			id = spawned_object_id, 
+			component_id = object.id, 
+			vehicle_type = l_vehicle_type, 
+			size = Tags.getValue(object.tags, "size", true) or "small"
+		}
+
+		if spawned_objects ~= nil then
+			table.insert(spawned_objects, object_data)
+		end
+
+		if out_spawned_objects ~= nil then
+			table.insert(out_spawned_objects, object_data)
+		end
+
+		return object_data
+	end
+
+	return nil
+end
+
+function SpawningUtils.spawnObjects(spawn_transform, addon_index, location_index, object_descriptors, out_spawned_objects)
+	local spawned_objects = {}
+
+	for _, object in pairs(object_descriptors) do
+		-- find parent vehicle id if set
+
+		local parent_vehicle_id = 0
+		if object.vehicle_parent_component_id > 0 then
+			for spawned_object_id, spawned_object in pairs(out_spawned_objects) do
+				if spawned_object.type == "vehicle" and spawned_object.component_id == object.vehicle_parent_component_id then
+					parent_vehicle_id = spawned_object.id
+				end
+			end
+		end
+
+		su.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+	end
+
+	return spawned_objects
+end
+ -- functions used by the spawn vehicle function -- functions related to getting tags from components inside of mission and environment locations
+--[[
+
+
+	Library Setup
+
+
+]]
 
 -- required libraries
 
 -- library name
-AI = {}
+AddonCommunication = {}
 
---- @param vehicle_object vehicle_object the vehicle you want to set the state of
---- @param state string the state you want to set the vehicle to
---- @return boolean success if the state was set
-function AI.setState(vehicle_object, state)
-	if vehicle_object then
-		if state ~= vehicle_object.state.s then
-			if state == VEHICLE.STATE.HOLDING then
-				vehicle_object.holding_target = vehicle_object.transform
-			end
-			vehicle_object.state.s = state
-		end
-	else
-		d.print("(AI.setState) vehicle_object is nil!", true, 1)
+-- shortened library name
+ac = AddonCommunication
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+replies_awaiting = {}
+
+--[[
+
+
+	Classes
+
+
+]]
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+function AddonCommunication.executeOnReply(short_addon_name, message, port, execute_function, count, timeout)
+	short_addon_name = short_addon_name or SHORT_ADDON_NAME-- default to this addon's short name
+	if not message then
+		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
+		return
 	end
-	return false
+
+	port = port or 0
+
+	if not execute_function then
+		d.print("(AddonCommunication.executeOnReply) execute_function was left blank!", true, 1)
+		return
+	end
+
+	count = count or 1
+
+	timeout = timeout or -1
+
+	local expiry = -1
+	if timeout ~= -1 then
+		expiry = s.getTimeMillisec() + timeout*60
+	end
+
+	table.insert(replies_awaiting, {
+		short_addon_name = short_addon_name,
+		message = message,
+		port = port,
+		execute_function = execute_function,
+		count = count,
+		expiry = expiry
+	})
 end
 
---# made for use with toggles in buttons (only use for toggle inputs to seats)
----@param vehicle_id integer the vehicle's id that has the seat you want to set
----@param seat_name string the name of the seat you want to set
----@param axis_ws number w/s axis
----@param axis_ad number a/d axis
----@param axis_ud number up down axis
----@param axis_lr number left right axis
----@param ... boolean buttons (1-7) (7 is trigger)
----@return boolean set_seat if the seat was set
-function AI.setSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, ...)
-	
-	if not vehicle_id then
-		d.print("(AI.setSeat) vehicle_id is nil!", true, 1)
-		return false
-	end
-
-	if not seat_name then
-		d.print("(AI.setSeat) seat_name is nil!", true, 1)
-		return false
-	end
-
-	local button = table.pack(...)
-
-	-- sets any nil values to 0 or false
-	axis_ws = axis_ws or 0
-	axis_ad = axis_ad or 0
-	axis_ud = axis_ud or 0
-	axis_lr = axis_lr or 0
-
-	for i = 1, 7 do
-		button[i] = button[i] or false
-	end
-
-	g_savedata.seat_states = g_savedata.seat_states or {}
-
-
-	if not g_savedata.seat_states[vehicle_id] or not g_savedata.seat_states[vehicle_id][seat_name] then
-
-		g_savedata.seat_states[vehicle_id] = g_savedata.seat_states[vehicle_id] or {}
-		g_savedata.seat_states[vehicle_id][seat_name] = {}
-
-		for i = 1, 7 do
-			g_savedata.seat_states[vehicle_id][seat_name][i] = false
+function AddonCommunication.tick()
+	for reply_index, reply in ipairs(replies_awaiting) do
+		-- check if this reply has expired
+		if reply.expiry ~= -1 and s.getTimeMillisec() > reply.expiry then
+			-- it has expired
+			d.print(("A function awaiting a reply of %s from %s has expired."):format(reply.message, reply.short_addon_name), true, 0)
+			table.remove(replies_awaiting, reply_index)
 		end
 	end
-
-	for i = 1, 7 do
-		if button[i] ~= g_savedata.seat_states[vehicle_id][seat_name][i] then
-			g_savedata.seat_states[vehicle_id][seat_name][i] = button[i]
-			button[i] = true
-		else
-			button[i] = false
-		end
-	end
-
-	s.setVehicleSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, button[1], button[2], button[3], button[4], button[5], button[6], button[7])
-	return true
 end
- -- functions relating to their AI
+
+function AddonCommunication.sendCommunication(message, port)
+	if not message then
+		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
+		return
+	end
+
+	port = port or 0
+
+	-- add this addon's short name to the list
+	local prepared_message = ("%s:%s"):format(SHORT_ADDON_NAME, message)
+
+	-- send the message
+	s.httpGet(port, prepared_message)
+end
+
+function httpReply(port, message)
+	-- check if we're waiting to execute a function from this reply
+	for reply_index, reply in ipairs(replies_awaiting) do
+		-- check if this is the same port
+		if reply.port ~= port then
+			goto httpReply_continue_reply
+		end
+
+		-- check if the message content is the one we're looking for
+		if ("%s:%s"):format(reply.short_addon_name, reply.message) ~= message then
+			goto httpReply_continue_reply
+		end
+
+		-- this is the one we're looking for!
+
+		-- remove 1 from count
+		reply.count = math.max(reply.count - 1, -1)
+
+		-- execute the function
+		reply.execute_function()
+
+		-- if count == 0 then remove this from the replies awaiting
+		if reply.count == 0 then
+			table.remove(replies_awaiting, reply_index)
+		end
+
+		break
+
+		::httpReply_continue_reply::
+	end
+end
+ -- functions for addon to addon communication
 -- required libraries
 
 -- library name
@@ -2266,15 +2320,10 @@ end
 -- required libraries
 
 -- library name
-Squad = {}
+Setup = {}
 
---[[
-
-
-	Variables
-   
-
-]]
+-- shortened library name
+sup = Setup
 
 --[[
 
@@ -2284,13 +2333,17 @@ Squad = {}
 
 ]]
 
----@class SQUAD
----@field command string the command the squad is following.
----@field vehicle_type string the vehicle_type this squad is composed of.
----@field role string the role of this squad.
----@field vehicles table<integer, vehicle_object> the vehicles in this squad.
----@field target_island ISLAND the island they're targetting.
+---@class SPAWN_ZONES
+---@field turrets table<number, SWZone> the turret spawn zones
+---@field land table<number, SWZone> the land vehicle spawn zones
+---@field sea table<number, SWZone> the sea vehicle spawn zones
 
+---@class PREFAB_DATA
+---@field addon_index integer, Addon index the vehicle is from
+---@field location_index integer, Location index the vehicle is in
+---@field location_data SWLocationData, the data of the mission location which the vehicle is in
+---@field vehicle SWAddonComponentData the data of the vehicle
+---@field fires table<number, SWAddonComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
 
 --[[
 
@@ -2300,85 +2353,945 @@ Squad = {}
 
 ]]
 
----@param vehicle_id integer the id of the vehicle you want to get the squad ID of
----@return integer|nil squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
----@return SQUAD|nil squad the info of the squad, if not found, then returns nil
-function Squad.getSquad(vehicle_id) -- input a vehicle's id, and it will return the squad index its from and the squad's data
-	local squad_index = g_savedata.ai_army.squad_vehicles[vehicle_id]
-	if squad_index then
-		local squad = g_savedata.ai_army.squadrons[squad_index]
-		if squad then
-			return squad_index, squad
-		else
-			return squad_index, nil
-		end
-	else
-		return nil, nil
-	end
-end
+--# sets up and returns the spawn zones, used for spawning certain vehicles at, such as boats, turrets and land vehicles
+---@return SPAWN_ZONES spawn_zones the table of spawn zones
+function Setup.spawnZones()
 
----@param vehicle_id integer the vehicle's id
----@return vehicle_object? vehicle_object the vehicle object, nil if not found
----@return integer? squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
----@return SQUAD? squad the info of the squad, if not found, then returns nil
-function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
-
-	local vehicle_object = nil
-	local squad_index = nil
-	local squad = nil
-
-	if not vehicle_id then -- makes sure vehicle id was provided
-		d.print("(Squad.getVehicle) vehicle_id is nil!", true, 1)
-		return vehicle_object, squad_index, squad
-	else
-		squad_index, squad = Squad.getSquad(vehicle_id)
-	end
-
-	if not squad_index or not squad then -- if we were not able to get a squad index then return nil
-		return vehicle_object, squad_index, squad
-	end
-
-	vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
-
-	if not vehicle_object then
-		d.print("(Squad.getVehicle) failed to get vehicle_object for vehicle with id "..tostring(vehicle_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
-	end
-
-	return vehicle_object, squad_index, squad
-end
-
----@param squad_index integer the squad's index which you want to create it under, if not specified it will use the next available index
----@param vehicle_object vehicle_object the vehicle object which is adding to the squad
----@return integer squad_index the index of the squad
----@return boolean squad_created if the squad was successfully created
-function Squad.createSquadron(squad_index, vehicle_object)
-
-	local squad_index = squad_index or #g_savedata.ai_army.squadrons + 1
-
-	if not vehicle_object then
-		d.print("(Squad.createSquadron) vehicle_object is nil!", true, 1)
-		return squad_index, false
-	end
-
-	if g_savedata.ai_army.squadrons[squad_index] then
-		d.print("(Squad.createSquadron) Squadron "..tostring(squad_index).." already exists!", true, 1)
-		return squad_index, false
-	end
-
-	g_savedata.ai_army.squadrons[squad_index] = { 
-		command = SQUAD.COMMAND.NONE,
-		index = squad_index,
-		vehicle_type = vehicle_object.vehicle_type,
-		role = vehicle_object.role,
-		vehicles = {},
-		target_island = nil,
-		target_players = {},
-		target_vehicles = {},
-		investigate_transform = nil
+	local spawn_zones = {
+		turrets = s.getZones("turret"),
+		land = s.getZones("land_spawn"),
+		sea = s.getZones("boat_spawn")
 	}
 
-	return squad_index, true
+	-- remove any NSO or non_NSO exlcusive zones
+
+	-----
+	--* filter NSO and non NSO exclusive islands
+	-----
+
+	-- go through all zone types
+	for zone_type, zones in pairs(spawn_zones) do
+		-- go through all of the zones for this zone type, backwards
+		for zone_index = #zones, 1, -1 do
+			zone = zones[zone_index]
+			if not g_savedata.info.mods.NSO and Tags.has(zone.tags, "NSO") or g_savedata.info.mods.NSO and Tags.has(zone.tags, "not_NSO") then
+				table.remove(zones, zone_index)
+			end
+		end
+	end
+
+	return spawn_zones
 end
+
+--# returns the tile's name which the zone is on
+---@param zone SWZone the zone to get the tile name of
+---@return string tile_name the name of the tile which the zone is on
+---@return boolean is_success if it successfully got the name of the tile
+function Setup.getZoneTileName(zone)
+	local tile_data, is_success = server.getTile(zone.transform)
+	if not is_success then
+		d.print("(sup.getZoneTileName) failed to get the location of zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]), true, 1)
+		return nil, false
+	end
+
+	return tile_data.name, true
+end
+
+--# sorts the zones in a table, indexed by the tile name which the zone is on
+---@param spawn_zones SPAWN_ZONES the zones to sort, gotten via sup.spawnZones
+---@return table tile_zones sorted table of spawn zones
+function Setup.sortSpawnZones(spawn_zones)
+
+	local tile_zones = {}
+
+	for zone_type, zones in pairs(spawn_zones) do
+
+		for zone_index, zone in ipairs(zones) do
+
+			local tile_name, is_success = Setup.getZoneTileName(zone)
+
+			if not is_success then
+				d.print("(sup.sortSpawnZones) Failed to get name of zone!", true, 1)
+				goto sup_sortSpawnZones_continueZone
+			end
+
+			table.tabulate(tile_zones, tile_name, zone_type)
+
+			table.insert(tile_zones[tile_name][zone_type], zone)
+
+			::sup_sortSpawnZones_continueZone::
+		end
+	end
+
+	return tile_zones
+end
+
+--# setups the vehicle prefabs
+function Setup.createVehiclePrefabs()
+
+	-- reset vehicle list
+	g_savedata.vehicle_list = {}
+
+	-- remove all existing vehicle data in constructable_vehicles
+	for role, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
+		if type(vehicles_with_role) == "table" then
+			for vehicle_type, vehicles_with_type in pairs(vehicles_with_role) do
+				if type(vehicles_with_type) == "table" then
+					for strategy, vehicles_with_strategy in pairs(vehicles_with_type) do
+						if type(vehicles_with_strategy) == "table" then
+							for i = 1, #vehicles_with_type do
+								vehicles_with_type[i].prefab_data = nil
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local before_processing_vehicle_pack_API_configs = s.getTimeMillisec()
+
+	local vehicle_pack_API_configs = {}
+
+	local ai_vehicle_configs = alu.getMissionComponents(nil, nil, "ICM | CONFIG", "AI_VEHICLES_CONFIG")
+
+	if ai_vehicle_configs then
+		for _, component_data in ipairs(ai_vehicle_configs) do
+			local tabled_config = table.fromString(component_data.tags_full)
+			if tabled_config then
+				vehicle_pack_API_configs[component_data.addon_index] = vehicle_pack_API_configs[component_data.addon_index] or {}
+				table.insert(vehicle_pack_API_configs[component_data.addon_index], tabled_config)
+			end
+		end
+	end
+	d.print(("Processed Vehicle Pack API Configs (took %0.2fs, for %0.0f configs)"):format((s.getTimeMillisec() - before_processing_vehicle_pack_API_configs)*0.001, #ai_vehicle_configs), true, 0)
+
+
+	--# checks if this vehicle is within the configs, returns false if its fine, returns true if its violating a config.
+	local function vehicleViolatesConfigs(addon_index, addon_data, location_data)
+		for config_addon_index, configs in pairs(vehicle_pack_API_configs) do
+			if config_addon_index ~= addon_index then
+				for _, config_data in ipairs(configs) do
+					for target_addon_name, vehicles_to_remove in pairs(config_data) do
+						if addon_data.name:match(target_addon_name) then
+							for _, vehicle_name in ipairs(vehicles_to_remove) do
+								if location_data.name:match(vehicle_name) then
+									d.print(("Removed Vehicle \"%s\" from AI's arsenal, due to a Vehicle Pack API Config from the addon \"%s\""):format(location_data.name, s.getAddonData(config_addon_index).name), false, 0)
+									return true
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return false
+	end
+
+	-- iterate through all addons
+	for addon_index = 0, s.getAddonCount() - 1 do
+		local addon_data = s.getAddonData(addon_index)
+
+		if not addon_data.location_count or addon_data.location_count <= 0 then
+			goto createVehiclePrefabs_continue_addon
+		end
+
+		-- iterate through all locations in this addon
+		for location_index = 0, addon_data.location_count - 1 do
+			local location_data = s.getLocationData(addon_index, location_index)
+
+			if location_data.env_mod then
+				goto createVehiclePrefabs_continue_location
+			end
+
+			-- iterate through all components in this location
+			for component_index = 0, location_data.component_count do
+
+				local component_data, is_success = s.getLocationComponentData(addon_index, location_index, component_index)
+
+				if not is_success then
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- check if this is the flag
+				if not flag_prefab and Tags.has(component_data.tags, "type=dlc_weapons_flag") and component_data.type == "vehicle" then
+					flag_prefab = { 
+						addon_index = addon_index,
+						location_index = location_index,
+						component_index = component_index
+					}
+
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- if this component is not an enemy AI vehicle
+				if not Tags.has(component_data.tags, "type=dlc_weapons") then
+					goto createVehiclePrefabs_continue_component
+				end
+
+				-- if this vehicle violates one of the configs
+				if vehicleViolatesConfigs(addon_index, addon_data, location_data) then
+					break
+				end
+
+				-- there is an enemy AI vehicle here
+
+				---@type PREFAB_DATA
+				local prefab_data = {
+					addon_index = addon_index, -- addon index the vehicle is from
+					location_index = location_index, -- the location index the vehicle is in
+					location_data = location_data, -- the data of the location
+					vehicle = component_data, -- the vehicle itself
+					fires = {} -- the fires attached to this vehicle
+				}
+
+				-- add any fires that are attached to this vehicle
+				for valid_component_index = 0, location_data.component_count - 1 do
+					local valid_component_data, is_success = s.getLocationComponentData(addon_index, location_index, valid_component_index)
+
+					if is_success then
+						-- if this is a fire, and its parented to this vehicle, then add it to the prefab
+						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == component_index then
+							table.insert(prefab_data.fires, valid_component_data)
+						end
+					end
+				end
+
+				-- get the role of the vehicle
+				local role = Tags.getValue(component_data.tags, "role", true) or "general"
+				-- get the type of the vehicle
+				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true), "wep_", "") or "unknown"
+				-- get the strategy of the vehicle
+				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
+
+				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
+				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
+
+				local vehicle_list_data = prefab_data
+				vehicle_list_data.role = role
+				vehicle_list_data.vehicle_type = vehicle_type
+				vehicle_list_data.strategy = strategy
+
+				-- add vehicle list data to the vehicle list
+				g_savedata.vehicle_list[#g_savedata.vehicle_list + 1] = vehicle_list_data
+
+				--[[ 
+					check if this vehicle exists within the constructable vehicles already
+					if it does, then just update it's prefab data
+					otherwise, create a new one
+				]]
+				for i = math.min(1, #g_savedata.constructable_vehicles[role][vehicle_type][strategy]), #g_savedata.constructable_vehicles[role][vehicle_type][strategy] do
+					local constructable_vehicle_data = g_savedata.constructable_vehicles[role][vehicle_type][strategy][i]
+
+					if constructable_vehicle_data and constructable_vehicle_data.name == location_data.name then
+						-- this vehicle already exists
+
+						-- update prefab data
+						constructable_vehicle_data.prefab_data = prefab_data
+
+						-- update id
+						constructable_vehicle_data.id = #g_savedata.vehicle_list
+
+						-- break, as we found a match.
+						break
+					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
+						-- this vehicle does not exist
+						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
+							prefab_data = prefab_data,
+							name = location_data.name,
+							mod = 1,
+							id = #g_savedata.vehicle_list
+						})
+					end
+				end
+				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
+				::createVehiclePrefabs_continue_component::
+			end
+			::createVehiclePrefabs_continue_location::
+		end
+
+		::createVehiclePrefabs_continue_addon::
+	end
+end
+-- required libraries
+
+-- library name
+Island = {}
+
+-- shortened library name
+is = Island
+
+-- checks if this island can spawn the specified vehicle
+---@param island ISLAND the island you want to check if AI can spawn there
+---@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
+---@return boolean can_spawn if the AI can spawn there
+function Island.canSpawn(island, selected_prefab)
+
+	-- if this island is owned by the AI
+	if island.faction ~= ISLAND.FACTION.AI then
+		return false
+	end
+
+	-- if this vehicle is a turret
+	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
+		local has_spawn = false
+		local total_spawned = 0
+
+		-- check if this island even has any turret zones
+		if not #island.zones.turrets then
+			return false
+		end
+
+		for turret_zone_index = 1, #island.zones.turrets do
+			if not island.zones.turrets[turret_zone_index].is_spawned then
+				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+					has_spawn = true
+				end
+			else
+				total_spawned = total_spawned + 1
+
+				-- already max amount of turrets
+				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if total_spawned >= #island.zones.turrets then
+					return false
+				end
+			end
+		end
+
+		-- if no valid turret spawn was found
+		if not has_spawn then
+			return false
+		end
+	else
+		-- this island can spawn this specific vehicle
+		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+			return false
+		end
+	end
+
+	local player_list = s.getPlayers()
+
+	-- theres no players within 2500m (cannot see the spawn point)
+	if not pl.noneNearby(player_list, island.transform, 2500, true) then
+		return false
+	end
+
+	return true
+end
+
+--# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param vehicle_id integer the vehicle_id of the island's flag vehicle
+---@return ISLAND island the island the flag vehicle belongs to
+---@return boolean got_island if the island was gotten
+function Island.getDataFromVehicleID(vehicle_id)
+	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.ai_base_island, true
+	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.player_base_island, true
+	else
+		for island_index, island in pairs(g_savedata.islands) do
+			if island.flag_vehicle.id == vehicle_id then
+				return island, true
+			end
+		end
+	end
+
+	return nil, false
+end
+
+--# returns the island data from the provided island index (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param island_index integer the island index you want to get
+---@return ISLAND island the island data from the index
+---@return boolean island_found returns true if the island was found
+function Island.getDataFromIndex(island_index)
+	if not island_index then -- if the island_index wasn't specified
+		d.print("(Island.getDataFromIndex) island_index was never inputted!", true, 1)
+		return nil, false
+	end
+
+	if g_savedata.islands[island_index] then
+		-- if its a normal island
+		return g_savedata.islands[island_index], true
+	elseif island_index == g_savedata.ai_base_island.index then
+		-- if its the ai's main base
+		return g_savedata.ai_base_island, true
+	elseif island_index == g_savedata.player_base_island.index then
+		-- if its the player's main base
+		return g_savedata.player_base_island, true 
+	end
+
+	d.print("(Island.getDataFromIndex) island was not found! inputted island_index: "..tostring(island_index), true, 1)
+
+	return nil, false
+end
+
+--# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param island_name string the island name you want to get
+---@return ISLAND island the island data from the name
+---@return boolean island_found returns true if the island was found
+function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
+	if island_name then
+		island_name = string.friendly(island_name)
+		if island_name == string.friendly(g_savedata.ai_base_island.name) then
+			-- if its the ai's main base
+			return g_savedata.ai_base_island, true
+		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
+			-- if its the player's main base
+			return g_savedata.player_base_island, true
+		else
+			-- check all other islands
+			for _, island in pairs(g_savedata.islands) do
+				if island_name == string.friendly(island.name) then
+					return island, true
+				end
+			end
+		end
+	else
+		return nil, false
+	end
+	return nil, false
+end
+
+
+-- library name
+Compatibility = {}
+
+-- shortened library name
+comp = Compatibility
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+--# stores which versions require compatibility updates
+local version_updates = {
+	"(0.3.0.78)",
+	"(0.3.0.79)",
+	"(0.3.0.82)",
+	"(0.3.1.2)"
+}
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class VERSION_DATA
+---@field data_version string the version which the data is on currently
+---@field version string the version which the mod is on
+---@field versions_outdated integer how many versions the data is out of date
+---@field is_outdated boolean if the data is outdated compared to the mod
+---@field newer_versions table a table of versions which are newer than the current, indexed by index, value as version string
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+--# creates version data for the specified version, for use in the version_history table
+---@param version string the version you want to create the data on
+---@return table version_history_data the data of the version
+function Compatibility.createVersionHistoryData(version)
+
+	--[[
+		calculate ticks played
+	]] 
+	local ticks_played = g_savedata.tick_counter
+
+	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
+		for _, version_data in ipairs(g_savedata.info.version_history) do
+			ticks_played = ticks_played - (version_data.ticks_played or 0)
+		end
+	end
+
+	--[[
+		
+	]]
+	local version_history_data = {
+		version = version,
+		ticks_played = ticks_played,
+		backup_g_savedata = {}
+	}
+
+	return version_history_data
+end
+
+--# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
+function Compatibility.getSavedataCopy()
+
+	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
+
+	--[[
+		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
+
+		returns a clone/copy of g_savedata
+	]]
+	
+	local function clone(t)
+		local copy = {}
+		if type(t) == "table" then
+			for key, value in next, t, nil do
+				copy[clone(key)] = clone(value)
+			end
+		else
+			copy = t
+		end
+		return copy
+	end
+
+	local copied_g_savedata = clone(g_savedata)
+	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
+
+	return copied_g_savedata
+end
+
+--# migrates the version system to the new one implemented in 0.3.0.78
+---@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
+---@return table migrated_g_savedata
+---@return boolean is_success if it successfully migrated the versioning system
+function Compatibility.migrateVersionSystem(overwrite_g_savedata)
+
+	d.print("migrating g_savedata...", false, 0)
+
+	--[[
+		create a local copy of g_savedata, as changes we make we dont want to be applied to the actual g_savedata
+	]]
+
+	local migrated_g_savedata = comp.getSavedataCopy()
+
+	--[[
+		make sure that the version_history table doesnt exist
+	]]
+	if g_savedata.info.version_history then
+		-- if it already does, then abort, as the version system is already migrated
+		d.print("(comp.migrateVersionSystem) the version system has already been migrated!", true, 1)
+		return nil, false
+	end
+
+	--[[
+		create the version_history table
+	]]
+	if overwrite_g_savedata then
+		g_savedata.info.version_history = {}
+	end
+
+	migrated_g_savedata.info.version_history = {}
+
+	--[[
+		create the version history data, with the previous version the creation version 
+		sadly, we cannot reliably get the last version used for versions 0.3.0.77 and below
+		so we have to make this assumption
+	]]
+
+	if overwrite_g_savedata then
+		table.insert(g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
+	end
+	
+	table.insert(migrated_g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
+
+	d.print("migrated g_savedata", false, 0)
+
+	return migrated_g_savedata, true
+end
+
+--# returns the version id from the provided version
+---@param version string the version you want to get the id of
+---@return integer version_id the id of the version
+---@return boolean is_success if it found the id of the version
+function Compatibility.getVersionID(version)
+	--[[
+		first, we want to ensure version was provided
+		lastly, we want to go through all of the versions stored in the version history, if we find a match, then we return it as the id
+		if we cannot find a match, we return nil and false
+	]]
+
+	-- ensure version was provided
+	if not version then
+		d.print("(comp.getVersionID) version was not provided!", false, 1)
+		return nil, false
+	end
+
+	-- go through all of the versions saved in version_history
+	for version_id, version_name in ipairs(g_savedata.info.version_history) do
+		if version_name == version then
+			return version_id, true
+		end
+	end
+
+	-- if a version was not found, return nil and false
+	return nil, false
+end
+
+--# splits a version into 
+---@param version string the version you want split
+---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
+function Compatibility.splitVersion(version) -- credit to woe
+	local T = {}
+
+	-- remove ( and )
+	version = version:match("[%d.]+")
+
+	for S in version:gmatch("([^%.]*)%.*") do
+		T[#T+1] = tonumber(S) or S
+	end
+
+	T = {
+		T[1], -- release
+		T[2], -- majour
+		T[3], -- minor
+		T[4] -- commit
+	}
+
+	return T
+end
+
+--# returns the version from the version_id
+---@param version_id integer the id of the version
+---@return string version the version associated with the id
+---@return boolean is_success if it successfully got the version from the id
+function Compatibility.getVersion(version_id)
+
+	-- ensure that version_id was specified
+	if not version_id then
+		d.print("(comp.getVersion) version_id was not provided!", false, 1)
+		return nil, false
+	end
+
+	-- ensure that it is a number
+	if type(version_id) ~= "number" then
+		d.print("(comp.getVersion) given version_id was not a number! type: "..type(version_id).." value: "..tostring(version_id), false, 1)
+		return nil, false
+	end
+
+	local version = g_savedata.info.version_history[version_id] and g_savedata.info.version_history[version_id].version or nil
+	return version, version ~= nil
+end
+
+--# returns version data about the specified version, or if left blank, the current version
+---@param version string the current version, leave blank if want data on current version
+---@return VERSION_DATA version_data the data about the version
+---@return boolean is_success if it successfully got the version data
+function Compatibility.getVersionData(version)
+
+	local version_data = {
+		data_version = "",
+		is_outdated = false,
+		version = "",
+		versions_outdated = 0,
+		newer_versions = {}
+	}
+
+	local copied_g_savedata = comp.getSavedataCopy() -- local copy of g_savedata so any changes we make to it wont affect any backups we may make
+
+	--[[
+		first, we want to ensure that the version system is migrated
+		second, we want to get the id of the version depending on the given version argument
+		third, we want to get the data version
+		fourth, we want to count how many versions out of date the data version is from the mod version
+		fifth, we want to want to check if the version is outdated
+		and lastly, we want to return the data
+	]]
+
+	-- (1) check if the version system is not migrated
+	if not g_savedata.info.version_history then
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
+		if not is_success then
+			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
+			return nil, false
+		end
+
+		-- set copied_g_savedata as migrated_g_savedata
+		copied_g_savedata = migrated_g_savedata
+	end
+
+	-- (2) get version id
+	local version_id = version and comp.getVersionID(version) or #copied_g_savedata.info.version_history
+
+	-- (3) get data version
+	--d.print("(comp.getVersionData) data_version: "..tostring(copied_g_savedata.info.version_history[version_id].version))
+	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
+
+	-- (4) count how many versions out of date the data is
+
+	local current_version = comp.splitVersion(version_data.data_version)
+
+	local ids_to_versions = {
+		"Release",
+		"Majour",
+		"Minor",
+		"Commit"
+	}
+
+	for _, version_name in ipairs(version_updates) do
+
+		--[[
+			first, we want to check if the release version is greater (x.#.#.#)
+			if not, second we want to check if the majour version is greater (#.x.#.#)
+			if not, third we want to check if the minor version is greater (#.#.x.#)
+			if not, lastly we want to check if the commit version is greater (#.#.#.x)
+		]]
+
+		local update_version = comp.splitVersion(version_name)
+
+		--[[
+			go through each version, and check if its newer than our current version
+		]]
+		for i = 1, #current_version do
+			if not current_version[i] or current_version[i] > update_version[i] then
+				--[[
+					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
+					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
+				]]
+				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+				break
+			elseif current_version[i] < update_version[i] then
+				-- current version is older, so we need to migrate data.
+				table.insert(version_data.newer_versions, version_name)
+				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
+				break
+			end
+
+			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+		end
+	end
+
+	-- count how many versions its outdated
+	version_data.versions_outdated = #version_data.newer_versions
+
+	-- (5) check if its outdated
+	version_data.is_outdated = version_data.versions_outdated > 0
+
+	return version_data, true
+end
+
+--# saves backup of current g_savedata
+---@return boolean is_success if it successfully saved a backup of the savedata
+function Compatibility.saveBackup()
+	--[[
+		first, we want to save a current local copy of the g_savedata
+		second we want to ensure that the g_savedata.info.version_history table is created
+		lastly, we want to save the backup g_savedata
+	]]
+
+	-- create local copy of g_savedata
+	local backup_g_savedata = comp.getSavedataCopy()
+
+	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
+		d.print("(comp.saveBackup) migrating version system", true, 0)
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
+		if not is_success then
+			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
+			return false
+		end
+
+		if not g_savedata.info.version_history then
+			d.print("(comp.saveBackup) successfully migrated version system, yet g_savedata doesn't contain the new version system, this is not good!", false, 1)
+		end
+	end
+
+	local version_data, is_success = comp.getVersionData()
+	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
+		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
+		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
+	end
+
+	-- save backup g_savedata
+	g_savedata.info.version_history[#g_savedata.info.version_history].backup_g_savedata = backup_g_savedata
+
+	-- remove g_savedata backups which are from over 2 data updates ago
+	local backup_versions = {}
+	for version_index, version_history_data in ipairs(g_savedata.info.version_history) do
+		if version_history_data.backup_g_savedata.info then
+			table.insert(backup_versions, version_index)
+		end
+	end
+	
+	if #backup_versions >= 3 then
+		d.print("Deleting old backup data...", false, 0)
+		for backup_index, backup_version_index in ipairs(backup_versions) do
+			d.print("Deleting backup data for "..g_savedata.info.version_history[backup_version_index].version, false, 0)
+			backup_versions[backup_index] = nil
+			g_savedata.info.version_history[backup_version_index].backup_g_savedata = {}
+
+			if #backup_versions <= 2 then
+				d.print("Deleted old backup data.", false, 0)
+				break
+			end
+		end
+	end
+
+	return true
+end
+
+--# updates g_savedata to be compatible with the mod version, to ensure that worlds are backwards compatible.
+function Compatibility.update()
+
+	-- ensure that we're actually outdated before proceeding
+	local version_data, is_success = comp.getVersionData()
+	if not is_success then
+		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
+		return
+	end
+
+	if not version_data.is_outdated then
+		d.print("(comp.update) according to version data, the data is not outdated. This is probably not good!", false, 1)
+		return
+	end
+
+	d.print(SHORT_ADDON_NAME.."'s data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
+
+	-- save backup
+	local backup_saved = comp.saveBackup()
+	if not backup_saved then
+		d.print("(comp.update) Failed to save backup. This is probably not good!", false, 1)
+		return false
+	end
+
+	d.print("Creating new version history for "..version_data.newer_versions[1].."...", false, 0)
+	local version_history_data = comp.createVersionHistoryData(version_data.newer_versions[1])
+	g_savedata.info.version_history[#g_savedata.info.version_history+1] = version_history_data
+	d.print("Successfully created new version history for "..version_data.newer_versions[1]..".", false, 0)
+
+	-- check for 0.3.0.78 changes
+	if version_data.newer_versions[1] == "(0.3.0.78)" then
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
+
+		-- clean up old data
+		g_savedata.info.creation_version = nil
+		g_savedata.info.full_reload_versions = nil
+		g_savedata.info.awaiting_reload = nil
+
+		-- clean up old player_data
+		for steam_id, player_data in pairs(g_savedata.player_data) do
+			player_data.timers = nil
+			player_data.fully_reloading = nil
+			player_data.do_as_i_say = nil
+		end		
+	elseif version_data.newer_versions[1] == "(0.3.0.79)" then -- 0.3.0.79 changes
+
+		-- update the island data with the proper zones, as previously, the zone system improperly filtered out NSO compatible and incompatible zones
+		local spawn_zones = sup.spawnZones()
+		local tile_zones = sup.sortSpawnZones(spawn_zones)
+
+		for tile_name, zones in pairs(tile_zones) do
+			local island, is_success = Island.getDataFromName(tile_name)
+			island.zones = zones
+		end
+
+		if g_savedata.info.version_history[1].ticked_played then
+			g_savedata.info.version_history.ticks_played = g_savedata.info.version_history.ticked_played
+			g_savedata.info.version_history.ticked_played = nil
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.0.82)" then -- 0.3.0.82 changes
+
+		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+				vehicle_object.transform_history = {}
+			end
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.1.2)" then -- 0.3.1.2 changes
+
+		d.print(("Migrating %s data..."):format(SHORT_ADDON_NAME), false, 0)
+
+		-- check if we've initialised the graph_node debug before
+		if g_savedata.graph_nodes.init_debug then
+
+			-- generate a global map id for all graph nodes
+			g_savedata.graph_nodes.ui_id = server.getMapID()
+
+			d.print("Cleaning up old data...", false, 0)
+
+			-- go through and remove all of the graph node's map ids from the map
+			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+				for z, z_data in pairs(x_data) do
+					s.removeMapID(-1, z_data.ui_id)
+					z_data.ui_id = nil
+				end
+			end
+
+			-- go through all of the player data and set graph_node debug to false
+			for _, player_data in pairs(g_savedata.player_data) do
+				player_data.debug.graph_node = false
+			end
+
+			-- disable graph_node debug globally
+			g_savedata.debug.graph_node = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	end
+
+	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+
+	-- this means that theres still newer versions
+	if #version_data.newer_versions > 1 then
+		-- migrate to the next version
+		comp.update()
+	end
+
+	-- we've finished migrating!
+	comp.showSaveMessage()
+end
+
+--# prints outdated message and starts update
+function Compatibility.outdated()
+	-- print that its outdated
+	d.print(SHORT_ADDON_NAME.." data is outdated! attempting to automatically update...", false, 0)
+
+	-- start update process
+	comp.update()
+end
+
+--# verifies that the mod is currently up to date
+function Compatibility.verify()
+	d.print("verifying if "..SHORT_ADDON_NAME.." data is up to date...", false, 0)
+	--[[
+		first, check if the versioning system is up to date
+	]]
+	if not g_savedata.info.version_history then
+		-- the versioning system is not up to date
+		comp.outdated()
+	else
+		-- check if we're outdated
+		local version_data, is_success = comp.getVersionData()
+
+		if not is_success then
+			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
+			return
+		end
+
+		-- if we're outdated
+		if version_data.is_outdated then
+			comp.outdated()
+		end
+	end
+end
+
+--# shows the message saying that the addon was fully migrated
+function Compatibility.showSaveMessage()
+	d.print(SHORT_ADDON_NAME.." Data has been fully migrated!", false, 0)
+end
+ -- functions used for making the mod backwards compatible -- functions for debugging -- functions for drawing on the map -- custom matrix functions
 --[[
 
 
@@ -2389,6 +3302,88 @@ end
 
 
 -- required libraries
+-- This library is for controlling or getting things about the Enemy AI.
+
+-- required libraries
+
+-- library name
+AI = {}
+
+--- @param vehicle_object vehicle_object the vehicle you want to set the state of
+--- @param state string the state you want to set the vehicle to
+--- @return boolean success if the state was set
+function AI.setState(vehicle_object, state)
+	if vehicle_object then
+		if state ~= vehicle_object.state.s then
+			if state == VEHICLE.STATE.HOLDING then
+				vehicle_object.holding_target = vehicle_object.transform
+			end
+			vehicle_object.state.s = state
+		end
+	else
+		d.print("(AI.setState) vehicle_object is nil!", true, 1)
+	end
+	return false
+end
+
+--# made for use with toggles in buttons (only use for toggle inputs to seats)
+---@param vehicle_id integer the vehicle's id that has the seat you want to set
+---@param seat_name string the name of the seat you want to set
+---@param axis_ws number w/s axis
+---@param axis_ad number a/d axis
+---@param axis_ud number up down axis
+---@param axis_lr number left right axis
+---@param ... boolean buttons (1-7) (7 is trigger)
+---@return boolean set_seat if the seat was set
+function AI.setSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, ...)
+	
+	if not vehicle_id then
+		d.print("(AI.setSeat) vehicle_id is nil!", true, 1)
+		return false
+	end
+
+	if not seat_name then
+		d.print("(AI.setSeat) seat_name is nil!", true, 1)
+		return false
+	end
+
+	local button = table.pack(...)
+
+	-- sets any nil values to 0 or false
+	axis_ws = axis_ws or 0
+	axis_ad = axis_ad or 0
+	axis_ud = axis_ud or 0
+	axis_lr = axis_lr or 0
+
+	for i = 1, 7 do
+		button[i] = button[i] or false
+	end
+
+	g_savedata.seat_states = g_savedata.seat_states or {}
+
+
+	if not g_savedata.seat_states[vehicle_id] or not g_savedata.seat_states[vehicle_id][seat_name] then
+
+		g_savedata.seat_states[vehicle_id] = g_savedata.seat_states[vehicle_id] or {}
+		g_savedata.seat_states[vehicle_id][seat_name] = {}
+
+		for i = 1, 7 do
+			g_savedata.seat_states[vehicle_id][seat_name][i] = false
+		end
+	end
+
+	for i = 1, 7 do
+		if button[i] ~= g_savedata.seat_states[vehicle_id][seat_name][i] then
+			g_savedata.seat_states[vehicle_id][seat_name][i] = button[i]
+			button[i] = true
+		else
+			button[i] = false
+		end
+	end
+
+	s.setVehicleSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, button[1], button[2], button[3], button[4], button[5], button[6], button[7])
+	return true
+end
 -- required libraries
 ---@param str string the string to make the first letter uppercase
 ---@return string str the string with the first letter uppercase
@@ -2738,52 +3733,6 @@ function SpawnModifiers.getStats()
 
 	return vehicles
 end
--- required libraries
-
--- library name
-Tags = {}
-
-function Tags.has(tags, tag, decrement)
-	if type(tags) ~= "table" then
-		d.print("(Tags.has) was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
-		return false
-	end
-
-	if not decrement then
-		for tag_index = 1, #tags do
-			if tags[tag_index] == tag then
-				return true
-			end
-		end
-	else
-		for tag_index = #tags, 1, -1 do
-			if tags[tag_index] == tag then
-				return true
-			end 
-		end
-	end
-
-	return false
-end
-
--- gets the value of the specifed tag, returns nil if tag not found
-function Tags.getValue(tags, tag, as_string)
-	if type(tags) ~= "table" then
-		d.print("(Tags.getValue) was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
-	end
-
-	for k, v in pairs(tags) do
-		if string.match(v, tag.."=") then
-			if not as_string then
-				return tonumber(tostring(string.gsub(v, tag.."=", "")))
-			else
-				return tostring(string.gsub(v, tag.."=", ""))
-			end
-		end
-	end
-	
-	return nil
-end
 
 
 -- library name
@@ -3084,238 +4033,198 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 	end
 	d.print("Got Y level of all paths\nNumber of nodes: "..total_paths.."\nTime taken: "..(millisecondsSince(start_time)/1000).."s", true, 0)
 end
--- required libraries
--- required libraries
+ -- functions for pathfinding -- functions relating to Players -- functions for script/world setup. -- functions relating to their AI
+--[[
 
--- library name
-Island = {}
 
--- shortened library name
-is = Island
+	Library Setup
 
--- checks if this island can spawn the specified vehicle
----@param island ISLAND the island you want to check if AI can spawn there
----@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
----@return boolean can_spawn if the AI can spawn there
-function Island.canSpawn(island, selected_prefab)
 
-	-- if this island is owned by the AI
-	if island.faction ~= ISLAND.FACTION.AI then
-		return false
-	end
+]]
 
-	-- if this vehicle is a turret
-	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
-		local has_spawn = false
-		local total_spawned = 0
+s = s or server
 
-		-- check if this island even has any turret zones
-		if not #island.zones.turrets then
-			return false
-		end
-
-		for turret_zone_index = 1, #island.zones.turrets do
-			if not island.zones.turrets[turret_zone_index].is_spawned then
-				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
-					has_spawn = true
-				end
-			else
-				total_spawned = total_spawned + 1
-
-				-- already max amount of turrets
-				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
-					return false
-				end
-
-				-- check if this island already has all of the turret spawns filled
-				if total_spawned >= #island.zones.turrets then
-					return false
-				end
-			end
-		end
-
-		-- if no valid turret spawn was found
-		if not has_spawn then
-			return false
-		end
-	else
-		-- this island can spawn this specific vehicle
-		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-			return false
-		end
-	end
-
-	local player_list = s.getPlayers()
-
-	-- theres no players within 2500m (cannot see the spawn point)
-	if not pl.noneNearby(player_list, island.transform, 2500, true) then
-		return false
-	end
-
-	return true
-end
-
---# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param vehicle_id integer the vehicle_id of the island's flag vehicle
----@return ISLAND island the island the flag vehicle belongs to
----@return boolean got_island if the island was gotten
-function Island.getDataFromVehicleID(vehicle_id)
-	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
-		return g_savedata.ai_base_island, true
-	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
-		return g_savedata.player_base_island, true
-	else
-		for island_index, island in pairs(g_savedata.islands) do
-			if island.flag_vehicle.id == vehicle_id then
-				return island, true
-			end
-		end
-	end
-
-	return nil, false
-end
-
---# returns the island data from the provided island index (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param island_index integer the island index you want to get
----@return ISLAND island the island data from the index
----@return boolean island_found returns true if the island was found
-function Island.getDataFromIndex(island_index)
-	if not island_index then -- if the island_index wasn't specified
-		d.print("(Island.getDataFromIndex) island_index was never inputted!", true, 1)
-		return nil, false
-	end
-
-	if g_savedata.islands[island_index] then
-		-- if its a normal island
-		return g_savedata.islands[island_index], true
-	elseif island_index == g_savedata.ai_base_island.index then
-		-- if its the ai's main base
-		return g_savedata.ai_base_island, true
-	elseif island_index == g_savedata.player_base_island.index then
-		-- if its the player's main base
-		return g_savedata.player_base_island, true 
-	end
-
-	d.print("(Island.getDataFromIndex) island was not found! inputted island_index: "..tostring(island_index), true, 1)
-
-	return nil, false
-end
-
---# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param island_name string the island name you want to get
----@return ISLAND island the island data from the name
----@return boolean island_found returns true if the island was found
-function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
-	if island_name then
-		island_name = string.friendly(island_name)
-		if island_name == string.friendly(g_savedata.ai_base_island.name) then
-			-- if its the ai's main base
-			return g_savedata.ai_base_island, true
-		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
-			-- if its the player's main base
-			return g_savedata.player_base_island, true
-		else
-			-- check all other islands
-			for _, island in pairs(g_savedata.islands) do
-				if island_name == string.friendly(island.name) then
-					return island, true
-				end
-			end
-		end
-	else
-		return nil, false
-	end
-	return nil, false
-end
 -- required libraries
 
 -- library name
-SpawningUtils = {}
+Characters = {}
 
 -- shortened library name
-su = SpawningUtils
+c = Characters
 
--- spawn an individual object descriptor from a playlist location
-function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
-	if is_success then
-		return component.id
-	else -- then it failed to spawn the addon component
-		d.print("this addon index: "..s.getAddonIndex(), false, 0)
-		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
-		return nil
-	end
-end
+--[[
 
-function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
-	-- spawn object
 
-	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
+	Variables
+   
 
-	-- add object to spawned object tables
+]]
 
-	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
-
-		local l_vehicle_type = VEHICLE.TYPE.HELI
-		if Tags.has(object.tags, "vehicle_type=wep_plane") then
-			l_vehicle_type = VEHICLE.TYPE.PLANE
-		end
-		if Tags.has(object.tags, "vehicle_type=wep_boat") then
-			l_vehicle_type = VEHICLE.TYPE.BOAT
-		end
-		if Tags.has(object.tags, "vehicle_type=wep_land") then
-			l_vehicle_type = VEHICLE.TYPE.LAND
-		end
-		if Tags.has(object.tags, "vehicle_type=wep_turret") then
-			l_vehicle_type = VEHICLE.TYPE.TURRET
-		end
-		if Tags.has(object.tags, "type=dlc_weapons_flag") then
-			l_vehicle_type = "flag"
-		end
-
-		local object_data = { 
-			name = object.display_name, 
-			type = object.type, 
-			id = spawned_object_id, 
-			component_id = object.id, 
-			vehicle_type = l_vehicle_type, 
-			size = Tags.getValue(object.tags, "size", true) or "small"
+Characters.valid_seats = { -- configure to select which are the valid seats, select which seat group.
+	enemy_ai = {
+		{
+			name = "Driver",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = false,
+			ai_state = 0
+		},
+		{
+			name = "Captain",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
+		},
+		{
+			name = "Pilot",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
+		},
+		{
+			name = "Gunner %d+",
+			outfit_id = 5,
+			is_interactable = true,
+			is_ai = true,
+			ai_state = 1
 		}
+	}
+}
 
-		if spawned_objects ~= nil then
-			table.insert(spawned_objects, object_data)
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class VALID_SEAT
+---@field name string a lua pattern of the name of the valid seat
+---@field outfit_id SWOutfitTypeEnum the outfit type the character will wear in that seat
+---@field is_interactable boolean if the character is interactable
+---@field is_ai boolean if the character has AI to use seat controls
+---@field ai_state integer the state of the AI
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+function Characters.overrides()
+
+	-- populate g_savedata with the table we will be using, 
+	table.tabulate(g_savedata, "libraries", "characters", "characters_to_seat")
+
+	-- onObjectLoad override
+	local old_onObjectLoad = onObjectLoad or function() end
+	function onObjectLoad(object_id)
+		if g_savedata.libraries.characters.characters_to_seat[object_id] then
+			Characters.setIntoSeat(object_id)
 		end
 
-		if out_spawned_objects ~= nil then
-			table.insert(out_spawned_objects, object_data)
-		end
-
-		return object_data
+		old_onObjectLoad(object_id)
 	end
 
-	return nil
-end
+	-- onCharacterSit override
+	local old_onCharacterSit = onCharacterSit or function() end
+	function onCharacterSit(object_id, vehicle_id, seat_name)
+		if g_savedata.libraries.characters.characters_to_seat[object_id] then
+			g_savedata.libraries.characters.characters_to_seat[object_id] = nil
+			d.print(("(Characters.onCharacterSit) Successfully set object %i into seat %s on vehicle %i"):format(object_id, seat_name, vehicle_id), true, 0)
 
-function SpawningUtils.spawnObjects(spawn_transform, addon_index, location_index, object_descriptors, out_spawned_objects)
-	local spawned_objects = {}
-
-	for _, object in pairs(object_descriptors) do
-		-- find parent vehicle id if set
-
-		local parent_vehicle_id = 0
-		if object.vehicle_parent_component_id > 0 then
-			for spawned_object_id, spawned_object in pairs(out_spawned_objects) do
-				if spawned_object.type == "vehicle" and spawned_object.component_id == object.vehicle_parent_component_id then
-					parent_vehicle_id = spawned_object.id
-				end
+			if onCharacterPrepared then
+				onCharacterPrepared(object_id, vehicle_id, seat_name)
 			end
 		end
 
-		su.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+		old_onCharacterSit(object_id, vehicle_id, seat_name)
+	end
+end
+
+function Characters.setIntoSeat(object_id)
+	local seat_char_data = g_savedata.libraries.characters.characters_to_seat[object_id]
+
+	local seat_pos = seat_char_data.seat_data.pos
+
+	s.setCharacterSeated(object_id, seat_char_data.vehicle_id, seat_pos.x, seat_pos.y, seat_pos.z)
+
+	s.setCharacterData(object_id, s.getCharacterData(object_id).hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
+	s.setAIState(object_id, seat_char_data.char_config.ai_state)
+	s.setAITargetVehicle(object_id, nil)
+end
+
+--# spawns the characters for all of the valid seats on the vehicle, and will later add them to the 
+---@param vehicle_id integer the vehicle to spawn the characters for, the vehicle must be loaded in or previously been loaded in.
+---@param valid_seats table<integer, VALID_SEAT> the valid seat names along with the outfit_id to use for them, set groups up in characters.lua in the valid_seats variable and then use them here
+function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
+	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+	-- failed to get vehicle data
+	if not is_success then
+		d.print("(Characters.setupVehicle) failed to get vehicle data for vehicle_id: "..vehicle_id, true, 1)
+		return {}, false
 	end
 
-	return spawned_objects
+	-- vehicle has never loaded
+	if not vehicle_data.components then
+		d.print(("(Characters.setupVehicle) vehicle_id: %i has not been loaded yet!"):format(vehicle_id), true, 1)
+		return {}, false
+	end
+
+	-- vehicle has no seats
+	if not vehicle_data.components.seats[1] then
+		d.print(("(Characters.setupVehicle) vehicle_id: %i has no seats!"):format(vehicle_id), true, 1)
+		return {}, false
+	end
+
+	-- make sure it's overriding the callback functions
+	Characters.overrides()
+
+	local characters = {}
+
+	-- go through all valid seat types, and for each, go through all of the seats, this way the output table is sorted in the order the valid seats table is ordered.
+	for valid_seat_id = 1, #valid_seats do
+		local valid_seat = valid_seats[valid_seat_id]
+		for seat_id = 1, #vehicle_data.components.seats do
+			local seat_data = vehicle_data.components.seats[seat_id]
+			if string.find(seat_data.name, valid_seat.name) then
+				-- this is a valid seat
+				local object_id, is_success = s.spawnCharacter(vehicle_data.transform, valid_seat.outfit_id)
+				if not is_success then
+					d.print(("(Characters.setupVehicle) failed to spawn character for vehicle_id: %i!"):format(vehicle_id), true, 1)
+				else 
+					s.setCharacterData(object_id, s.getCharacterData(object_id).hp, valid_seat.is_interactable, valid_seat.is_ai)
+					s.setAIState(object_id, valid_seat.ai_state)
+					s.setAITargetVehicle(object_id, nil)
+					table.insert(characters, object_id)
+					g_savedata.libraries.characters.characters_to_seat[object_id] = {
+						seat_data = seat_data,
+						vehicle_id = vehicle_id,
+						char_config = valid_seat
+					}
+				end
+			end
+		end
+	end 
+
+	return characters, true
 end
+ -- functions for characters, such as setting them into seats.
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
 -- This library is for the main objectives in Conquest Mode, such as getting the AI's island they want to attack.
 
 --[[
@@ -3431,7 +4340,131 @@ function Objective.getIslandToAttack(ignore_scouted)
 	end
 	return target_island, origin_island
 end
+--[[
 
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+
+-- library name
+Squad = {}
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class SQUAD
+---@field command string the command the squad is following.
+---@field vehicle_type string the vehicle_type this squad is composed of.
+---@field role string the role of this squad.
+---@field vehicles table<integer, vehicle_object> the vehicles in this squad.
+---@field target_island ISLAND the island they're targetting.
+
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+---@param vehicle_id integer the id of the vehicle you want to get the squad ID of
+---@return integer|nil squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return SQUAD|nil squad the info of the squad, if not found, then returns nil
+function Squad.getSquad(vehicle_id) -- input a vehicle's id, and it will return the squad index its from and the squad's data
+	local squad_index = g_savedata.ai_army.squad_vehicles[vehicle_id]
+	if squad_index then
+		local squad = g_savedata.ai_army.squadrons[squad_index]
+		if squad then
+			return squad_index, squad
+		else
+			return squad_index, nil
+		end
+	else
+		return nil, nil
+	end
+end
+
+---@param vehicle_id integer the vehicle's id
+---@return vehicle_object? vehicle_object the vehicle object, nil if not found
+---@return integer? squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
+---@return SQUAD? squad the info of the squad, if not found, then returns nil
+function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
+
+	local vehicle_object = nil
+	local squad_index = nil
+	local squad = nil
+
+	if not vehicle_id then -- makes sure vehicle id was provided
+		d.print("(Squad.getVehicle) vehicle_id is nil!", true, 1)
+		return vehicle_object, squad_index, squad
+	else
+		squad_index, squad = Squad.getSquad(vehicle_id)
+	end
+
+	if not squad_index or not squad then -- if we were not able to get a squad index then return nil
+		return vehicle_object, squad_index, squad
+	end
+
+	vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
+
+	if not vehicle_object then
+		d.print("(Squad.getVehicle) failed to get vehicle_object for vehicle with id "..tostring(vehicle_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
+	end
+
+	return vehicle_object, squad_index, squad
+end
+
+---@param squad_index integer the squad's index which you want to create it under, if not specified it will use the next available index
+---@param vehicle_object vehicle_object the vehicle object which is adding to the squad
+---@return integer squad_index the index of the squad
+---@return boolean squad_created if the squad was successfully created
+function Squad.createSquadron(squad_index, vehicle_object)
+
+	local squad_index = squad_index or #g_savedata.ai_army.squadrons + 1
+
+	if not vehicle_object then
+		d.print("(Squad.createSquadron) vehicle_object is nil!", true, 1)
+		return squad_index, false
+	end
+
+	if g_savedata.ai_army.squadrons[squad_index] then
+		d.print("(Squad.createSquadron) Squadron "..tostring(squad_index).." already exists!", true, 1)
+		return squad_index, false
+	end
+
+	g_savedata.ai_army.squadrons[squad_index] = { 
+		command = SQUAD.COMMAND.NONE,
+		index = squad_index,
+		vehicle_type = vehicle_object.vehicle_type,
+		role = vehicle_object.role,
+		vehicles = {},
+		target_island = nil,
+		target_players = {},
+		target_vehicles = {},
+		investigate_transform = nil
+	}
+
+	return squad_index, true
+end
+-- required libraries
 
 -- library name
 Vehicle = {}
@@ -5940,1039 +6973,7 @@ function Cargo.reset(island, cargo_type)
 
 	return true, "reset"
 end
- -- functions relating to the Convoys and Cargo Vehicles
---[[
-
-
-	Library Setup
-
-
-]]
-
-s = s or server
-
--- required libraries
-
--- library name
-Characters = {}
-
--- shortened library name
-c = Characters
-
---[[
-
-
-	Variables
-   
-
-]]
-
-Characters.valid_seats = { -- configure to select which are the valid seats, select which seat group.
-	enemy_ai = {
-		{
-			name = "Driver",
-			outfit_id = 5,
-			is_interactable = true,
-			is_ai = false,
-			ai_state = 0
-		},
-		{
-			name = "Captain",
-			outfit_id = 5,
-			is_interactable = true,
-			is_ai = true,
-			ai_state = 1
-		},
-		{
-			name = "Pilot",
-			outfit_id = 5,
-			is_interactable = true,
-			is_ai = true,
-			ai_state = 1
-		},
-		{
-			name = "Gunner %d+",
-			outfit_id = 5,
-			is_interactable = true,
-			is_ai = true,
-			ai_state = 1
-		}
-	}
-}
-
---[[
-
-
-	Classes
-
-
-]]
-
----@class VALID_SEAT
----@field name string a lua pattern of the name of the valid seat
----@field outfit_id SWOutfitTypeEnum the outfit type the character will wear in that seat
----@field is_interactable boolean if the character is interactable
----@field is_ai boolean if the character has AI to use seat controls
----@field ai_state integer the state of the AI
-
---[[
-
-
-	Functions         
-
-
-]]
-
-function Characters.overrides()
-
-	-- populate g_savedata with the table we will be using, 
-	table.tabulate(g_savedata, "libraries", "characters", "characters_to_seat")
-
-	-- onObjectLoad override
-	local old_onObjectLoad = onObjectLoad or function() end
-	function onObjectLoad(object_id)
-		if g_savedata.libraries.characters.characters_to_seat[object_id] then
-			Characters.setIntoSeat(object_id)
-		end
-
-		old_onObjectLoad(object_id)
-	end
-
-	-- onCharacterSit override
-	local old_onCharacterSit = onCharacterSit or function() end
-	function onCharacterSit(object_id, vehicle_id, seat_name)
-		if g_savedata.libraries.characters.characters_to_seat[object_id] then
-			g_savedata.libraries.characters.characters_to_seat[object_id] = nil
-			d.print(("(Characters.onCharacterSit) Successfully set object %i into seat %s on vehicle %i"):format(object_id, seat_name, vehicle_id), true, 0)
-
-			if onCharacterPrepared then
-				onCharacterPrepared(object_id, vehicle_id, seat_name)
-			end
-		end
-
-		old_onCharacterSit(object_id, vehicle_id, seat_name)
-	end
-end
-
-function Characters.setIntoSeat(object_id)
-	local seat_char_data = g_savedata.libraries.characters.characters_to_seat[object_id]
-
-	local seat_pos = seat_char_data.seat_data.pos
-
-	s.setCharacterSeated(object_id, seat_char_data.vehicle_id, seat_pos.x, seat_pos.y, seat_pos.z)
-
-	s.setCharacterData(object_id, s.getCharacterData(object_id).hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
-	s.setAIState(object_id, seat_char_data.char_config.ai_state)
-	s.setAITargetVehicle(object_id, nil)
-end
-
---# spawns the characters for all of the valid seats on the vehicle, and will later add them to the 
----@param vehicle_id integer the vehicle to spawn the characters for, the vehicle must be loaded in or previously been loaded in.
----@param valid_seats table<integer, VALID_SEAT> the valid seat names along with the outfit_id to use for them, set groups up in characters.lua in the valid_seats variable and then use them here
-function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
-	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
-
-	-- failed to get vehicle data
-	if not is_success then
-		d.print("(Characters.setupVehicle) failed to get vehicle data for vehicle_id: "..vehicle_id, true, 1)
-		return {}, false
-	end
-
-	-- vehicle has never loaded
-	if not vehicle_data.components then
-		d.print(("(Characters.setupVehicle) vehicle_id: %i has not been loaded yet!"):format(vehicle_id), true, 1)
-		return {}, false
-	end
-
-	-- vehicle has no seats
-	if not vehicle_data.components.seats[1] then
-		d.print(("(Characters.setupVehicle) vehicle_id: %i has no seats!"):format(vehicle_id), true, 1)
-		return {}, false
-	end
-
-	-- make sure it's overriding the callback functions
-	Characters.overrides()
-
-	local characters = {}
-
-	-- go through all valid seat types, and for each, go through all of the seats, this way the output table is sorted in the order the valid seats table is ordered.
-	for valid_seat_id = 1, #valid_seats do
-		local valid_seat = valid_seats[valid_seat_id]
-		for seat_id = 1, #vehicle_data.components.seats do
-			local seat_data = vehicle_data.components.seats[seat_id]
-			if string.find(seat_data.name, valid_seat.name) then
-				-- this is a valid seat
-				local object_id, is_success = s.spawnCharacter(vehicle_data.transform, valid_seat.outfit_id)
-				if not is_success then
-					d.print(("(Characters.setupVehicle) failed to spawn character for vehicle_id: %i!"):format(vehicle_id), true, 1)
-				else 
-					s.setCharacterData(object_id, s.getCharacterData(object_id).hp, valid_seat.is_interactable, valid_seat.is_ai)
-					s.setAIState(object_id, valid_seat.ai_state)
-					s.setAITargetVehicle(object_id, nil)
-					table.insert(characters, object_id)
-					g_savedata.libraries.characters.characters_to_seat[object_id] = {
-						seat_data = seat_data,
-						vehicle_id = vehicle_id,
-						char_config = valid_seat
-					}
-				end
-			end
-		end
-	end 
-
-	return characters, true
-end
- -- functions for characters, such as setting them into seats.
---[[
-
-
-	Library Setup
-
-
-]]
-
--- required libraries
---[[
-
-
-	Library Setup
-
-
-]]
-
--- required libraries
-
--- library name
-Setup = {}
-
--- shortened library name
-sup = Setup
-
---[[
-
-
-	Classes
-
-
-]]
-
----@class SPAWN_ZONES
----@field turrets table<number, SWZone> the turret spawn zones
----@field land table<number, SWZone> the land vehicle spawn zones
----@field sea table<number, SWZone> the sea vehicle spawn zones
-
----@class PREFAB_DATA
----@field addon_index integer, Addon index the vehicle is from
----@field location_index integer, Location index the vehicle is in
----@field location_data SWLocationData, the data of the mission location which the vehicle is in
----@field vehicle SWAddonComponentData the data of the vehicle
----@field fires table<number, SWAddonComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
-
---[[
-
-
-	Functions         
-
-
-]]
-
---# sets up and returns the spawn zones, used for spawning certain vehicles at, such as boats, turrets and land vehicles
----@return SPAWN_ZONES spawn_zones the table of spawn zones
-function Setup.spawnZones()
-
-	local spawn_zones = {
-		turrets = s.getZones("turret"),
-		land = s.getZones("land_spawn"),
-		sea = s.getZones("boat_spawn")
-	}
-
-	-- remove any NSO or non_NSO exlcusive zones
-
-	-----
-	--* filter NSO and non NSO exclusive islands
-	-----
-
-	-- go through all zone types
-	for zone_type, zones in pairs(spawn_zones) do
-		-- go through all of the zones for this zone type, backwards
-		for zone_index = #zones, 1, -1 do
-			zone = zones[zone_index]
-			if not g_savedata.info.mods.NSO and Tags.has(zone.tags, "NSO") or g_savedata.info.mods.NSO and Tags.has(zone.tags, "not_NSO") then
-				table.remove(zones, zone_index)
-			end
-		end
-	end
-
-	return spawn_zones
-end
-
---# returns the tile's name which the zone is on
----@param zone SWZone the zone to get the tile name of
----@return string tile_name the name of the tile which the zone is on
----@return boolean is_success if it successfully got the name of the tile
-function Setup.getZoneTileName(zone)
-	local tile_data, is_success = server.getTile(zone.transform)
-	if not is_success then
-		d.print("(sup.getZoneTileName) failed to get the location of zone at: "..tostring(zone.transform[13])..", "..tostring(zone.transform[14])..", "..tostring(zone.transform[15]), true, 1)
-		return nil, false
-	end
-
-	return tile_data.name, true
-end
-
---# sorts the zones in a table, indexed by the tile name which the zone is on
----@param spawn_zones SPAWN_ZONES the zones to sort, gotten via sup.spawnZones
----@return table tile_zones sorted table of spawn zones
-function Setup.sortSpawnZones(spawn_zones)
-
-	local tile_zones = {}
-
-	for zone_type, zones in pairs(spawn_zones) do
-
-		for zone_index, zone in ipairs(zones) do
-
-			local tile_name, is_success = Setup.getZoneTileName(zone)
-
-			if not is_success then
-				d.print("(sup.sortSpawnZones) Failed to get name of zone!", true, 1)
-				goto sup_sortSpawnZones_continueZone
-			end
-
-			table.tabulate(tile_zones, tile_name, zone_type)
-
-			table.insert(tile_zones[tile_name][zone_type], zone)
-
-			::sup_sortSpawnZones_continueZone::
-		end
-	end
-
-	return tile_zones
-end
-
---# setups the vehicle prefabs
-function Setup.createVehiclePrefabs()
-
-	-- reset vehicle list
-	g_savedata.vehicle_list = {}
-
-	-- remove all existing vehicle data in constructable_vehicles
-	for role, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
-		if type(vehicles_with_role) == "table" then
-			for vehicle_type, vehicles_with_type in pairs(vehicles_with_role) do
-				if type(vehicles_with_type) == "table" then
-					for strategy, vehicles_with_strategy in pairs(vehicles_with_type) do
-						if type(vehicles_with_strategy) == "table" then
-							for i = 1, #vehicles_with_type do
-								vehicles_with_type[i].prefab_data = nil
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local before_processing_vehicle_pack_API_configs = s.getTimeMillisec()
-
-	local vehicle_pack_API_configs = {}
-
-	local ai_vehicle_configs = alu.getMissionComponents(nil, nil, "ICM | CONFIG", "AI_VEHICLES_CONFIG")
-
-	if ai_vehicle_configs then
-		for _, component_data in ipairs(ai_vehicle_configs) do
-			local tabled_config = table.fromString(component_data.tags_full)
-			if tabled_config then
-				vehicle_pack_API_configs[component_data.addon_index] = vehicle_pack_API_configs[component_data.addon_index] or {}
-				table.insert(vehicle_pack_API_configs[component_data.addon_index], tabled_config)
-			end
-		end
-	end
-	d.print(("Processed Vehicle Pack API Configs (took %0.2fs, for %0.0f configs)"):format((s.getTimeMillisec() - before_processing_vehicle_pack_API_configs)*0.001, #ai_vehicle_configs), true, 0)
-
-
-	--# checks if this vehicle is within the configs, returns false if its fine, returns true if its violating a config.
-	local function vehicleViolatesConfigs(addon_index, addon_data, location_data)
-		for config_addon_index, configs in pairs(vehicle_pack_API_configs) do
-			if config_addon_index ~= addon_index then
-				for _, config_data in ipairs(configs) do
-					for target_addon_name, vehicles_to_remove in pairs(config_data) do
-						if addon_data.name:match(target_addon_name) then
-							for _, vehicle_name in ipairs(vehicles_to_remove) do
-								if location_data.name:match(vehicle_name) then
-									d.print(("Removed Vehicle \"%s\" from AI's arsenal, due to a Vehicle Pack API Config from the addon \"%s\""):format(location_data.name, s.getAddonData(config_addon_index).name), false, 0)
-									return true
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-
-		return false
-	end
-
-	-- iterate through all addons
-	for addon_index = 0, s.getAddonCount() - 1 do
-		local addon_data = s.getAddonData(addon_index)
-
-		if not addon_data.location_count or addon_data.location_count <= 0 then
-			goto createVehiclePrefabs_continue_addon
-		end
-
-		-- iterate through all locations in this addon
-		for location_index = 0, addon_data.location_count - 1 do
-			local location_data = s.getLocationData(addon_index, location_index)
-
-			if location_data.env_mod then
-				goto createVehiclePrefabs_continue_location
-			end
-
-			-- iterate through all components in this location
-			for component_index = 0, location_data.component_count do
-
-				local component_data, is_success = s.getLocationComponentData(addon_index, location_index, component_index)
-
-				if not is_success then
-					goto createVehiclePrefabs_continue_component
-				end
-
-				-- check if this is the flag
-				if not flag_prefab and Tags.has(component_data.tags, "type=dlc_weapons_flag") and component_data.type == "vehicle" then
-					flag_prefab = { 
-						addon_index = addon_index,
-						location_index = location_index,
-						component_index = component_index
-					}
-
-					goto createVehiclePrefabs_continue_component
-				end
-
-				-- if this component is not an enemy AI vehicle
-				if not Tags.has(component_data.tags, "type=dlc_weapons") then
-					goto createVehiclePrefabs_continue_component
-				end
-
-				-- if this vehicle violates one of the configs
-				if vehicleViolatesConfigs(addon_index, addon_data, location_data) then
-					break
-				end
-
-				-- there is an enemy AI vehicle here
-
-				---@type PREFAB_DATA
-				local prefab_data = {
-					addon_index = addon_index, -- addon index the vehicle is from
-					location_index = location_index, -- the location index the vehicle is in
-					location_data = location_data, -- the data of the location
-					vehicle = component_data, -- the vehicle itself
-					fires = {} -- the fires attached to this vehicle
-				}
-
-				-- add any fires that are attached to this vehicle
-				for valid_component_index = 0, location_data.component_count - 1 do
-					local valid_component_data, is_success = s.getLocationComponentData(addon_index, location_index, valid_component_index)
-
-					if is_success then
-						-- if this is a fire, and its parented to this vehicle, then add it to the prefab
-						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == component_index then
-							table.insert(prefab_data.fires, valid_component_data)
-						end
-					end
-				end
-
-				-- get the role of the vehicle
-				local role = Tags.getValue(component_data.tags, "role", true) or "general"
-				-- get the type of the vehicle
-				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true), "wep_", "") or "unknown"
-				-- get the strategy of the vehicle
-				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
-
-				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
-				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
-
-				local vehicle_list_data = prefab_data
-				vehicle_list_data.role = role
-				vehicle_list_data.vehicle_type = vehicle_type
-				vehicle_list_data.strategy = strategy
-
-				-- add vehicle list data to the vehicle list
-				g_savedata.vehicle_list[#g_savedata.vehicle_list + 1] = vehicle_list_data
-
-				--[[ 
-					check if this vehicle exists within the constructable vehicles already
-					if it does, then just update it's prefab data
-					otherwise, create a new one
-				]]
-				for i = math.min(1, #g_savedata.constructable_vehicles[role][vehicle_type][strategy]), #g_savedata.constructable_vehicles[role][vehicle_type][strategy] do
-					local constructable_vehicle_data = g_savedata.constructable_vehicles[role][vehicle_type][strategy][i]
-
-					if constructable_vehicle_data and constructable_vehicle_data.name == location_data.name then
-						-- this vehicle already exists
-
-						-- update prefab data
-						constructable_vehicle_data.prefab_data = prefab_data
-
-						-- update id
-						constructable_vehicle_data.id = #g_savedata.vehicle_list
-
-						-- break, as we found a match.
-						break
-					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
-						-- this vehicle does not exist
-						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
-							prefab_data = prefab_data,
-							name = location_data.name,
-							mod = 1,
-							id = #g_savedata.vehicle_list
-						})
-					end
-				end
-				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
-				::createVehiclePrefabs_continue_component::
-			end
-			::createVehiclePrefabs_continue_location::
-		end
-
-		::createVehiclePrefabs_continue_addon::
-	end
-end
-
-
--- library name
-Compatibility = {}
-
--- shortened library name
-comp = Compatibility
-
---[[
-
-
-	Variables
-   
-
-]]
-
---# stores which versions require compatibility updates
-local version_updates = {
-	"(0.3.0.78)",
-	"(0.3.0.79)",
-	"(0.3.0.82)",
-	"(0.3.1.2)"
-}
-
---[[
-
-
-	Classes
-
-
-]]
-
----@class VERSION_DATA
----@field data_version string the version which the data is on currently
----@field version string the version which the mod is on
----@field versions_outdated integer how many versions the data is out of date
----@field is_outdated boolean if the data is outdated compared to the mod
----@field newer_versions table a table of versions which are newer than the current, indexed by index, value as version string
-
---[[
-
-
-	Functions         
-
-
-]]
-
---# creates version data for the specified version, for use in the version_history table
----@param version string the version you want to create the data on
----@return table version_history_data the data of the version
-function Compatibility.createVersionHistoryData(version)
-
-	--[[
-		calculate ticks played
-	]] 
-	local ticks_played = g_savedata.tick_counter
-
-	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
-		for _, version_data in ipairs(g_savedata.info.version_history) do
-			ticks_played = ticks_played - (version_data.ticks_played or 0)
-		end
-	end
-
-	--[[
-		
-	]]
-	local version_history_data = {
-		version = version,
-		ticks_played = ticks_played,
-		backup_g_savedata = {}
-	}
-
-	return version_history_data
-end
-
---# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
-function Compatibility.getSavedataCopy()
-
-	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
-
-	--[[
-		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
-
-		returns a clone/copy of g_savedata
-	]]
-	
-	local function clone(t)
-		local copy = {}
-		if type(t) == "table" then
-			for key, value in next, t, nil do
-				copy[clone(key)] = clone(value)
-			end
-		else
-			copy = t
-		end
-		return copy
-	end
-
-	local copied_g_savedata = clone(g_savedata)
-	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
-
-	return copied_g_savedata
-end
-
---# migrates the version system to the new one implemented in 0.3.0.78
----@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
----@return table migrated_g_savedata
----@return boolean is_success if it successfully migrated the versioning system
-function Compatibility.migrateVersionSystem(overwrite_g_savedata)
-
-	d.print("migrating g_savedata...", false, 0)
-
-	--[[
-		create a local copy of g_savedata, as changes we make we dont want to be applied to the actual g_savedata
-	]]
-
-	local migrated_g_savedata = comp.getSavedataCopy()
-
-	--[[
-		make sure that the version_history table doesnt exist
-	]]
-	if g_savedata.info.version_history then
-		-- if it already does, then abort, as the version system is already migrated
-		d.print("(comp.migrateVersionSystem) the version system has already been migrated!", true, 1)
-		return nil, false
-	end
-
-	--[[
-		create the version_history table
-	]]
-	if overwrite_g_savedata then
-		g_savedata.info.version_history = {}
-	end
-
-	migrated_g_savedata.info.version_history = {}
-
-	--[[
-		create the version history data, with the previous version the creation version 
-		sadly, we cannot reliably get the last version used for versions 0.3.0.77 and below
-		so we have to make this assumption
-	]]
-
-	if overwrite_g_savedata then
-		table.insert(g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
-	end
-	
-	table.insert(migrated_g_savedata.info.version_history, comp.createVersionHistoryData(migrated_g_savedata.info.creation_version))
-
-	d.print("migrated g_savedata", false, 0)
-
-	return migrated_g_savedata, true
-end
-
---# returns the version id from the provided version
----@param version string the version you want to get the id of
----@return integer version_id the id of the version
----@return boolean is_success if it found the id of the version
-function Compatibility.getVersionID(version)
-	--[[
-		first, we want to ensure version was provided
-		lastly, we want to go through all of the versions stored in the version history, if we find a match, then we return it as the id
-		if we cannot find a match, we return nil and false
-	]]
-
-	-- ensure version was provided
-	if not version then
-		d.print("(comp.getVersionID) version was not provided!", false, 1)
-		return nil, false
-	end
-
-	-- go through all of the versions saved in version_history
-	for version_id, version_name in ipairs(g_savedata.info.version_history) do
-		if version_name == version then
-			return version_id, true
-		end
-	end
-
-	-- if a version was not found, return nil and false
-	return nil, false
-end
-
---# splits a version into 
----@param version string the version you want split
----@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
-function Compatibility.splitVersion(version) -- credit to woe
-	local T = {}
-
-	-- remove ( and )
-	version = version:match("[%d.]+")
-
-	for S in version:gmatch("([^%.]*)%.*") do
-		T[#T+1] = tonumber(S) or S
-	end
-
-	T = {
-		T[1], -- release
-		T[2], -- majour
-		T[3], -- minor
-		T[4] -- commit
-	}
-
-	return T
-end
-
---# returns the version from the version_id
----@param version_id integer the id of the version
----@return string version the version associated with the id
----@return boolean is_success if it successfully got the version from the id
-function Compatibility.getVersion(version_id)
-
-	-- ensure that version_id was specified
-	if not version_id then
-		d.print("(comp.getVersion) version_id was not provided!", false, 1)
-		return nil, false
-	end
-
-	-- ensure that it is a number
-	if type(version_id) ~= "number" then
-		d.print("(comp.getVersion) given version_id was not a number! type: "..type(version_id).." value: "..tostring(version_id), false, 1)
-		return nil, false
-	end
-
-	local version = g_savedata.info.version_history[version_id] and g_savedata.info.version_history[version_id].version or nil
-	return version, version ~= nil
-end
-
---# returns version data about the specified version, or if left blank, the current version
----@param version string the current version, leave blank if want data on current version
----@return VERSION_DATA version_data the data about the version
----@return boolean is_success if it successfully got the version data
-function Compatibility.getVersionData(version)
-
-	local version_data = {
-		data_version = "",
-		is_outdated = false,
-		version = "",
-		versions_outdated = 0,
-		newer_versions = {}
-	}
-
-	local copied_g_savedata = comp.getSavedataCopy() -- local copy of g_savedata so any changes we make to it wont affect any backups we may make
-
-	--[[
-		first, we want to ensure that the version system is migrated
-		second, we want to get the id of the version depending on the given version argument
-		third, we want to get the data version
-		fourth, we want to count how many versions out of date the data version is from the mod version
-		fifth, we want to want to check if the version is outdated
-		and lastly, we want to return the data
-	]]
-
-	-- (1) check if the version system is not migrated
-	if not g_savedata.info.version_history then
-		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
-		if not is_success then
-			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
-			return nil, false
-		end
-
-		-- set copied_g_savedata as migrated_g_savedata
-		copied_g_savedata = migrated_g_savedata
-	end
-
-	-- (2) get version id
-	local version_id = version and comp.getVersionID(version) or #copied_g_savedata.info.version_history
-
-	-- (3) get data version
-	--d.print("(comp.getVersionData) data_version: "..tostring(copied_g_savedata.info.version_history[version_id].version))
-	version_data.data_version = copied_g_savedata.info.version_history[version_id].version
-
-	-- (4) count how many versions out of date the data is
-
-	local current_version = comp.splitVersion(version_data.data_version)
-
-	local ids_to_versions = {
-		"Release",
-		"Majour",
-		"Minor",
-		"Commit"
-	}
-
-	for _, version_name in ipairs(version_updates) do
-
-		--[[
-			first, we want to check if the release version is greater (x.#.#.#)
-			if not, second we want to check if the majour version is greater (#.x.#.#)
-			if not, third we want to check if the minor version is greater (#.#.x.#)
-			if not, lastly we want to check if the commit version is greater (#.#.#.x)
-		]]
-
-		local update_version = comp.splitVersion(version_name)
-
-		--[[
-			go through each version, and check if its newer than our current version
-		]]
-		for i = 1, #current_version do
-			if not current_version[i] or current_version[i] > update_version[i] then
-				--[[
-					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
-					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
-				]]
-				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
-				break
-			elseif current_version[i] < update_version[i] then
-				-- current version is older, so we need to migrate data.
-				table.insert(version_data.newer_versions, version_name)
-				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
-				break
-			end
-
-			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
-		end
-	end
-
-	-- count how many versions its outdated
-	version_data.versions_outdated = #version_data.newer_versions
-
-	-- (5) check if its outdated
-	version_data.is_outdated = version_data.versions_outdated > 0
-
-	return version_data, true
-end
-
---# saves backup of current g_savedata
----@return boolean is_success if it successfully saved a backup of the savedata
-function Compatibility.saveBackup()
-	--[[
-		first, we want to save a current local copy of the g_savedata
-		second we want to ensure that the g_savedata.info.version_history table is created
-		lastly, we want to save the backup g_savedata
-	]]
-
-	-- create local copy of g_savedata
-	local backup_g_savedata = comp.getSavedataCopy()
-
-	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
-		d.print("(comp.saveBackup) migrating version system", true, 0)
-		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
-		if not is_success then
-			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
-			return false
-		end
-
-		if not g_savedata.info.version_history then
-			d.print("(comp.saveBackup) successfully migrated version system, yet g_savedata doesn't contain the new version system, this is not good!", false, 1)
-		end
-	end
-
-	local version_data, is_success = comp.getVersionData()
-	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
-		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
-		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
-	end
-
-	-- save backup g_savedata
-	g_savedata.info.version_history[#g_savedata.info.version_history].backup_g_savedata = backup_g_savedata
-
-	-- remove g_savedata backups which are from over 2 data updates ago
-	local backup_versions = {}
-	for version_index, version_history_data in ipairs(g_savedata.info.version_history) do
-		if version_history_data.backup_g_savedata.info then
-			table.insert(backup_versions, version_index)
-		end
-	end
-	
-	if #backup_versions >= 3 then
-		d.print("Deleting old backup data...", false, 0)
-		for backup_index, backup_version_index in ipairs(backup_versions) do
-			d.print("Deleting backup data for "..g_savedata.info.version_history[backup_version_index].version, false, 0)
-			backup_versions[backup_index] = nil
-			g_savedata.info.version_history[backup_version_index].backup_g_savedata = {}
-
-			if #backup_versions <= 2 then
-				d.print("Deleted old backup data.", false, 0)
-				break
-			end
-		end
-	end
-
-	return true
-end
-
---# updates g_savedata to be compatible with the mod version, to ensure that worlds are backwards compatible.
-function Compatibility.update()
-
-	-- ensure that we're actually outdated before proceeding
-	local version_data, is_success = comp.getVersionData()
-	if not is_success then
-		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
-		return
-	end
-
-	if not version_data.is_outdated then
-		d.print("(comp.update) according to version data, the data is not outdated. This is probably not good!", false, 1)
-		return
-	end
-
-	d.print(SHORT_ADDON_NAME.."'s data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
-
-	-- save backup
-	local backup_saved = comp.saveBackup()
-	if not backup_saved then
-		d.print("(comp.update) Failed to save backup. This is probably not good!", false, 1)
-		return false
-	end
-
-	d.print("Creating new version history for "..version_data.newer_versions[1].."...", false, 0)
-	local version_history_data = comp.createVersionHistoryData(version_data.newer_versions[1])
-	g_savedata.info.version_history[#g_savedata.info.version_history+1] = version_history_data
-	d.print("Successfully created new version history for "..version_data.newer_versions[1]..".", false, 0)
-
-	-- check for 0.3.0.78 changes
-	if version_data.newer_versions[1] == "(0.3.0.78)" then
-		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
-
-		-- clean up old data
-		g_savedata.info.creation_version = nil
-		g_savedata.info.full_reload_versions = nil
-		g_savedata.info.awaiting_reload = nil
-
-		-- clean up old player_data
-		for steam_id, player_data in pairs(g_savedata.player_data) do
-			player_data.timers = nil
-			player_data.fully_reloading = nil
-			player_data.do_as_i_say = nil
-		end		
-	elseif version_data.newer_versions[1] == "(0.3.0.79)" then -- 0.3.0.79 changes
-
-		-- update the island data with the proper zones, as previously, the zone system improperly filtered out NSO compatible and incompatible zones
-		local spawn_zones = sup.spawnZones()
-		local tile_zones = sup.sortSpawnZones(spawn_zones)
-
-		for tile_name, zones in pairs(tile_zones) do
-			local island, is_success = Island.getDataFromName(tile_name)
-			island.zones = zones
-		end
-
-		if g_savedata.info.version_history[1].ticked_played then
-			g_savedata.info.version_history.ticks_played = g_savedata.info.version_history.ticked_played
-			g_savedata.info.version_history.ticked_played = nil
-		end
-
-		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
-
-	elseif version_data.newer_versions[1] == "(0.3.0.82)" then -- 0.3.0.82 changes
-
-		for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
-			for vehicle_index, vehicle_object in pairs(squad.vehicles) do
-				vehicle_object.transform_history = {}
-			end
-		end
-
-		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
-	elseif version_data.newer_versions[1] == "(0.3.1.2)" then -- 0.3.1.2 changes
-
-		d.print(("Migrating %s data..."):format(SHORT_ADDON_NAME), false, 0)
-
-		-- check if we've initialised the graph_node debug before
-		if g_savedata.graph_nodes.init_debug then
-
-			-- generate a global map id for all graph nodes
-			g_savedata.graph_nodes.ui_id = server.getMapID()
-
-			d.print("Cleaning up old data...", false, 0)
-
-			-- go through and remove all of the graph node's map ids from the map
-			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
-				for z, z_data in pairs(x_data) do
-					s.removeMapID(-1, z_data.ui_id)
-					z_data.ui_id = nil
-				end
-			end
-
-			-- go through all of the player data and set graph_node debug to false
-			for _, player_data in pairs(g_savedata.player_data) do
-				player_data.debug.graph_node = false
-			end
-
-			-- disable graph_node debug globally
-			g_savedata.debug.graph_node = false
-		end
-
-		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
-	end
-
-	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
-
-	-- this means that theres still newer versions
-	if #version_data.newer_versions > 1 then
-		-- migrate to the next version
-		comp.update()
-	end
-
-	-- we've finished migrating!
-	comp.showSaveMessage()
-end
-
---# prints outdated message and starts update
-function Compatibility.outdated()
-	-- print that its outdated
-	d.print(SHORT_ADDON_NAME.." data is outdated! attempting to automatically update...", false, 0)
-
-	-- start update process
-	comp.update()
-end
-
---# verifies that the mod is currently up to date
-function Compatibility.verify()
-	d.print("verifying if "..SHORT_ADDON_NAME.." data is up to date...", false, 0)
-	--[[
-		first, check if the versioning system is up to date
-	]]
-	if not g_savedata.info.version_history then
-		-- the versioning system is not up to date
-		comp.outdated()
-	else
-		-- check if we're outdated
-		local version_data, is_success = comp.getVersionData()
-
-		if not is_success then
-			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
-			return
-		end
-
-		-- if we're outdated
-		if version_data.is_outdated then
-			comp.outdated()
-		end
-	end
-end
-
---# shows the message saying that the addon was fully migrated
-function Compatibility.showSaveMessage()
-	d.print(SHORT_ADDON_NAME.." Data has been fully migrated!", false, 0)
-end
- -- functions used for making the mod backwards compatible -- functions for debugging
+ -- functions relating to the Convoys and Cargo Vehicles -- functions relating to islands -- functions for the main objectives. -- functions relating to the Adaptive AI -- functions for squads -- functions related to vehicles, and parsing data on them
 --[[
 
 
@@ -7115,7 +7116,7 @@ function ExecutionQueue.queue(execute_condition, function_to_execute, variable_t
 
 	return true
 end
- -- functions for queuing functions for conditions to be met. -- functions relating to islands -- functions for drawing on the map -- custom math functions -- custom matrix functions -- functions for the main objectives. -- functions for pathfinding -- functions relating to Players -- functions for script/world setup. -- functions used by the spawn vehicle function -- functions relating to the Adaptive AI -- functions for squads -- custom string functions -- custom table functions -- functions related to getting tags from components inside of mission and environment locations -- functions related to vehicles, and parsing data on them
+ -- functions for queuing functions for conditions to be met. -- custom math functions -- custom string functions -- custom table functions
 
 --[[
 		Functions

@@ -7,15 +7,17 @@
 ]]
 
 -- required libraries
-require("libraries.squad")
-require("libraries.debugging")
-require("libraries.matrix")
-require("libraries.math")
-require("libraries.pathfinding")
-require("libraries.tags")
-require("libraries.tables")
-require("libraries.vehicle")
-require("libraries.objective")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.matrix")
+require("libraries.addon.script.pathfinding")
+
+require("libraries.icm.objective")
+require("libraries.icm.squad")
+require("libraries.icm.vehicle")
+
+require("libraries.utils.math")
+require("libraries.utils.tables")
 
 -- library name
 Cargo = {}

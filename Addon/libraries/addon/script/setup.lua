@@ -7,10 +7,10 @@
 ]]
 
 -- required libraries
-require("libraries.addonLocationUtils")
-require("libraries.debugging")
-require("libraries.tables")
-require("libraries.tags")
+require("libraries.addon.components.addonLocationUtils")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.debugging")
+require("libraries.utils.tables")
 
 -- library name
 Setup = {}

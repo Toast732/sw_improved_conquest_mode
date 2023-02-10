@@ -9,8 +9,8 @@
 s = s or server
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.tables")
+require("libraries.addon.script.debugging")
+require("libraries.utils.tables")
 
 -- library name
 Characters = {}

@@ -7,8 +7,8 @@
 ]]
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.math")
+require("libraries.addon.script.debugging")
+require("libraries.utils.math")
 
 -- library name
 Map = {}

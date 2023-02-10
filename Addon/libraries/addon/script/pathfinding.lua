@@ -8,11 +8,12 @@
 
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.ai")
-require("libraries.spawnModifiers")
-require("libraries.matrix")
-require("libraries.tags")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.matrix")
+require("libraries.addon.vehicles.ai")
+
+require("libraries.icm.spawnModifiers")
 
 -- library name
 Pathfinding = {}

@@ -1,7 +1,7 @@
 -- required libraries
-require("libraries.players")
-require("libraries.tables")
-require("libraries.map")
+require("libraries.addon.script.players")
+require("libraries.addon.script.map")
+require("libraries.utils.tables")
 
 -- library name
 Debugging = {}

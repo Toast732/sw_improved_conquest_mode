@@ -1,7 +1,7 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.math")
-require("libraries.string")
+require("libraries.addon.script.debugging")
+require("libraries.utils.math")
+require("libraries.utils.string")
 
 -- library name
 SpawnModifiers = {}
