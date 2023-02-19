@@ -1,5 +1,5 @@
 ---@param str string the string to make the first letter uppercase
----@return string str the string with the first letter uppercase
+---@return string|nil str the string with the first letter uppercase
 function string.upperFirst(str)
 	if type(str) == "string" then
 		return (str:gsub("^%l", string.upper))
@@ -8,8 +8,8 @@ function string.upperFirst(str)
 end
 
 --- @param str string the string the make friendly
---- @param remove_spaces boolean true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
---- @param keep_caps boolean if you want to keep the caps of the name, false will make all letters lowercase
+--- @param remove_spaces boolean? true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
+--- @param keep_caps boolean? if you want to keep the caps of the name, false will make all letters lowercase
 --- @return string|nil friendly_string friendly string, nil if input_string was not a string
 function string.friendly(str, remove_spaces, keep_caps) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
 
@@ -61,6 +61,11 @@ function string.removePrefix(vehicle_name, keep_caps)
 
 	-- makes the string friendly
 	vehicle_name = string.friendly(vehicle_name, false, keep_caps)
+
+	if not vehicle_name then
+		d.print("(string.removePrefix) string.friendly() failed, and now vehicle_name is nil!", true, 1)
+		return ""
+	end
 
 	return vehicle_name
 end

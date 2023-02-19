@@ -7,47 +7,47 @@
 --      By Nameous Changey
 -- Minimized Size: 1041 (1355 with comment) chars
 
-y=true
-j=false
-l=math
-u=output
-v=input
-f=v.getNumber
-g=u.setBool
-b=u.setNumber
+z=true
+k=false
+s=math
+y=output
+x=input
+f=x.getNumber
+g=y.setBool
+b=y.setNumber
 c=property.getNumber
-local h=l
-N=c("Throttle Type")E=c("Starter RPS")x=c("Min RPS")A=c("Max RPS")J=c("AFR")M=c("Enabling Cooling System Temp")F=c("Half Throttle Temp")D=c("Automatic Shutdown Temp")function L(p,q,t)return{p=p,q=q,t=t,a=0,e=0,k=0,K=function(_,I,G)local a,e,o
-a=I-G
-e=a-_.a
-o=l.abs(e-_.e)_.a=a
-_.e=e
-_.k=o<a and _.k+a*_.q or _.k*.5
-return a*_.p+(o<a and _.k or 0)+e*_.t
+local h=s
+J=c("Throttle Type")F=c("Starter RPS")A=c("Min RPS")w=c("Max RPS")N=c("AFR")H=c("Enabling Cooling System Temp")D=c("Half Throttle Temp")I=c("Automatic Shutdown Temp")function E(m,q,r)return{m=m,q=q,r=r,a=0,d=0,j=0,C=function(_,M,L)local a,d,o
+a=M-L
+d=a-_.a
+o=s.abs(d-_.d)_.a=a
+_.d=d
+_.j=o<a and _.j+a*_.q or _.j*.5
+return a*_.m+(o<a and _.j or 0)+d*_.r
 end}end
-function z()b(1,0)b(2,0)s=j
-b(4,0)g(1,j)end
-function onTick()local C=L(-.037+f(7),.00025+f(8),.125052+f(9))s=v.getBool(1)if not s then
-z()end
-local n=f(3)if n>=D then
-z()end
-local i=f(5)if n>M then
-g(2,y)else
-g(2,j)end
-if not s then
+function u()b(1,0)b(2,0)p=k
+b(4,0)g(1,k)end
+function onTick()local B=E(-.037+f(7),.00025+f(8),.125052+f(9))p=x.getBool(1)if not p then
+u()end
+local l=f(3)if l>=I then
+u()end
+local i=f(5)if l>H then
+g(2,z)else
+g(2,k)end
+if not p then
 return
 end
-if n>F then
+if l>D then
 i=i/2
 end
-local m=f(4)local r=i+.8
-if N==0 then
-r=h.max(h.abs(A*i),x)+.8
+local n=f(4)local t=i+.8
+if J==0 then
+t=h.max(h.abs(w*i),A)+.8
 end
-local w=h.B(C:K(r,m),0,1)b(5,r)b(1,w/J)b(2,w)b(3,O(h.sqrt(h.max(m-x)/A,0)))if m<E then
-b(4,1)g(1,y)else
-b(4,0)g(1,j)end
+local v=h.K(B:C(t,n),0,1)b(5,t)b(1,v/N)b(2,v)b(3,O(h.sqrt(h.max(n-A)/w,0)))if n<F then
+b(4,1)g(1,z)else
+b(4,0)g(1,k)end
 end
-function l.B(d,min,max)return H(max<d and max or min>d and min or d)end
-function H(d)return d~=d and 0 or d
+function s.K(e,min,max)return G(max<e and max or min>e and min or e)end
+function G(e)return e~=e and 0 or e
 end

@@ -61,10 +61,8 @@ function Island.canSpawn(island, selected_prefab)
 		end
 	end
 
-	local player_list = s.getPlayers()
-
 	-- theres no players within 2500m (cannot see the spawn point)
-	if not pl.noneNearby(player_list, island.transform, 2500, true) then
+	if not pl.noneNearby(s.getPlayers(), island.transform, 2500, true) then
 		return false
 	end
 
@@ -73,7 +71,7 @@ end
 
 --# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
 ---@param vehicle_id integer the vehicle_id of the island's flag vehicle
----@return ISLAND island the island the flag vehicle belongs to
+---@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
 ---@return boolean got_island if the island was gotten
 function Island.getDataFromVehicleID(vehicle_id)
 	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
@@ -81,7 +79,7 @@ function Island.getDataFromVehicleID(vehicle_id)
 	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
 		return g_savedata.player_base_island, true
 	else
-		for island_index, island in pairs(g_savedata.islands) do
+		for _, island in pairs(g_savedata.islands) do
 			if island.flag_vehicle.id == vehicle_id then
 				return island, true
 			end

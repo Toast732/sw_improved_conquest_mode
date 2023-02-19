@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.4)"
+ADDON_VERSION = "(0.4.0.5)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1018,14 +1018,14 @@ function Players.dataByPID(peer_id)
 	return g_savedata.players.individual_data[steam_id]
 end
 
----@param player_list Players[] the list of players to check
----@param target_pos Matrix the position that you want to check
+---@param player_list table<integer, SWPlayer> the list of players to check
+---@param target_pos SWMatrix the position that you want to check
 ---@param min_dist number the minimum distance between the player and the target position
 ---@param ignore_y boolean if you want to ignore the y level between the two or not
 ---@return boolean no_players_nearby returns true if theres no players which distance from the target_pos was less than the min_dist
 function Players.noneNearby(player_list, target_pos, min_dist, ignore_y)
 	local players_clear = true
-	for player_index, player in pairs(player_list) do
+	for _, player in pairs(player_list) do
 		if ignore_y and m.xzDistance(s.getPlayerPos(player.id), target_pos) < min_dist then
 			players_clear = false
 		elseif not ignore_y and m.distance(s.getPlayerPos(player.id), target_pos) < min_dist then
@@ -1055,7 +1055,7 @@ end
 ---@return integer|nil object_id the object ID of the player, nil if not found
 function Players.objectIDFromSteamID(steam_id)
 	if not steam_id then
-		d.print("(pl.objectIDFromSteamID) steam_id was never provided!", true, 1, -1, 10)
+		d.print("(pl.objectIDFromSteamID) steam_id was never provided!", true, 1, -1)
 		return
 	end
 
@@ -1335,7 +1335,7 @@ d = Debugging
 ---@param peer_id ?integer if you want to send it to a specific player, leave empty to send to all players
 function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glorious debug function" - senty, 2022
 
-	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
+	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) or debug_type == 1 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
 		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", ADDON_VERSION)..suffix
 
@@ -1357,7 +1357,7 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 				end
 			else
 				for _, peer in ipairs(s.getPlayers()) do -- if this is being sent to all players with the debug enabled
-					if d.getDebug(debug_type, peer.id) or debug_type == 2 and d.getDebug(0, peer.id) then -- if this player has debug enabled
+					if d.getDebug(debug_type, peer.id) or debug_type == 2 and d.getDebug(0, peer.id) or debug_type == 1 and d.getDebug(0, peer.id) then -- if this player has debug enabled
 						s.announce(prefix, message, peer.id) -- send the message to them
 					end
 				end
@@ -1373,6 +1373,9 @@ function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
 end
 
 function Debugging.debugIDFromType(debug_type)
+
+	debug_type = string.friendly(debug_type)
+
 	for debug_id, d_type in ipairs(debug_types) do
 		if debug_type == d_type then
 			return debug_id
@@ -1860,7 +1863,7 @@ function AddonLocationUtils.print(message, requires_debug, debug_type, peer_id)
 	d.print(message, requires_debug, debug_type, peer_id)
 end
 
----@param addon_index integer|table<_, integer>? the target addon index to go through its components, leave nil or -1 for all, specify a table<_, addon_index> for multiple. 
+---@param addon_index number|table<_, integer>? the target addon index to go through its components, leave nil or -1 for all, specify a table<_, addon_index> for multiple. 
 ---@param addon_pattern string? the pattern to match the addon name against. leave nil to not care about the addon name. (will be ignored if the addon index is specified)
 ---@param location_pattern string? the pattern to match the location name against. leave nil to not care about the location name.
 ---@param component_pattern string? the pattern to match the component name against. leave nil to not care about the component name.
@@ -1888,7 +1891,7 @@ function AddonLocationUtils.getMissionComponents(addon_index, addon_pattern, loc
 		addon_index = {addon_index}
 	end
 
-	if specified_addon_index and not s.getAddonData(addon_index) then
+	if specified_addon_index and addon_index_type == "number" and not s.getAddonData(addon_index) then
 		alu.print(("(alu.getMissionComponents) addon_index was specified, however there is not an addon matching this index! addon_index: %s"):format(addon_index), true, 1)
 		return
 	end
@@ -2007,51 +2010,89 @@ SpawningUtils = {}
 -- shortened library name
 su = SpawningUtils
 
+--- @class SpawnableComponentData
+--- @field tags_full                        string
+--- @field tags                             table<number, string> The tags on the component
+--- @field display_name                     string The display name of the component
+--- @field type                             SWAddonComponentDataTypeEnum The type of the component (0 = zone, 1 = object, 2 = character, 3 = vehicle, 4 = flare, 5 = fire, 6 = loot, 7 = button, 8 = animal, 9 = ice, 10 = cargo_zone)
+--- @field id                               number The ID of the component from the missions editor e.g. ID_27
+--- @field dynamic_object_type              SWObjectTypeEnum The object type of the component (number for pan/character/pot/whatever)
+--- @field transform                        SWMatrix The position of the component
+--- @field vehicle_parent_component_id      number 
+--- @field character_outfit_type            number The character outfit type (See Outfit type)
+--- @field component_index                  number the component_index inside of the location
+
+--- adds .component_index to component_data
+--- @param component_index number the index of the component, local to each location.
+--- @param component_data SWAddonComponentData the data of the component
+--- @return SpawnableComponentData component_data component_data but with .component_index = component_index
+function SpawningUtils.populateComponentData(component_index, component_data)
+	component_data.component_index = component_index
+
+	---@cast component_data -SWAddonComponentData
+	return component_data
+end
+
 -- spawn an individual object descriptor from a playlist location
-function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
-	if is_success then
-		return component.id
-	else -- then it failed to spawn the addon component
-		d.print("this addon index: "..s.getAddonIndex(), false, 0)
-		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
-		return nil
+--- @param spawn_transform SWMatrix the matrix of where to spawn the component
+--- @param addon_index number the index of the addon which contains the component
+--- @param location_index number the index of the location which contains the component
+--- @param component_data SpawnableComponentData the populated component data of the component
+--- @param parent_vehicle_id number? the id of the vehicle, to parent this component to
+function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, component_data, parent_vehicle_id)
+
+	if component_data or component_data.component_index then
+		local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, component_data.component_index, parent_vehicle_id)
+		if is_success then
+			return component.id
+		else -- then it failed to spawn the addon component
+			d.print("this addon index: "..s.getAddonIndex(), false, 0)
+			d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
+			return nil
+		end
+	elseif component_data then
+		d.print("(su.spawningUtils) component_data.component_index is nil!", true, 1)
+		d.print(component_data, true, 1)
+	else
+		d.print("(su.spawningUtils) component_data is nil!", true, 1)
 	end
 end
 
-function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, component_data, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
+	--d.print(component_data)
+
+	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, component_data.transform), addon_index, location_index, component_data, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
 	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
 
 		local l_vehicle_type = VEHICLE.TYPE.HELI
-		if Tags.has(object.tags, "vehicle_type=wep_plane") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_plane") then
 			l_vehicle_type = VEHICLE.TYPE.PLANE
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_boat") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_boat") then
 			l_vehicle_type = VEHICLE.TYPE.BOAT
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_land") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_land") then
 			l_vehicle_type = VEHICLE.TYPE.LAND
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_turret") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_turret") then
 			l_vehicle_type = VEHICLE.TYPE.TURRET
 		end
-		if Tags.has(object.tags, "type=dlc_weapons_flag") then
+		if Tags.has(component_data.tags, "type=dlc_weapons_flag") then
 			l_vehicle_type = "flag"
 		end
 
-		local object_data = { 
-			name = object.display_name, 
-			type = object.type, 
-			id = spawned_object_id, 
-			component_id = object.id, 
-			vehicle_type = l_vehicle_type, 
-			size = Tags.getValue(object.tags, "size", true) or "small"
+		local object_data = {
+			name = component_data.display_name,
+			type = component_data.type,
+			id = spawned_object_id,
+			component_id = component_data.id,
+			vehicle_type = l_vehicle_type,
+			size = Tags.getValue(component_data.tags, "size", true) or "small"
 		}
 
 		if spawned_objects ~= nil then
@@ -2063,6 +2104,8 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 		end
 
 		return object_data
+	else
+		d.print("(su.spawnObject) Failed to spawn vehicle!", true, 1)
 	end
 
 	return nil
@@ -2342,8 +2385,8 @@ sup = Setup
 ---@field addon_index integer, Addon index the vehicle is from
 ---@field location_index integer, Location index the vehicle is in
 ---@field location_data SWLocationData, the data of the mission location which the vehicle is in
----@field vehicle SWAddonComponentData the data of the vehicle
----@field fires table<number, SWAddonComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
+---@field vehicle SpawnableComponentData the data of the vehicle
+---@field fires table<number, SpawnableComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
 
 --[[
 
@@ -2506,7 +2549,7 @@ function Setup.createVehiclePrefabs()
 			end
 
 			-- iterate through all components in this location
-			for component_index = 0, location_data.component_count do
+			for component_index = 0, location_data.component_count - 1 do
 
 				local component_data, is_success = s.getLocationComponentData(addon_index, location_index, component_index)
 
@@ -2537,6 +2580,8 @@ function Setup.createVehiclePrefabs()
 
 				-- there is an enemy AI vehicle here
 
+				component_data = su.populateComponentData(component_index, component_data)
+
 				---@type PREFAB_DATA
 				local prefab_data = {
 					addon_index = addon_index, -- addon index the vehicle is from
@@ -2552,8 +2597,8 @@ function Setup.createVehiclePrefabs()
 
 					if is_success then
 						-- if this is a fire, and its parented to this vehicle, then add it to the prefab
-						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == component_index then
-							table.insert(prefab_data.fires, valid_component_data)
+						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == prefab_data.vehicle.id then
+							table.insert(prefab_data.fires, su.populateComponentData(valid_component_index, valid_component_data))
 						end
 					end
 				end
@@ -2561,7 +2606,7 @@ function Setup.createVehiclePrefabs()
 				-- get the role of the vehicle
 				local role = Tags.getValue(component_data.tags, "role", true) or "general"
 				-- get the type of the vehicle
-				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true), "wep_", "") or "unknown"
+				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true) --[[@as string]], "wep_", "") or "unknown"
 				-- get the strategy of the vehicle
 				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
 
@@ -2674,10 +2719,8 @@ function Island.canSpawn(island, selected_prefab)
 		end
 	end
 
-	local player_list = s.getPlayers()
-
 	-- theres no players within 2500m (cannot see the spawn point)
-	if not pl.noneNearby(player_list, island.transform, 2500, true) then
+	if not pl.noneNearby(s.getPlayers(), island.transform, 2500, true) then
 		return false
 	end
 
@@ -2686,7 +2729,7 @@ end
 
 --# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
 ---@param vehicle_id integer the vehicle_id of the island's flag vehicle
----@return ISLAND island the island the flag vehicle belongs to
+---@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
 ---@return boolean got_island if the island was gotten
 function Island.getDataFromVehicleID(vehicle_id)
 	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
@@ -2694,7 +2737,7 @@ function Island.getDataFromVehicleID(vehicle_id)
 	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
 		return g_savedata.player_base_island, true
 	else
-		for island_index, island in pairs(g_savedata.islands) do
+		for _, island in pairs(g_savedata.islands) do
 			if island.flag_vehicle.id == vehicle_id then
 				return island, true
 			end
@@ -2804,7 +2847,7 @@ local version_updates = {
 ]]
 
 --# creates version data for the specified version, for use in the version_history table
----@param version string the version you want to create the data on
+---@param version string? the version you want to create the data on
 ---@return table version_history_data the data of the version
 function Compatibility.createVersionHistoryData(version)
 
@@ -2861,8 +2904,8 @@ function Compatibility.getSavedataCopy()
 end
 
 --# migrates the version system to the new one implemented in 0.3.0.78
----@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
----@return table migrated_g_savedata
+---@param overwrite_g_savedata boolean? if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
+---@return table|nil migrated_g_savedata
 ---@return boolean is_success if it successfully migrated the versioning system
 function Compatibility.migrateVersionSystem(overwrite_g_savedata)
 
@@ -2911,7 +2954,7 @@ end
 
 --# returns the version id from the provided version
 ---@param version string the version you want to get the id of
----@return integer version_id the id of the version
+---@return integer|nil version_id the id of the version
 ---@return boolean is_success if it found the id of the version
 function Compatibility.getVersionID(version)
 	--[[
@@ -2962,7 +3005,7 @@ end
 
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
----@return string version the version associated with the id
+---@return string|nil version the version associated with the id
 ---@return boolean is_success if it successfully got the version from the id
 function Compatibility.getVersion(version_id)
 
@@ -2983,8 +3026,8 @@ function Compatibility.getVersion(version_id)
 end
 
 --# returns version data about the specified version, or if left blank, the current version
----@param version string the current version, leave blank if want data on current version
----@return VERSION_DATA version_data the data about the version
+---@param version string? the current version, leave blank if want data on current version
+---@return VERSION_DATA|nil version_data the data about the version
 ---@return boolean is_success if it successfully got the version data
 function Compatibility.getVersionData(version)
 
@@ -3010,7 +3053,7 @@ function Compatibility.getVersionData(version)
 	-- (1) check if the version system is not migrated
 	if not g_savedata.info.version_history then
 		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
-		if not is_success then
+		if not is_success or not migrated_g_savedata then
 			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
 			return nil, false
 		end
@@ -3093,7 +3136,7 @@ function Compatibility.saveBackup()
 
 	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
 		d.print("(comp.saveBackup) migrating version system", true, 0)
-		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
+		local _, is_success = comp.migrateVersionSystem(true) -- migrate version system
 		if not is_success then
 			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
 			return false
@@ -3104,8 +3147,8 @@ function Compatibility.saveBackup()
 		end
 	end
 
-	local version_data, is_success = comp.getVersionData()
-	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
+	local version_data, _ = comp.getVersionData()
+	if version_data and version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
 		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
 		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
 	end
@@ -3143,7 +3186,7 @@ function Compatibility.update()
 
 	-- ensure that we're actually outdated before proceeding
 	local version_data, is_success = comp.getVersionData()
-	if not is_success then
+	if not is_success or not version_data then
 		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
 		return
 	end
@@ -3275,7 +3318,7 @@ function Compatibility.verify()
 		-- check if we're outdated
 		local version_data, is_success = comp.getVersionData()
 
-		if not is_success then
+		if not is_success or not version_data then
 			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
 			return
 		end
@@ -3386,7 +3429,7 @@ function AI.setSeat(vehicle_id, seat_name, axis_ws, axis_ad, axis_ud, axis_lr, .
 end
 -- required libraries
 ---@param str string the string to make the first letter uppercase
----@return string str the string with the first letter uppercase
+---@return string|nil str the string with the first letter uppercase
 function string.upperFirst(str)
 	if type(str) == "string" then
 		return (str:gsub("^%l", string.upper))
@@ -3395,8 +3438,8 @@ function string.upperFirst(str)
 end
 
 --- @param str string the string the make friendly
---- @param remove_spaces boolean true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
---- @param keep_caps boolean if you want to keep the caps of the name, false will make all letters lowercase
+--- @param remove_spaces boolean? true for if you want to remove spaces, will also remove all underscores instead of replacing them with spaces
+--- @param keep_caps boolean? if you want to keep the caps of the name, false will make all letters lowercase
 --- @return string|nil friendly_string friendly string, nil if input_string was not a string
 function string.friendly(str, remove_spaces, keep_caps) -- function that replaced underscores with spaces and makes it all lower case, useful for player commands so its not extremely picky
 
@@ -3448,6 +3491,11 @@ function string.removePrefix(vehicle_name, keep_caps)
 
 	-- makes the string friendly
 	vehicle_name = string.friendly(vehicle_name, false, keep_caps)
+
+	if not vehicle_name then
+		d.print("(string.removePrefix) string.friendly() failed, and now vehicle_name is nil!", true, 1)
+		return ""
+	end
 
 	return vehicle_name
 end
@@ -7860,6 +7908,7 @@ player_commands = {
 }
 
 command_aliases = {
+	dbg = "debug",
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
@@ -9194,7 +9243,9 @@ function onVehicleLoad(vehicle_id)
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 		vehicle_object.state.is_simulating = true
 
-		vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+		if #vehicle_object.survivors == 0 then
+			vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+		end
 
 		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
 		for _, checking_squad in pairs(g_savedata.ai_army.squadrons) do
@@ -10094,7 +10145,7 @@ function tickSquadrons()
 					and if the vehicle its linked to isnt a cargo vehicle
 					then kill the vehicle
 				]]
-				if c and (c.incapacitated or c.dead) and vehicle_object.role ~= SQUAD.COMMAND.CARGO then
+				if c and (c.incapacitated or c.dead) and vehicle_object.role ~= SQUAD.COMMAND.CARGO and not vehicle_object.is_killed then
 					v.kill(vehicle_id)
 				end
 			end
@@ -10113,7 +10164,7 @@ function tickSquadrons()
 							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
 	
-								for island_index, island in pairs(g_savedata.islands) do
+								for _, island in pairs(g_savedata.islands) do
 									if island.assigned_squad_index == squad_index then
 										island.assigned_squad_index = -1
 									end
@@ -10131,8 +10182,62 @@ function tickSquadrons()
 							v.kill(vehicle_id)
 						end
 					end
-					-- check if the vehicle simply needs to a ammo belt, barrel or box
-					local gun_info = isVehicleNeedsReload(vehicle_id)
+
+					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
+					local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+					if is_success and vehicle_data.components and vehicle_data.components.guns then
+						for gun_index = 1, #vehicle_data.components.guns do
+							local gun_data = vehicle_data.components.guns[gun_index]
+
+							-- if this is a gun that might need reloading
+							if gun_data.ammo == 0 and (gun_data.name:match("^Ammo %d+$") or (gun_data.name:match("^Gunner %d+$"))) then
+
+								-- the target weapons we can reload from
+								local ammo_group = tonumber(table.pack(gun_data.name:gsub("[%a ]+", ""))[1])
+								local target_pattern = ("Reserve Ammo %i"):format(ammo_group)
+								for reserve_ammo_index = 1, #vehicle_data.components.guns do
+									local reserve_ammo_data = vehicle_data.components.guns[reserve_ammo_index]
+
+									-- we can reload from this weapon
+									if gun_index ~= reserve_ammo_index and reserve_ammo_data.ammo ~= 0 and reserve_ammo_data.name:match(target_pattern) then
+										-- move as much ammo as we can from the reserve ammo to the gun.
+										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
+
+										-- take that away from the reserve ammo container
+										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										
+										-- move that into the gun
+										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+
+										-- if the gun is not at capcity, continue on
+										-- otherwise, break.
+										if gun_data.ammo + ammo_to_move == gun_data.capacity then
+											break
+										end
+									end
+								end
+							end
+						end
+					end
+
+					-- local guns_to_reload = isVehicleNeedsReload(vehicle_id)
+					--[[for i = 1, #guns_to_reload do
+						local ammo_group = guns_to_reload[i]
+
+						--local gun_data, is_success = s.getVehicleWeapon(vehicle_id, "Ammo "..gun_id)
+
+						local vehicle_data, _ = s.getVehicleData(vehicle_id)
+
+						for weapon_index = 1, #vehicle_data.components.guns do
+							local weapon = vehicle_data.components.guns[weapon_index]
+
+							if weapon.name:match("Ammo "..ammo_group) then
+
+							end
+						end 
+					end
+
 					if gun_info[1] and gun_info[2] ~= 0 then
 						local i = 1
 						local successed = false
@@ -10151,7 +10256,7 @@ function tickSquadrons()
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
-					end
+					end]]
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -10242,7 +10347,7 @@ function tickSquadrons()
 					--d.print("convoy_index: "..convoy_index, true, 0)
 					if convoy.convoy[convoy_index - 1] then -- if theres a vehicle behind this one
 
-						local behind_vehicle_object, behind_squad_index, behind_squad = Squad.getVehicle(convoy.convoy[convoy_index - 1])
+						local behind_vehicle_object, _, _ = Squad.getVehicle(convoy.convoy[convoy_index - 1])
 
 						--? if this vehicle is not waiting and the behind vehicle exists
 						if behind_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING  then
@@ -11658,7 +11763,7 @@ function tickModifiers()
 			if island.faction == ISLAND.FACTION.AI then
 				local player_list = s.getPlayers()
 				for player_index, player in pairs(player_list) do
-					local player_pos = s.getPlayerPos(player)
+					local player_pos = s.getPlayerPos(player.id)
 					local player_island_dist = m.xzDistance(player_pos, island.transform)
 					if player_island_dist < 1000 then
 						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
@@ -11974,7 +12079,7 @@ function tickCargoVehicles()
 							-- spawn it as it doesnt exist
 							local island, found_island = Island.getDataFromIndex(cargo_vehicle.route_data[1].island_index)
 							local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
-							if not was_spawned then
+							if not was_spawned or not vehicle_data then
 								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
 							else
 								-- add it to the cargo vehicles list
@@ -12422,22 +12527,24 @@ function isVehicleNeedsResupply(vehicle_id, button_name)
 end
 
 function isVehicleNeedsReload(vehicle_id)
-	local needing_reload = false
-	local gun_id = 0
-	for i=1,6 do
-		local needs_reload, is_success_button = s.getVehicleButton(vehicle_id, "AI_RELOAD_AMMO_"..i)
-		if needs_reload ~= nil then
-			if needs_reload.on and is_success_button then
-				needing_reload = true
-				gun_id = i
-				break
+
+	local guns_to_reload = {}
+
+	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+	if is_success then
+		if vehicle_data.components and vehicle_data.components.buttons then
+			for i = 1, #vehicle_data.components.buttons do
+				local button = vehicle_data.components.buttons[i]
+				if button.on and button.name:match("AI_RELOAD_AMMO_") then
+					table.insert(guns_to_reload, tonumber(button.name:gsub("AI_RELOAD_AMMO_", "")))
+				end
 			end
 		end
+	else
+		d.print(("(isVehicleNeedsReload) Failed to get vehicle_data! vehicle_id: %s"):format(vehicle_id))
 	end
-	local returnings = {}
-	returnings[1] = needing_reload
-	returnings[2] = gun_id
-	return returnings
+
+	return guns_to_reload
 end
 
 --------------------------------------------------------------------------------

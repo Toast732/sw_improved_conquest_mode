@@ -8,51 +8,89 @@ SpawningUtils = {}
 -- shortened library name
 su = SpawningUtils
 
+--- @class SpawnableComponentData
+--- @field tags_full                        string
+--- @field tags                             table<number, string> The tags on the component
+--- @field display_name                     string The display name of the component
+--- @field type                             SWAddonComponentDataTypeEnum The type of the component (0 = zone, 1 = object, 2 = character, 3 = vehicle, 4 = flare, 5 = fire, 6 = loot, 7 = button, 8 = animal, 9 = ice, 10 = cargo_zone)
+--- @field id                               number The ID of the component from the missions editor e.g. ID_27
+--- @field dynamic_object_type              SWObjectTypeEnum The object type of the component (number for pan/character/pot/whatever)
+--- @field transform                        SWMatrix The position of the component
+--- @field vehicle_parent_component_id      number 
+--- @field character_outfit_type            number The character outfit type (See Outfit type)
+--- @field component_index                  number the component_index inside of the location
+
+--- adds .component_index to component_data
+--- @param component_index number the index of the component, local to each location.
+--- @param component_data SWAddonComponentData the data of the component
+--- @return SpawnableComponentData component_data component_data but with .component_index = component_index
+function SpawningUtils.populateComponentData(component_index, component_data)
+	component_data.component_index = component_index
+
+	---@cast component_data -SWAddonComponentData
+	return component_data
+end
+
 -- spawn an individual object descriptor from a playlist location
-function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, object_descriptor, parent_vehicle_id)
-	local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, object_descriptor.index, parent_vehicle_id)
-	if is_success then
-		return component.id
-	else -- then it failed to spawn the addon component
-		d.print("this addon index: "..s.getAddonIndex(), false, 0)
-		d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
-		return nil
+--- @param spawn_transform SWMatrix the matrix of where to spawn the component
+--- @param addon_index number the index of the addon which contains the component
+--- @param location_index number the index of the location which contains the component
+--- @param component_data SpawnableComponentData the populated component data of the component
+--- @param parent_vehicle_id number? the id of the vehicle, to parent this component to
+function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, component_data, parent_vehicle_id)
+
+	if component_data or component_data.component_index then
+		local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, component_data.component_index, parent_vehicle_id)
+		if is_success then
+			return component.id
+		else -- then it failed to spawn the addon component
+			d.print("this addon index: "..s.getAddonIndex(), false, 0)
+			d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
+			return nil
+		end
+	elseif component_data then
+		d.print("(su.spawningUtils) component_data.component_index is nil!", true, 1)
+		d.print(component_data, true, 1)
+	else
+		d.print("(su.spawningUtils) component_data is nil!", true, 1)
 	end
 end
 
-function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, object, parent_vehicle_id, spawned_objects, out_spawned_objects)
+function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index, component_data, parent_vehicle_id, spawned_objects, out_spawned_objects)
 	-- spawn object
 
-	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, object.transform), addon_index, location_index, object, parent_vehicle_id)
+	--d.print(component_data)
+
+	local spawned_object_id = su.spawnObjectType(m.multiply(spawn_transform, component_data.transform), addon_index, location_index, component_data, parent_vehicle_id)
 
 	-- add object to spawned object tables
 
 	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
 
 		local l_vehicle_type = VEHICLE.TYPE.HELI
-		if Tags.has(object.tags, "vehicle_type=wep_plane") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_plane") then
 			l_vehicle_type = VEHICLE.TYPE.PLANE
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_boat") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_boat") then
 			l_vehicle_type = VEHICLE.TYPE.BOAT
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_land") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_land") then
 			l_vehicle_type = VEHICLE.TYPE.LAND
 		end
-		if Tags.has(object.tags, "vehicle_type=wep_turret") then
+		if Tags.has(component_data.tags, "vehicle_type=wep_turret") then
 			l_vehicle_type = VEHICLE.TYPE.TURRET
 		end
-		if Tags.has(object.tags, "type=dlc_weapons_flag") then
+		if Tags.has(component_data.tags, "type=dlc_weapons_flag") then
 			l_vehicle_type = "flag"
 		end
 
-		local object_data = { 
-			name = object.display_name, 
-			type = object.type, 
-			id = spawned_object_id, 
-			component_id = object.id, 
-			vehicle_type = l_vehicle_type, 
-			size = Tags.getValue(object.tags, "size", true) or "small"
+		local object_data = {
+			name = component_data.display_name,
+			type = component_data.type,
+			id = spawned_object_id,
+			component_id = component_data.id,
+			vehicle_type = l_vehicle_type,
+			size = Tags.getValue(component_data.tags, "size", true) or "small"
 		}
 
 		if spawned_objects ~= nil then
@@ -64,6 +102,8 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 		end
 
 		return object_data
+	else
+		d.print("(su.spawnObject) Failed to spawn vehicle!", true, 1)
 	end
 
 	return nil

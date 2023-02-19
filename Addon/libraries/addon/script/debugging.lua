@@ -15,7 +15,7 @@ d = Debugging
 ---@param peer_id ?integer if you want to send it to a specific player, leave empty to send to all players
 function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glorious debug function" - senty, 2022
 
-	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
+	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) or debug_type == 1 and d.getDebug(0, peer_id) then
 		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
 		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", ADDON_VERSION)..suffix
 
@@ -37,7 +37,7 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 				end
 			else
 				for _, peer in ipairs(s.getPlayers()) do -- if this is being sent to all players with the debug enabled
-					if d.getDebug(debug_type, peer.id) or debug_type == 2 and d.getDebug(0, peer.id) then -- if this player has debug enabled
+					if d.getDebug(debug_type, peer.id) or debug_type == 2 and d.getDebug(0, peer.id) or debug_type == 1 and d.getDebug(0, peer.id) then -- if this player has debug enabled
 						s.announce(prefix, message, peer.id) -- send the message to them
 					end
 				end
@@ -53,6 +53,9 @@ function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
 end
 
 function Debugging.debugIDFromType(debug_type)
+
+	debug_type = string.friendly(debug_type)
+
 	for debug_id, d_type in ipairs(debug_types) do
 		if debug_type == d_type then
 			return debug_id

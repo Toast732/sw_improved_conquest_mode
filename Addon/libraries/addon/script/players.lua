@@ -494,14 +494,14 @@ function Players.dataByPID(peer_id)
 	return g_savedata.players.individual_data[steam_id]
 end
 
----@param player_list Players[] the list of players to check
----@param target_pos Matrix the position that you want to check
+---@param player_list table<integer, SWPlayer> the list of players to check
+---@param target_pos SWMatrix the position that you want to check
 ---@param min_dist number the minimum distance between the player and the target position
 ---@param ignore_y boolean if you want to ignore the y level between the two or not
 ---@return boolean no_players_nearby returns true if theres no players which distance from the target_pos was less than the min_dist
 function Players.noneNearby(player_list, target_pos, min_dist, ignore_y)
 	local players_clear = true
-	for player_index, player in pairs(player_list) do
+	for _, player in pairs(player_list) do
 		if ignore_y and m.xzDistance(s.getPlayerPos(player.id), target_pos) < min_dist then
 			players_clear = false
 		elseif not ignore_y and m.distance(s.getPlayerPos(player.id), target_pos) < min_dist then
@@ -531,7 +531,7 @@ end
 ---@return integer|nil object_id the object ID of the player, nil if not found
 function Players.objectIDFromSteamID(steam_id)
 	if not steam_id then
-		d.print("(pl.objectIDFromSteamID) steam_id was never provided!", true, 1, -1, 10)
+		d.print("(pl.objectIDFromSteamID) steam_id was never provided!", true, 1, -1)
 		return
 	end
 

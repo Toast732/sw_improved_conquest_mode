@@ -7,122 +7,122 @@
 --      By Nameous Changey
 -- Minimized Size: 1786 (2100 with comment) chars
 
-ak=false
+U=false
 aa=property
-v=math
-am=output
-_=am.setNumber
-f=am.setBool
-R=v.abs
+u=math
+ap=output
+_=ap.setNumber
+f=ap.setBool
+ak=u.abs
 a=input.getNumber
-P=v.max
-an=aa.getText
-aw=an("Yaw navigation constant")or 5
-ay=an("Pitch navigation constant")or 7
-g=v
-ap=g.pi*2
-pi=ap/2
+K=u.max
+ac=aa.getText
+ar=ac("Yaw navigation constant")or 5
+aB=ac("Pitch navigation constant")or 7
+g=u
+V=g.pi*2
+pi=V/2
 atan=g.atan
 sqrt=g.sqrt
-V=0
-Y=0
-ai=0
-X=0
-ae=0
-ac=0
-ao=0
-b,e,p=0,0,0
-E,t,u=0,0,0
-W,S,ab=0,0,0
-F,A,O=0,0,0
-h=0
-G=0
-D=0
-r=0
-H=0
-ag=0
-ah=0
-d=0
-m=0
-x=ak
+aj=0
 ad=0
-af=0
+ai=0
+ao=0
+S=0
+ag=0
+ae=0
+b,d,i=0,0,0
+D,G,E=0,0,0
+an,X,aq=0,0,0
+H,F,I=0,0,0
+h=0
+A=0
+s=0
+r=0
+v=0
+W=0
+Y=0
+e=0
+k=0
+C=U
+ah=0
+ab=0
 c=75
-U=0
-aq=0
-T=0
+af=0
+Z=0
 al=0
-q=0
-n=0
-z=0
-y=0
-N=0
-I=0
-M=0
+am=0
 w=0
-C=0
-function s(b,ar,au)return v.min(P(b,ar),au)end
-function onTick()o=a(10)l=a(11)if w==0 or C==0 then
-w=o
-C=l
+o=0
+z=0
+q=0
+J=0
+M=0
+N=0
+y=0
+x=0
+function B(b,aD,ay)return u.min(K(b,aD),ay)end
+function onTick()j=a(10)p=a(11)if y==0 or x==0 then
+y=j
+x=p
 end
-aA=g.max(g.min(o*.175+(o-w)*.2,1),-1)av=g.max(g.min(l*.175+(l-C)*.2,1),-1)w=o
-C=l
-K=a(1)J=a(2)Z=a(3)aj=a(7)>0
-k=K~=0 and J~=0
-if k then
+at=g.max(g.min(j*.175+(j-y)*.2,1),-1)aw=g.max(g.min(p*.175+(p-x)*.2,1),-1)y=j
+x=p
+L=a(1)O=a(2)T=a(3)R=a(7)>0
+n=L~=0 and O~=0
+if n then
 if a(9)>0 then
-E,t,u=K,J,Z
-aC,aD,ax=E-W,t-S,u-ab
-b,e,p=E+aC*2,t+aD*2,u+ax*2 else b,e,p=K,J,Z
+D,G,E=L,O,T
+az,aA,ax=D-an,G-X,E-aq
+b,d,i=D+az*2,G+aA*2,E+ax*2 else b,d,i=L,O,T
 end
 end
-i=a(4)j=a(5)B=a(6)F=b-i
-A=e-j
-O=p-B
-d=sqrt(F^2+A^2+O^2)Q=atan(F,A)L=atan(O,sqrt(F^2+A^2))z=(i-aq)*60
-y=(j-T)*60
-N=(B-al)*60
-at=atan(z,y)as=atan(N,sqrt(z^2+y^2))n=sqrt(z^2+y^2+N^2)q=(n-U)*60
-aB=(Q-at+pi)%ap-pi
-az=L-as
-if k then
-h=(ai-d)*60
-G=Q-V
-D=L-Y
-r=G-X
-H=D-ae
-ag=r-ac
-ah=H-ao
-c=d/h
-ad=G*R(h)+ag*c*5+r*c^2
-af=D*R(h)+ah*c*5+H*c^2
+m=a(4)l=a(5)t=a(6)H=b-m
+F=d-l
+I=i-t
+e=sqrt(H^2+F^2+I^2)P=atan(H,F)Q=atan(I,sqrt(H^2+F^2))z=(m-Z)*60
+q=(l-al)*60
+J=(t-am)*60
+av=atan(z,q)as=atan(J,sqrt(z^2+q^2))o=sqrt(z^2+q^2+J^2)w=(o-af)*60
+au=(P-av+pi)%V-pi
+aC=Q-as
+if n then
+h=(ai-e)*60
+A=P-aj
+s=Q-ad
+r=A-ao
+v=s-S
+W=r-ag
+Y=v-ae
+c=e/h
+ah=A*ak(h)+W*c*5+r*c^2
+ab=s*ak(h)+Y*c*5+v*c^2
 end
-f(1,ak)if aj and not x then
-_(2,.04)_(1,-0)if not k or aa.getBool("Seeker preference")and d<1000 and h>20 and o~=0 and l~=0 then
-_(2,.04-av)_(1,-aA)elseif b~=0 and e~=0 and h>20 and d<3000 then
-_(2,.04-af*ay*s(c/6,.3,1)*s(1-c/8,.75,1))_(1,-(ad*aw*s(c/6,.3,1)*s(1-c/8,.75,1)))elseif b~=0 and e~=0 then
-_(2,.04-az)_(1,-aB)end
-m=m+1
-_(3,m)if(d<25 and c<.177 or d<100 and q<-50)and b~=0 and e~=0 and p~=0 and m>30 or m>2400 then
+f(1,U)if R and not C then
+_(2,.04)_(1,-0)if not n or aa.getBool("Seeker preference")and e<1000 and h>20 and j~=0 and p~=0 then
+_(2,.04-aw)_(1,-at)elseif b~=0 and d~=0 and h>20 and e<3000 then
+_(2,.04-ab*aB*B(c/6,.3,1)*B(1-c/8,.75,1))_(1,-(ah*ar*B(c/6,.3,1)*B(1-c/8,.75,1)))elseif b~=0 and d~=0 then
+_(2,.04-aC)_(1,-au)end
+k=k+1
+_(3,k)if(e<25 and c<.177 or e<100 and w<-50)and b~=0 and d~=0 and i~=0 and k>30 or k>2400 then
 f(1,true)end
-x=x
+C=C
 or a(8)>0
-I=P(I,n)M=P(M,q)end
-V=Q
-Y=L
-ai=d
+M=K(M,o)N=K(N,w)end
+aj=P
+ad=Q
+ai=e
+ao=A
+S=s
+ag=r
+ae=v
+Z=m
+al=l
+am=t
+af=o
+_(4,b)_(5,d)_(6,i)_(7,m)_(8,l)_(9,t)_(10,o)_(11,M)_(12,w)_(13,N)f(2,b==0 and d==0)f(3,m==0 and l==0)f(4,n)f(5,C)f(6,R)if n then
+an=D
 X=G
-ae=D
-ac=r
-ao=H
-aq=i
-T=j
-al=B
-U=n
-_(4,b)_(5,e)_(6,p)_(7,i)_(8,j)_(9,B)_(10,n)_(11,I)_(12,q)_(13,M)f(2,b==0 and e==0)f(3,i==0 and j==0)f(4,k)f(5,x)f(6,aj)if k then
-W=E
-S=t
-ab=u
+aq=E
 end
 end

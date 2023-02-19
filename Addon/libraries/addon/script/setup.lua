@@ -9,7 +9,10 @@
 -- required libraries
 require("libraries.addon.components.addonLocationUtils")
 require("libraries.addon.components.tags")
+require("libraries.addon.components.spawningUtils")
+
 require("libraries.addon.script.debugging")
+
 require("libraries.utils.tables")
 
 -- library name
@@ -35,8 +38,8 @@ sup = Setup
 ---@field addon_index integer, Addon index the vehicle is from
 ---@field location_index integer, Location index the vehicle is in
 ---@field location_data SWLocationData, the data of the mission location which the vehicle is in
----@field vehicle SWAddonComponentData the data of the vehicle
----@field fires table<number, SWAddonComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
+---@field vehicle SpawnableComponentData the data of the vehicle
+---@field fires table<number, SpawnableComponentData> a table of the fires which are parented to the vehicle, containing the data of the fires
 
 --[[
 
@@ -199,7 +202,7 @@ function Setup.createVehiclePrefabs()
 			end
 
 			-- iterate through all components in this location
-			for component_index = 0, location_data.component_count do
+			for component_index = 0, location_data.component_count - 1 do
 
 				local component_data, is_success = s.getLocationComponentData(addon_index, location_index, component_index)
 
@@ -230,6 +233,8 @@ function Setup.createVehiclePrefabs()
 
 				-- there is an enemy AI vehicle here
 
+				component_data = su.populateComponentData(component_index, component_data)
+
 				---@type PREFAB_DATA
 				local prefab_data = {
 					addon_index = addon_index, -- addon index the vehicle is from
@@ -245,8 +250,8 @@ function Setup.createVehiclePrefabs()
 
 					if is_success then
 						-- if this is a fire, and its parented to this vehicle, then add it to the prefab
-						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == component_index then
-							table.insert(prefab_data.fires, valid_component_data)
+						if valid_component_data.type == "fire" and valid_component_data.vehicle_parent_component_id == prefab_data.vehicle.id then
+							table.insert(prefab_data.fires, su.populateComponentData(valid_component_index, valid_component_data))
 						end
 					end
 				end
@@ -254,7 +259,7 @@ function Setup.createVehiclePrefabs()
 				-- get the role of the vehicle
 				local role = Tags.getValue(component_data.tags, "role", true) or "general"
 				-- get the type of the vehicle
-				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true), "wep_", "") or "unknown"
+				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true) --[[@as string]], "wep_", "") or "unknown"
 				-- get the strategy of the vehicle
 				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
 

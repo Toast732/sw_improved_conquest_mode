@@ -7,56 +7,56 @@
 --      By Nameous Changey
 -- Minimized Size: 1042 (1356 with comment) chars
 
-x=true
+q=true
 d=false
-p=property
+x=property
 c=math
-q=input
-u=output.setBool
-a=q.getNumber
+A=input
+y=output.setBool
+b=A.getNumber
 z=c.atan
-_=p.getNumber
-v=p.getBool
-j=0
-w=0
-E=0
+a=x.getNumber
+C=x.getBool
+k=0
+u=0
+Q=0
 J=0
-A=v("Requires Is Occupied?")P=v("Radar Rotation")Q=_("Time Between Missiles (s)")e=_("Min Mass")g=_("Max Mass")W=_("Min Y")S=_("Max Y")K=_("Min Distance")M=_("Max Distance")h=_("Radar FOV X")*.75
-m=_("Radar FOV Y")*.75
-if P then
-local I=m
-m=h
-h=I
+s=C("Requires Is Occupied?")D=C("Radar Rotation")G=a("Time Between Missiles (s)")e=a("Min Mass")i=a("Max Mass")U=a("Min Y")V=a("Max Y")F=a("Min Distance")L=a("Max Distance")m=a("Radar FOV X")*.75
+g=a("Radar FOV Y")*.75
+if D then
+local H=g
+g=m
+m=H
 end
-y=c.pi*2
-function N(l,i,k,o)return z(l-k,i-o)/y
+w=c.pi*2
+function O(j,f,o,l)return z(j-o,f-l)/w
 end
-function O(k,o,l,i)return c.sqrt((l-k)^2+(i-o)^2)end
-function onTick()local r=d
-j=j+1
-E=0
+function M(o,l,j,f)return c.sqrt((j-o)^2+(f-l)^2)end
+function onTick()local v=d
+k=k+1
+Q=0
 J=0
-U=d
+T=d
 X=d
-H=q.getBool(1)if not A or A and H then
-n=a(8)if g==0 and e==0 or g==0 and e>=0 and n>=e or n>=e and n<=g then
-B=a(5)C=a(7)t=a(1)s=a(3)f=O(B,C,t,s)if f>=K and f<=M then
-L=-a(4)D=N(t,s,B,C)if c.abs(D-L)<=h then
-F=a(6)G=a(2)if z((G-F)/f)/y-a(9)<=m then
-if w==0 or j-w>=Q*60 then
-u(1,x)r=x
+E=A.getBool(1)if not s or s and E then
+h=b(8)if i==0 and e==0 or i==0 and e>=0 and h>=e or h>=e and h<=i then
+r=b(5)p=b(7)B=b(1)t=b(3)n=M(r,p,B,t)if n>=F and n<=L then
+N=-b(4)K=O(B,t,r,p)if c.abs(K-N)<=m then
+I=b(6)P=b(2)if z((P-I)/n)/w-b(9)<=g then
+if u==0 or k-u>=G*60 then
+y(1,q)v=q
 end
 end
 end
 end
 end
 end
-if not r then
-u(1,d)end
+if not v then
+y(1,d)end
 end
-function c.T(b,min,max)return max<b and max or min>b and min or b
+function c.S(_,min,max)return max<_ and max or min>_ and min or _
 end
-function R(b)return b~=b and 0 or b
+function R(_)return _~=_ and 0 or _
 end
-function V(b,min,max)return(b-min)/(max-min)%1*(max-min)+min
+function W(_,min,max)return(_-min)/(max-min)%1*(max-min)+min
 end

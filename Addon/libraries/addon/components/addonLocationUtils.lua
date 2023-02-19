@@ -55,7 +55,7 @@ function AddonLocationUtils.print(message, requires_debug, debug_type, peer_id)
 	d.print(message, requires_debug, debug_type, peer_id)
 end
 
----@param addon_index integer|table<_, integer>? the target addon index to go through its components, leave nil or -1 for all, specify a table<_, addon_index> for multiple. 
+---@param addon_index number|table<_, integer>? the target addon index to go through its components, leave nil or -1 for all, specify a table<_, addon_index> for multiple. 
 ---@param addon_pattern string? the pattern to match the addon name against. leave nil to not care about the addon name. (will be ignored if the addon index is specified)
 ---@param location_pattern string? the pattern to match the location name against. leave nil to not care about the location name.
 ---@param component_pattern string? the pattern to match the component name against. leave nil to not care about the component name.
@@ -83,7 +83,7 @@ function AddonLocationUtils.getMissionComponents(addon_index, addon_pattern, loc
 		addon_index = {addon_index}
 	end
 
-	if specified_addon_index and not s.getAddonData(addon_index) then
+	if specified_addon_index and addon_index_type == "number" and not s.getAddonData(addon_index) then
 		alu.print(("(alu.getMissionComponents) addon_index was specified, however there is not an addon matching this index! addon_index: %s"):format(addon_index), true, 1)
 		return
 	end

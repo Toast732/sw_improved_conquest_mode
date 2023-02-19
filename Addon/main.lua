@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.4)"
+ADDON_VERSION = "(0.4.0.5)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1079,6 +1079,7 @@ player_commands = {
 }
 
 command_aliases = {
+	dbg = "debug",
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
@@ -2413,7 +2414,9 @@ function onVehicleLoad(vehicle_id)
 		d.print("(onVehicleLoad) vehicle name: "..vehicle_object.name, true, 0)
 		vehicle_object.state.is_simulating = true
 
-		vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+		if #vehicle_object.survivors == 0 then
+			vehicle_object.survivors = c.createAndSetCharactersIntoSeat(vehicle_id, c.valid_seats.enemy_ai)
+		end
 
 		-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
 		for _, checking_squad in pairs(g_savedata.ai_army.squadrons) do
@@ -3313,7 +3316,7 @@ function tickSquadrons()
 					and if the vehicle its linked to isnt a cargo vehicle
 					then kill the vehicle
 				]]
-				if c and (c.incapacitated or c.dead) and vehicle_object.role ~= SQUAD.COMMAND.CARGO then
+				if c and (c.incapacitated or c.dead) and vehicle_object.role ~= SQUAD.COMMAND.CARGO and not vehicle_object.is_killed then
 					v.kill(vehicle_id)
 				end
 			end
@@ -3332,7 +3335,7 @@ function tickSquadrons()
 							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
 	
-								for island_index, island in pairs(g_savedata.islands) do
+								for _, island in pairs(g_savedata.islands) do
 									if island.assigned_squad_index == squad_index then
 										island.assigned_squad_index = -1
 									end
@@ -3350,8 +3353,62 @@ function tickSquadrons()
 							v.kill(vehicle_id)
 						end
 					end
-					-- check if the vehicle simply needs to a ammo belt, barrel or box
-					local gun_info = isVehicleNeedsReload(vehicle_id)
+
+					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
+					local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+					if is_success and vehicle_data.components and vehicle_data.components.guns then
+						for gun_index = 1, #vehicle_data.components.guns do
+							local gun_data = vehicle_data.components.guns[gun_index]
+
+							-- if this is a gun that might need reloading
+							if gun_data.ammo == 0 and (gun_data.name:match("^Ammo %d+$") or (gun_data.name:match("^Gunner %d+$"))) then
+
+								-- the target weapons we can reload from
+								local ammo_group = tonumber(table.pack(gun_data.name:gsub("[%a ]+", ""))[1])
+								local target_pattern = ("Reserve Ammo %i"):format(ammo_group)
+								for reserve_ammo_index = 1, #vehicle_data.components.guns do
+									local reserve_ammo_data = vehicle_data.components.guns[reserve_ammo_index]
+
+									-- we can reload from this weapon
+									if gun_index ~= reserve_ammo_index and reserve_ammo_data.ammo ~= 0 and reserve_ammo_data.name:match(target_pattern) then
+										-- move as much ammo as we can from the reserve ammo to the gun.
+										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
+
+										-- take that away from the reserve ammo container
+										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										
+										-- move that into the gun
+										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+
+										-- if the gun is not at capcity, continue on
+										-- otherwise, break.
+										if gun_data.ammo + ammo_to_move == gun_data.capacity then
+											break
+										end
+									end
+								end
+							end
+						end
+					end
+
+					-- local guns_to_reload = isVehicleNeedsReload(vehicle_id)
+					--[[for i = 1, #guns_to_reload do
+						local ammo_group = guns_to_reload[i]
+
+						--local gun_data, is_success = s.getVehicleWeapon(vehicle_id, "Ammo "..gun_id)
+
+						local vehicle_data, _ = s.getVehicleData(vehicle_id)
+
+						for weapon_index = 1, #vehicle_data.components.guns do
+							local weapon = vehicle_data.components.guns[weapon_index]
+
+							if weapon.name:match("Ammo "..ammo_group) then
+
+							end
+						end 
+					end
+
 					if gun_info[1] and gun_info[2] ~= 0 then
 						local i = 1
 						local successed = false
@@ -3370,7 +3427,7 @@ function tickSquadrons()
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
-					end
+					end]]
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -3461,7 +3518,7 @@ function tickSquadrons()
 					--d.print("convoy_index: "..convoy_index, true, 0)
 					if convoy.convoy[convoy_index - 1] then -- if theres a vehicle behind this one
 
-						local behind_vehicle_object, behind_squad_index, behind_squad = Squad.getVehicle(convoy.convoy[convoy_index - 1])
+						local behind_vehicle_object, _, _ = Squad.getVehicle(convoy.convoy[convoy_index - 1])
 
 						--? if this vehicle is not waiting and the behind vehicle exists
 						if behind_vehicle_object and vehicle_object.state.convoy.status ~= CONVOY.WAITING  then
@@ -4877,7 +4934,7 @@ function tickModifiers()
 			if island.faction == ISLAND.FACTION.AI then
 				local player_list = s.getPlayers()
 				for player_index, player in pairs(player_list) do
-					local player_pos = s.getPlayerPos(player)
+					local player_pos = s.getPlayerPos(player.id)
 					local player_island_dist = m.xzDistance(player_pos, island.transform)
 					if player_island_dist < 1000 then
 						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
@@ -5193,7 +5250,7 @@ function tickCargoVehicles()
 							-- spawn it as it doesnt exist
 							local island, found_island = Island.getDataFromIndex(cargo_vehicle.route_data[1].island_index)
 							local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
-							if not was_spawned then
+							if not was_spawned or not vehicle_data then
 								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
 							else
 								-- add it to the cargo vehicles list
@@ -5641,22 +5698,24 @@ function isVehicleNeedsResupply(vehicle_id, button_name)
 end
 
 function isVehicleNeedsReload(vehicle_id)
-	local needing_reload = false
-	local gun_id = 0
-	for i=1,6 do
-		local needs_reload, is_success_button = s.getVehicleButton(vehicle_id, "AI_RELOAD_AMMO_"..i)
-		if needs_reload ~= nil then
-			if needs_reload.on and is_success_button then
-				needing_reload = true
-				gun_id = i
-				break
+
+	local guns_to_reload = {}
+
+	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+	if is_success then
+		if vehicle_data.components and vehicle_data.components.buttons then
+			for i = 1, #vehicle_data.components.buttons do
+				local button = vehicle_data.components.buttons[i]
+				if button.on and button.name:match("AI_RELOAD_AMMO_") then
+					table.insert(guns_to_reload, tonumber(button.name:gsub("AI_RELOAD_AMMO_", "")))
+				end
 			end
 		end
+	else
+		d.print(("(isVehicleNeedsReload) Failed to get vehicle_data! vehicle_id: %s"):format(vehicle_id))
 	end
-	local returnings = {}
-	returnings[1] = needing_reload
-	returnings[2] = gun_id
-	return returnings
+
+	return guns_to_reload
 end
 
 --------------------------------------------------------------------------------
