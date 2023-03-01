@@ -139,6 +139,14 @@ local addon_contributors = {
 
 		}
 	},
+	["76561197971637605"] = {
+		name = "Tom",
+		role = "Meier Island & Private Alpha Tester",
+		can_auto_enable = debug_auto_enable_levels[2],
+		debug = { -- the debug to automatically enable for them
+
+		}
+	},
 	["76561198257253907"] = {
 		name = "Just Mob",
 		role = "Video Producer & Private Alpha Tester",
@@ -213,14 +221,6 @@ local addon_contributors = {
 	},
 	["76561197982256220"] = {
 		name = "Tarelius",
-		role = "Private Alpha Tester",
-		can_auto_enable = debug_auto_enable_levels[2],
-		debug = { -- the debug to automatically enable for them
-
-		}
-	},
-	["76561197971637605"] = {
-		name = "Tom",
 		role = "Private Alpha Tester",
 		can_auto_enable = debug_auto_enable_levels[2],
 		debug = { -- the debug to automatically enable for them
@@ -337,7 +337,7 @@ function Players.setupOOP(player)
 			-- if we're enabling this debug
 			if enabled then
 				-- set this debug as true for global, so the addon can start checking who has it enabled.
-				g_savedata.debug[debug_type] = true
+				g_savedata.debug[debug_type].enabled = true
 			else
 				-- check if we can globally disable this debug to save on performance
 				d.checkDebug()

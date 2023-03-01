@@ -142,6 +142,11 @@ function math.euclideanDistance(...)
 
 	local rx = c[1] - c[2]
 	local rz = c[3] - c[4]
+
+	if cause_error then
+		rx = rx * nil
+		--d.trace.print()
+	end
 	if #c == 4 then
 		-- 2D distance
 		return math.sqrt(rx*rx+rz*rz)

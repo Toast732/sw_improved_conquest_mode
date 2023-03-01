@@ -55,7 +55,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		sel_veh_type = g_savedata.vehicle_list[vehicle_list_id].vehicle_type
 		sel_strat = g_savedata.vehicle_list[vehicle_list_id].strategy
 		for vehicle_id, _ in pairs(g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat]) do
-			if not sel_vehicle and vehicle_list_id == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
+			if not sel_vehicle and vehicle_id ~= "mod" and vehicle_list_id == g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][vehicle_id].id then
 				sel_vehicle = vehicle_id
 			end
 		end
@@ -141,7 +141,7 @@ function SpawnModifiers.getConstructableVehicleID(role, vehicle_type, strategy, 
 	local constructable_vehicle_id = nil
 	if g_savedata.constructable_vehicles[role] and g_savedata.constructable_vehicles[role][vehicle_type] and g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
 		for vehicle_id, _ in pairs(g_savedata.constructable_vehicles[role][vehicle_type][strategy]) do
-			if not constructable_vehicle_id and vehicle_list_id == g_savedata.constructable_vehicles[role][vehicle_type][strategy][vehicle_id].id then
+			if not constructable_vehicle_id and vehicle_id ~= "mod" and vehicle_list_id == g_savedata.constructable_vehicles[role][vehicle_type][strategy][vehicle_id].id then
 				constructable_vehicle_id = vehicle_id
 			end
 		end

@@ -841,6 +841,11 @@ function Vehicle.teleport(vehicle_id, transform)
 
 	local none_failed = true
 
+	if not vehicle_object then
+		d.print(("(Vehicle.teleport) failed to get vehicle_object! vehicle_id: %s returned squad_index: %s"):format(vehicle_id, squad_index), true, 1)
+		return false
+	end
+
 	-- set char pos
 	for _, object_id in ipairs(vehicle_object.survivors) do
 		local is_success = s.setObjectPos(object_id, transform)

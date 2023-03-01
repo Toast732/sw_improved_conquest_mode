@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.5)"
+ADDON_VERSION = "(0.4.0.6)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -82,7 +82,9 @@ debug_types = {
 	"map",
 	"graph_node",
 	"driving",
-	"vehicle"
+	"vehicle",
+	"function",
+	"traceback"
 }
 
 time = { -- the time unit in ticks, irl time, not in game
@@ -289,13 +291,53 @@ g_savedata = {
 		ui_id = nil
 	},
 	debug = {
-		chat = false,
-		error = false,
-		profiler = false,
-		map = false,
-		graph_node = false,
-		driving = false,
-		vehicle = false
+		chat = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		error = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		profiler = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		map = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		graph_node = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		driving = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		vehicle = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		["function"] = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = true
+		},
+		traceback = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = true,
+			trace = {},
+			stack_size = 0
+		}
 	},
 	tick_extensions = {
 		cargo_vehicle_spawn = 0
@@ -509,6 +551,8 @@ end
 	to have it default true, you must wrap true in quotes.
 	you also cannot have any commas inside of the text, for checkboxes and sliders, as that will break it
 ]]
+
+local PERFORMANCE_MODE = property.checkbox("Performance Mode (Disables tracebacks.)", false)
 local SINKING_MODE = property.checkbox("Sinking Mode (Ships sink then explode.)", "true")
 local ISLAND_CONTESTING = property.checkbox("Point Contesting (Factions block eachothers progress when they're both trying to capture the same point)", "true")
 local CARGO_MODE = property.checkbox("Cargo Mode (AI needs to transport resources to make more vehicles.)", "true")
@@ -516,9 +560,11 @@ local AIR_CRASH_MODE = property.checkbox("Air Crash Mode (Air vehicles explode w
 local PAUSE_WHEN_NONE_ONLINE = property.checkbox("Pause the addon when nobody's online (For dedicated servers - so the AI doesn't keep advancing when people are asleep.)", "true")
 
 function onCreate(is_world_create)
+
 	-- setup settings
 	if not g_savedata.settings then
 		g_savedata.settings = {
+			PERFORMANCE_MODE = PERFORMANCE_MODE,
 			SINKING_MODE = SINKING_MODE,
 			CONTESTED_MODE = ISLAND_CONTESTING,
 			CARGO_MODE = CARGO_MODE,
@@ -538,6 +584,8 @@ function onCreate(is_world_create)
 			CARGO_CAPACITY_MULTIPLIER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
 			PAUSE_WHEN_NONE_ONLINE = PAUSE_WHEN_NONE_ONLINE,
 		}
+
+		g_savedata.debug.traceback.default = not g_savedata.settings.PERFORMANCE_MODE
 	end
 
 	-- checks for AI Paths addon
@@ -888,6 +936,18 @@ function setupMain(is_world_create)
 	g_savedata.info.setup = true
 
 	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
+
+	for debug_type, debug_setting in pairs(g_savedata.debug) do
+		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
+			local debug_id = d.debugIDFromType(debug_type)
+
+			if debug_setting.needs_setup_on_reload then
+				d.handleDebug(debug_id, true, 0)
+			end
+
+			d.setDebug(debug_id, -1, true)
+		end
+	end
 end
 
 player_commands = {
@@ -1073,6 +1133,18 @@ player_commands = {
 			desc = "returns how much memory the lua environment is using, this requires a modified version of sw which has the base lua functions injected.",
 			args = "",
 			example ="?icm getmemusage"
+		},
+		causeerror = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
+		},
+		printtraceback = {
+			short_desc = "",
+			desc = "",
+			args = "",
+			example = ""
 		}
 	},
 	host = {}
@@ -1830,6 +1902,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			else
 				d.print(("Lua is using %0.0fkb of memory."):format(collectgarbage("count")), false, 0, peer_id)
 			end
+		elseif command == "causeerror" then
+			cause_error = true
+		elseif command == "printtraceback" then
+
+			d.trace.print()
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -2050,6 +2127,10 @@ function onPlayerJoin(steam_id, name, peer_id)
 
 	warningChecks(peer_id)
 
+	if not g_savedata.info.setup then
+		d.print("Setting up ICM for the first time, this may take a few seconds.", false, 0, peer_id)
+	end
+
 	eq.queue(
 		function()
 			return is_dlc_weapons and g_savedata.info.setup
@@ -2073,6 +2154,16 @@ function onPlayerJoin(steam_id, name, peer_id)
 		1,
 		-1
 	)
+
+	local player = Players.dataBySID(tostring(steam_id))
+
+	if player then
+		for debug_type, debug_data in pairs(g_savedata.debug) do
+			if debug_data.auto_enable then
+				d.setDebug(d.debugIDFromType(debug_type), peer_id, true)
+			end
+		end
+	end
 end
 
 function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
@@ -5610,6 +5701,10 @@ function tickControls()
 end
 
 function onTick()
+
+	if g_savedata.debug.traceback.enabled then
+		ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
+	end
 
 	eq.tick()
 

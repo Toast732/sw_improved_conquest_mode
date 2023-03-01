@@ -253,7 +253,6 @@ function Pathfinding.getPathY(path)
 		g_savedata.graph_nodes.init = true --never build the table again unless you run traverse() manually
 	end
 	for each in pairs(path) do
-		--d.print("(p.getPathY) x: "..((path_res):format(path[each].x)).."\nz: "..((path_res):format(path[each].z)), true, 0)
 		if g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)] and g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)][(path_res):format(path[each].z)] then --if y exists
 			path[each].y = g_savedata.graph_nodes.nodes[(path_res):format(path[each].x)][(path_res):format(path[each].z)].y --add it to the table that already contains x and z
 			--d.print("path["..each.."].y: "..tostring(path[each].y), true, 0)

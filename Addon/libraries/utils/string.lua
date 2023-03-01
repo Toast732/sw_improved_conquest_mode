@@ -69,3 +69,43 @@ function string.removePrefix(vehicle_name, keep_caps)
 
 	return vehicle_name
 end
+
+function string.fromTable(t)
+
+	local function tableToString(T, S, ind)
+		S = S or "{"
+		ind = ind or "  "
+
+		local table_length = table.length(T)
+		local table_counter = 0
+
+		for index, value in pairs(T) do
+
+			table_counter = table_counter + 1
+			if type(index) == "number" then
+				S = ("%s\n%s[%s] = "):format(S, ind, tostring(index))
+			elseif type(index) == "string" and tonumber(index) and math.isWhole(tonumber(index)) then
+				S = ("%s\n%s\"%s\" = "):format(S, ind, index)
+			else
+				S = ("%s\n%s%s = "):format(S, ind, tostring(index))
+			end
+
+			if type(value) == "table" then
+				S = ("%s{"):format(S)
+				S = tableoString(value, S, ind.."  ")
+			elseif type(value) == "string" then
+				S = ("%s\"%s\""):format(S, tostring(value))
+			else
+				S = ("%s%s"):format(S, tostring(value))
+			end
+
+			S = ("%s%s"):format(S, table_counter == table_length and "" or ",")
+		end
+
+		S = ("%s\n%s}"):format(S, string.gsub(ind, "  ", "", 1))
+
+		return S
+	end
+
+	return tableToString(t)
+end

@@ -129,3 +129,45 @@ function table.fromString(S)
 
 	return table.pack(stringToTable(S, 1))[1]
 end
+
+-- a table containing a bunch of functions for making a copy of tables, to best fit each scenario performance wise.
+table.copy = {
+
+	iShallow = function(t, __ENV)
+		__ENV = __ENV or _ENV
+		return {__ENV.table.unpack(t)}
+	end,
+	shallow = function(t, __ENV)
+		__ENV = __ENV or _ENV
+
+		local t_type = __ENV.type(t)
+
+		local t_shallow
+
+		if t_type == "table" then
+			for key, value in __ENV.next, t, nil do
+				t_shallow[key] = value
+			end
+		end
+
+		return t_shallow or t
+	end,
+	deep = function(t, __ENV)
+
+		__ENV = __ENV or _ENV
+
+		local function deepCopy(T)
+			local copy = {}
+			if __ENV.type(T) == "table" then
+				for key, value in __ENV.next, T, nil do
+					copy[deepCopy(key)] = deepCopy(value)
+				end
+			else
+				copy = T
+			end
+			return copy
+		end
+	
+		return deepCopy(t)
+	end
+}

@@ -116,13 +116,18 @@ end
 function Characters.setIntoSeat(object_id)
 	local seat_char_data = g_savedata.libraries.characters.characters_to_seat[object_id]
 
-	local seat_pos = seat_char_data.seat_data.pos
+	local object_data = s.getCharacterData(object_id)
 
-	s.setCharacterSeated(object_id, seat_char_data.vehicle_id, seat_pos.x, seat_pos.y, seat_pos.z)
+	-- ensure that object_data exists
+	if object_data then
+		local seat_pos = seat_char_data.seat_data.pos
 
-	s.setCharacterData(object_id, s.getCharacterData(object_id).hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
-	s.setAIState(object_id, seat_char_data.char_config.ai_state)
-	s.setAITargetVehicle(object_id, nil)
+		s.setCharacterSeated(object_id, seat_char_data.vehicle_id, seat_pos.x, seat_pos.y, seat_pos.z)
+
+		s.setCharacterData(object_id, object_data.hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
+		s.setAIState(object_id, seat_char_data.char_config.ai_state)
+		s.setAITargetVehicle(object_id, nil)
+	end
 end
 
 --# spawns the characters for all of the valid seats on the vehicle, and will later add them to the 

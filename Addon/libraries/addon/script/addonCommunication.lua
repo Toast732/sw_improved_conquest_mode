@@ -87,7 +87,7 @@ end
 
 function AddonCommunication.sendCommunication(message, port)
 	if not message then
-		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
+		d.print("(AddonCommunication.sendCommunication) message was left blank!", true, 1)
 		return
 	end
 
@@ -119,7 +119,7 @@ function httpReply(port, message)
 		reply.count = math.max(reply.count - 1, -1)
 
 		-- execute the function
-		reply.execute_function()
+		reply:execute_function()
 
 		-- if count == 0 then remove this from the replies awaiting
 		if reply.count == 0 then
