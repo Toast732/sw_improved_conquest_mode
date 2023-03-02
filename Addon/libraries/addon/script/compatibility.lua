@@ -87,27 +87,7 @@ end
 --# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
 function Compatibility.getSavedataCopy()
 
-	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
-
-	--[[
-		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
-
-		returns a clone/copy of g_savedata
-	]]
-	
-	local function clone(t)
-		local copy = {}
-		if type(t) == "table" then
-			for key, value in next, t, nil do
-				copy[clone(key)] = clone(value)
-			end
-		else
-			copy = t
-		end
-		return copy
-	end
-
-	local copied_g_savedata = clone(g_savedata)
+	local copied_g_savedata = table.copy.deep(g_savedata)
 	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
 
 	return copied_g_savedata

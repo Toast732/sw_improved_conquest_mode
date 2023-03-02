@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.6)"
+ADDON_VERSION = "(0.4.0.7)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -2029,8 +2029,10 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 		end
 		return (enabled and "Enabled" or "Disabled").." Function Debug"
 	elseif debug_type == "traceback" then
-		if enabled then
+		if enabled and not _ENV_NORMAL then
 			-- enable traceback debug (function debug prints debug output whenever a function is called)
+
+			_ENV_NORMAL = nil
 
 			_ENV_NORMAL = table.copy.deep(_ENV)
 
@@ -2042,7 +2044,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return ...
 			end
 			local function setupFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 7)
+				d.print(("setting up function %s()..."):format(name), true, 8)
 				return (function(...)
 
 					trace_add(name, ...)
@@ -2059,20 +2061,28 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				end
 
 				local T = {}
+
+				--[[if n == "_ENV.g_savedata" then
+					T = g_savedata
+				end]]
+
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					local type_v = type(v)
-					if type_v == "function" then
-						-- "inject" debug into the function
-						T[k] = setupFunction(v, ("%s.%s"):format(n, k))
-					elseif type_v == "table" then
-						-- go through this table looking for functions
-						local name = ("%s.%s"):format(n, k)
-						T[k] = setupTraceback(v, name)
-					else
-						-- just save as a variable
-						T[k] = v
+					if k ~= "_ENV_NORMAL" then
+						local type_v = type(v)
+						if type_v == "function" and k ~= "g_savedata" then
+							-- "inject" debug into the function
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupFunction(v, name)
+						elseif type_v == "table" then
+							-- go through this table looking for functions
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupTraceback(v, name)
+						else--if not n:match("^_ENV%.g_savedata") then
+							-- just save as a variable
+							T[k] = v
+						end
 					end
 				end
 
@@ -2080,16 +2090,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				if n == "_ENV" then
 					-- add _ENV_NORMAL to this env before we set it, as otherwise _ENV_NORMAL will no longer exist.
 					T._ENV_NORMAL = _ENV_NORMAL
+
+					T.g_savedata = g_savedata
 					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
-			_ENV_NORMAL = table.copy.deep(_ENV)
-
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
 			--onTick = setupTraceback(onTick, "onTick")
 
 			-- add the error checker
@@ -2098,7 +2109,6 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				"DEBUG.TRACEBACK.ERROR_CHECKER",
 				0,
 				function(self)
-
 					-- if traceback debug has been disabled, then remove ourselves
 					if not g_savedata.debug.traceback.enabled then
 						self.count = 0
@@ -2121,11 +2131,11 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			)
 
 			ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
-		else
+		elseif not enabled and _ENV_NORMAL then
 			-- revert modified _ENV functions to be the non modified _ENV
 			--- @param t table the environment thats not been modified, will take all of the functions from this table and put it into the current _ENV
 			--- @param mt table the modified enviroment
-			local function removeTraceback(t, mt)
+			--[[local function removeTraceback(t, mt)
 				for k, v in _ENV_NORMAL.pairs(t) do
 					local v_type = _ENV_NORMAL.type(v)
 					-- modified table with this indexed
@@ -2140,8 +2150,13 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return mt
 			end
 
-			_ENV = removeTraceback(_ENV_NORMAL, _ENV)
+			_ENV = removeTraceback(_ENV_NORMAL, _ENV)]]
 
+			__ENV = _ENV_NORMAL.table.copy.deep(_ENV_NORMAL, _ENV_NORMAL)
+			__ENV.g_savedata = g_savedata
+			_ENV = __ENV
+
+			_ENV_NORMAL = nil
 		end
 		return (enabled and "Enabled" or "Disabled").." Tracebacks"
 	end
@@ -3370,27 +3385,7 @@ end
 --# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
 function Compatibility.getSavedataCopy()
 
-	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
-
-	--[[
-		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
-
-		returns a clone/copy of g_savedata
-	]]
-	
-	local function clone(t)
-		local copy = {}
-		if type(t) == "table" then
-			for key, value in next, t, nil do
-				copy[clone(key)] = clone(value)
-			end
-		else
-			copy = t
-		end
-		return copy
-	end
-
-	local copied_g_savedata = clone(g_savedata)
+	local copied_g_savedata = table.copy.deep(g_savedata)
 	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
 
 	return copied_g_savedata
@@ -8362,6 +8357,12 @@ player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		execute = {
+			short_desc = "allows you to get, set or call global variables.",
+			desc = "allows you to get or set global variables, and call global functions with specified arguments.",
+			args = "(address)[(\"(\"function_args\")\") value]",
+			example = "?icm execute g_savedata.debug.traceback.enabled\n?icm execute g_savedata.debug.traceback.debug true\n?icm execute sm.train(\"reward\",\"attack\",5)"
 		}
 	},
 	host = {}
@@ -9124,6 +9125,55 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "printtraceback" then
 
 			d.trace.print()
+		elseif command == "execute" then
+			local location_string = arg[1]
+			local value = arg[2]
+
+			local _, index_count = location_string:gsub("%.", ".")
+
+			-- this is not a function call
+			if not location_string:match("%(") then
+				local selected_variable = _ENV
+				local index_depth = 0
+				for index, _ in location_string:gmatch("[%w_]+") do
+					if type(selected_variable) == "table" then
+						if index_depth == index_count and arg.n == 2 then
+							if value == "true" then
+								value = true
+							elseif value == "false" then
+								value = false
+							elseif arg.n == 2 and not value then
+								value = nil
+							elseif tonumber(value) then
+								value = tonumber(value)
+							else
+								value = value:gsub("\"", "")
+							end
+							selected_variable[index] = value
+							break
+						end
+
+						selected_variable = selected_variable[index]
+					end
+
+					index_depth = index_depth + 1
+				end
+
+				if arg.n == 2 then
+					d.print(("set %s to %s"):format(location_string, value), false, 0, peer_id)
+				else
+					d.print(("value of %s: %s"):format(location_string, selected_variable), false, 0, peer_id)
+				end
+			else
+				--[[if location_string:match("onCustomCommand") then
+					d.print("Hey, I see what you're trying to do there...", false, 1, peer_id)
+					goto onCustomCommand_execute_fail
+				end]]
+				d.print("sorry, but the execute command does not yet support calling functions.", false, 1, peer_id)
+				goto onCustomCommand_execute_fail
+			end
+
+			::onCustomCommand_execute_fail::
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -12132,7 +12182,7 @@ function tickVehicles()
 								as if a vehicle is unloaded, clients will not recieve the vehicle's position from the server, causing it
 								to instead be drawn at 0, 0
 							]]
-							if peer.id == 0 or vehicle.is_simulating then
+							if peer.id == 0 or vehicle_object.state.is_simulating then
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
 								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)

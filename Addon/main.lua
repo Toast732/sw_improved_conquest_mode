@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.6)"
+ADDON_VERSION = "(0.4.0.7)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1145,6 +1145,12 @@ player_commands = {
 			desc = "",
 			args = "",
 			example = ""
+		},
+		execute = {
+			short_desc = "allows you to get, set or call global variables.",
+			desc = "allows you to get or set global variables, and call global functions with specified arguments.",
+			args = "(address)[(\"(\"function_args\")\") value]",
+			example = "?icm execute g_savedata.debug.traceback.enabled\n?icm execute g_savedata.debug.traceback.debug true\n?icm execute sm.train(\"reward\",\"attack\",5)"
 		}
 	},
 	host = {}
@@ -1907,6 +1913,55 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "printtraceback" then
 
 			d.trace.print()
+		elseif command == "execute" then
+			local location_string = arg[1]
+			local value = arg[2]
+
+			local _, index_count = location_string:gsub("%.", ".")
+
+			-- this is not a function call
+			if not location_string:match("%(") then
+				local selected_variable = _ENV
+				local index_depth = 0
+				for index, _ in location_string:gmatch("[%w_]+") do
+					if type(selected_variable) == "table" then
+						if index_depth == index_count and arg.n == 2 then
+							if value == "true" then
+								value = true
+							elseif value == "false" then
+								value = false
+							elseif arg.n == 2 and not value then
+								value = nil
+							elseif tonumber(value) then
+								value = tonumber(value)
+							else
+								value = value:gsub("\"", "")
+							end
+							selected_variable[index] = value
+							break
+						end
+
+						selected_variable = selected_variable[index]
+					end
+
+					index_depth = index_depth + 1
+				end
+
+				if arg.n == 2 then
+					d.print(("set %s to %s"):format(location_string, value), false, 0, peer_id)
+				else
+					d.print(("value of %s: %s"):format(location_string, selected_variable), false, 0, peer_id)
+				end
+			else
+				--[[if location_string:match("onCustomCommand") then
+					d.print("Hey, I see what you're trying to do there...", false, 1, peer_id)
+					goto onCustomCommand_execute_fail
+				end]]
+				d.print("sorry, but the execute command does not yet support calling functions.", false, 1, peer_id)
+				goto onCustomCommand_execute_fail
+			end
+
+			::onCustomCommand_execute_fail::
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -4915,7 +4970,7 @@ function tickVehicles()
 								as if a vehicle is unloaded, clients will not recieve the vehicle's position from the server, causing it
 								to instead be drawn at 0, 0
 							]]
-							if peer.id == 0 or vehicle.is_simulating then
+							if peer.id == 0 or vehicle_object.state.is_simulating then
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
 								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)

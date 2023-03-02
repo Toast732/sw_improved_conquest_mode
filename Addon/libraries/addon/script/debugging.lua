@@ -380,8 +380,10 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 		end
 		return (enabled and "Enabled" or "Disabled").." Function Debug"
 	elseif debug_type == "traceback" then
-		if enabled then
+		if enabled and not _ENV_NORMAL then
 			-- enable traceback debug (function debug prints debug output whenever a function is called)
+
+			_ENV_NORMAL = nil
 
 			_ENV_NORMAL = table.copy.deep(_ENV)
 
@@ -393,7 +395,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return ...
 			end
 			local function setupFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 7)
+				d.print(("setting up function %s()..."):format(name), true, 8)
 				return (function(...)
 
 					trace_add(name, ...)
@@ -410,20 +412,28 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				end
 
 				local T = {}
+
+				--[[if n == "_ENV.g_savedata" then
+					T = g_savedata
+				end]]
+
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					local type_v = type(v)
-					if type_v == "function" then
-						-- "inject" debug into the function
-						T[k] = setupFunction(v, ("%s.%s"):format(n, k))
-					elseif type_v == "table" then
-						-- go through this table looking for functions
-						local name = ("%s.%s"):format(n, k)
-						T[k] = setupTraceback(v, name)
-					else
-						-- just save as a variable
-						T[k] = v
+					if k ~= "_ENV_NORMAL" then
+						local type_v = type(v)
+						if type_v == "function" and k ~= "g_savedata" then
+							-- "inject" debug into the function
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupFunction(v, name)
+						elseif type_v == "table" then
+							-- go through this table looking for functions
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupTraceback(v, name)
+						else--if not n:match("^_ENV%.g_savedata") then
+							-- just save as a variable
+							T[k] = v
+						end
 					end
 				end
 
@@ -431,16 +441,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				if n == "_ENV" then
 					-- add _ENV_NORMAL to this env before we set it, as otherwise _ENV_NORMAL will no longer exist.
 					T._ENV_NORMAL = _ENV_NORMAL
+
+					T.g_savedata = g_savedata
 					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
-			_ENV_NORMAL = table.copy.deep(_ENV)
-
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
 			--onTick = setupTraceback(onTick, "onTick")
 
 			-- add the error checker
@@ -449,7 +460,6 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				"DEBUG.TRACEBACK.ERROR_CHECKER",
 				0,
 				function(self)
-
 					-- if traceback debug has been disabled, then remove ourselves
 					if not g_savedata.debug.traceback.enabled then
 						self.count = 0
@@ -472,11 +482,11 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			)
 
 			ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
-		else
+		elseif not enabled and _ENV_NORMAL then
 			-- revert modified _ENV functions to be the non modified _ENV
 			--- @param t table the environment thats not been modified, will take all of the functions from this table and put it into the current _ENV
 			--- @param mt table the modified enviroment
-			local function removeTraceback(t, mt)
+			--[[local function removeTraceback(t, mt)
 				for k, v in _ENV_NORMAL.pairs(t) do
 					local v_type = _ENV_NORMAL.type(v)
 					-- modified table with this indexed
@@ -491,8 +501,13 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return mt
 			end
 
-			_ENV = removeTraceback(_ENV_NORMAL, _ENV)
+			_ENV = removeTraceback(_ENV_NORMAL, _ENV)]]
 
+			__ENV = _ENV_NORMAL.table.copy.deep(_ENV_NORMAL, _ENV_NORMAL)
+			__ENV.g_savedata = g_savedata
+			_ENV = __ENV
+
+			_ENV_NORMAL = nil
 		end
 		return (enabled and "Enabled" or "Disabled").." Tracebacks"
 	end
