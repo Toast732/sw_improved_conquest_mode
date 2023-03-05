@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.7)"
+ADDON_VERSION = "(0.4.0.8)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -336,7 +336,9 @@ g_savedata = {
 			default = false,
 			needs_setup_on_reload = true,
 			trace = {},
-			stack_size = 0
+			stack_size = 0,
+			funct_names = {},
+			funct_count = 0
 		}
 	},
 	tick_extensions = {
@@ -1299,7 +1301,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 		elseif command == "visionreset" then
 			d.print("resetting all squad vision data", false, 0, peer_id)
-			for squad_index, squad in pairs(g_savedata.squadrons) do
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
 				squad.target_players = {}
 				squad.target_vehicles = {}
 			end
@@ -1911,8 +1913,15 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "causeerror" then
 			cause_error = true
 		elseif command == "printtraceback" then
+			-- swap to normal env to avoid a self reference loop
+			local __ENV = _ENV_NORMAL
+			__ENV._ENV_MODIFIED = _ENV
+			_ENV = __ENV
 
 			d.trace.print()
+
+			-- swap back to modified environment
+			_ENV = _ENV_MODIFIED
 		elseif command == "execute" then
 			local location_string = arg[1]
 			local value = arg[2]

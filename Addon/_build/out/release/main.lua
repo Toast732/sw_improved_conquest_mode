@@ -337,7 +337,9 @@ g_savedata = {
 			default = false,
 			needs_setup_on_reload = true,
 			trace = {},
-			stack_size = 0
+			stack_size = 0,
+			funct_names = {},
+			funct_count = 0
 		}
 	},
 	tick_extensions = {
@@ -2036,18 +2038,30 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 			_ENV_NORMAL = table.copy.deep(_ENV)
 
-			local trace_remove = _ENV_NORMAL.d.trace.remove
-			local trace_add = _ENV_NORMAL.d.trace.add
+			local g_tb = g_savedata.debug.traceback
 
 			local function removeAndReturn(...)
-				trace_remove()
+				g_tb.stack_size = g_tb.stack_size - 1
 				return ...
 			end
 			local function setupFunction(funct, name)
 				d.print(("setting up function %s()..."):format(name), true, 8)
+
+				g_tb.funct_count = g_tb.funct_count + 1
+				g_tb.funct_names[g_tb.funct_count] = name
+
+				local funct_index = g_tb.funct_count
 				return (function(...)
 
-					trace_add(name, ...)
+					--trace_add(name, ...)
+
+					g_tb.stack_size = g_tb.stack_size + 1
+					g_tb.trace[g_tb.stack_size] = {
+						funct_index
+					}
+					if ... ~= nil then
+						g_tb.trace[g_tb.stack_size][2] = {...}
+					end
 
 					return removeAndReturn(funct(...))
 				end)
@@ -2432,11 +2446,11 @@ Debugging.trace = {
 		local str = ""
 
 		if g_tb.stack_size > 0 then
-			str = ("Error in function: %s(%s)"):format(g_tb.trace[g_tb.stack_size][1], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
+			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.trace[g_tb.stack_size][1]], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
 		end
 
 		for trace = g_tb.stack_size - 1, 1, -1 do
-			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.trace[trace][1], d.buildArgs(g_tb.trace[trace][2]))
+			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.trace[trace][1]], d.buildArgs(g_tb.trace[trace][2]))
 		end
 
 		d.print(str, false, 8)
@@ -8511,7 +8525,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 		elseif command == "visionreset" then
 			d.print("resetting all squad vision data", false, 0, peer_id)
-			for squad_index, squad in pairs(g_savedata.squadrons) do
+			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				squad.target_players = {}
 				squad.target_vehicles = {}
 			end
@@ -9123,8 +9137,15 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "causeerror" then
 			cause_error = true
 		elseif command == "printtraceback" then
+			-- swap to normal env to avoid a self reference loop
+			local __ENV = _ENV_NORMAL
+			__ENV._ENV_MODIFIED = _ENV
+			_ENV = __ENV
 
 			d.trace.print()
+
+			-- swap back to modified environment
+			_ENV = _ENV_MODIFIED
 		elseif command == "execute" then
 			local location_string = arg[1]
 			local value = arg[2]

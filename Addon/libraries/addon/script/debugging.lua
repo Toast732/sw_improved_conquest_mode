@@ -387,18 +387,28 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 			_ENV_NORMAL = table.copy.deep(_ENV)
 
-			local trace_remove = _ENV_NORMAL.d.trace.remove
-			local trace_add = _ENV_NORMAL.d.trace.add
+			local g_tb = g_savedata.debug.traceback
 
 			local function removeAndReturn(...)
-				trace_remove()
+				g_tb.stack_size = g_tb.stack_size - 1
 				return ...
 			end
 			local function setupFunction(funct, name)
 				d.print(("setting up function %s()..."):format(name), true, 8)
+
+				g_tb.funct_count = g_tb.funct_count + 1
+				g_tb.funct_names[g_tb.funct_count] = name
+
+				local funct_index = g_tb.funct_count
 				return (function(...)
 
-					trace_add(name, ...)
+					g_tb.stack_size = g_tb.stack_size + 1
+					g_tb.trace[g_tb.stack_size] = {
+						funct_index
+					}
+					if ... ~= nil then
+						g_tb.trace[g_tb.stack_size][2] = {...}
+					end
 
 					return removeAndReturn(funct(...))
 				end)
@@ -783,27 +793,13 @@ Debugging.trace = {
 		local str = ""
 
 		if g_tb.stack_size > 0 then
-			str = ("Error in function: %s(%s)"):format(g_tb.trace[g_tb.stack_size][1], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
+			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.trace[g_tb.stack_size][1]], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
 		end
 
 		for trace = g_tb.stack_size - 1, 1, -1 do
-			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.trace[trace][1], d.buildArgs(g_tb.trace[trace][2]))
+			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.trace[trace][1]], d.buildArgs(g_tb.trace[trace][2]))
 		end
 
 		d.print(str, false, 8)
-	end,
-	add = function(name, ...)
-		local g_tb = g_savedata.debug.traceback
-		g_tb.stack_size = g_tb.stack_size + 1
-		g_tb.trace[g_tb.stack_size] = {
-			name
-		}
-		if ... ~= nil then
-			g_tb.trace[g_tb.stack_size][2] = {...}
-		end
-	end,
-	remove = function()
-		local g_tb = g_savedata.debug.traceback
-		g_tb.stack_size = g_tb.stack_size - 1
 	end
 }
