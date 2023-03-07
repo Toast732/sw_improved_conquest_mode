@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.7)"
+ADDON_VERSION = "(0.4.0.8)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -2053,8 +2053,6 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				local funct_index = g_tb.funct_count
 				return (function(...)
 
-					--trace_add(name, ...)
-
 					g_tb.stack_size = g_tb.stack_size + 1
 					g_tb.trace[g_tb.stack_size] = {
 						funct_index
@@ -2454,20 +2452,6 @@ Debugging.trace = {
 		end
 
 		d.print(str, false, 8)
-	end,
-	add = function(name, ...)
-		local g_tb = g_savedata.debug.traceback
-		g_tb.stack_size = g_tb.stack_size + 1
-		g_tb.trace[g_tb.stack_size] = {
-			name
-		}
-		if ... ~= nil then
-			g_tb.trace[g_tb.stack_size][2] = {...}
-		end
-	end,
-	remove = function()
-		local g_tb = g_savedata.debug.traceback
-		g_tb.stack_size = g_tb.stack_size - 1
 	end
 }
 
@@ -8525,7 +8509,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 		elseif command == "visionreset" then
 			d.print("resetting all squad vision data", false, 0, peer_id)
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
 				squad.target_players = {}
 				squad.target_vehicles = {}
 			end
