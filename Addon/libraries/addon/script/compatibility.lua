@@ -7,9 +7,9 @@
 ]]
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.island")
-require("libraries.setup")
+require("libraries.addon.script.debugging")
+require("libraries.icm.island")
+require("libraries.addon.script.setup")
 
 -- library name
 Compatibility = {}

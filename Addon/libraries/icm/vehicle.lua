@@ -1,15 +1,15 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.squad")
-require("libraries.string")
-require("libraries.island")
-require("libraries.spawningUtils")
-require("libraries.tags")
-require("libraries.players")
-require("libraries.matrix")
-require("libraries.spawnModifiers")
-require("libraries.cargo")
-require("libraries.objective")
+require("libraries.addon.script.debugging")
+require("libraries.icm.squad")
+require("libraries.utils.string")
+require("libraries.icm.island")
+require("libraries.addon.components.spawningUtils")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.players")
+require("libraries.addon.script.matrix")
+require("libraries.icm.spawnModifiers")
+require("libraries.icm.cargo")
+require("libraries.icm.objective")
 
 -- library name
 Vehicle = {}

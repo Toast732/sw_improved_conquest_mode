@@ -9,7 +9,7 @@
 ]]
 
 -- required libraries
-require("libraries.matrix")
+require("libraries.addon.script.matrix")
 
 -- library name
 Objective = {}

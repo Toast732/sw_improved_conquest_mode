@@ -1,6 +1,6 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.matrix")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.matrix")
 
 -- library name
 Players = {}

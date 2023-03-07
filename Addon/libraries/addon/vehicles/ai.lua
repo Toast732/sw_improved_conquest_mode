@@ -1,7 +1,7 @@
 -- This library is for controlling or getting things about the Enemy AI.
 
 -- required libraries
-require("libraries.debugging")
+require("libraries.addon.script.debugging")
 
 -- library name
 AI = {}

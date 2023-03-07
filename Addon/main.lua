@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.1)"
+ADDON_VERSION = "(0.3.2.1)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -292,26 +292,30 @@ g_savedata = {
 }
 
 -- libraries
-require("libraries.ai") -- functions relating to their AI
-require("libraries.cache") -- functions relating to the custom 
-require("libraries.cargo") -- functions relating to the Convoys and Cargo Vehicles
-require("libraries.compatibility") -- functions used for making the mod backwards compatible
-require("libraries.debugging") -- functions for debugging
-require("libraries.island") -- functions relating to islands
-require("libraries.map") -- functions for drawing on the map
-require("libraries.math") -- custom math functions
-require("libraries.matrix") -- custom matrix functions
-require("libraries.objective") -- functions for the main objectives.
-require("libraries.pathfinding") -- functions for pathfinding
-require("libraries.players") -- functions relating to Players
-require("libraries.setup") -- functions for script/world setup.
-require("libraries.spawningUtils") -- functions used by the spawn vehicle function
-require("libraries.spawnModifiers") -- functions relating to the Adaptive AI
-require("libraries.squad") -- functions for squads
-require("libraries.string") -- custom string functions
-require("libraries.tables") -- custom table functions
-require("libraries.tags") -- functions related to getting tags from components inside of mission and environment locations
-require("libraries.vehicle") -- functions related to vehicles, and parsing data on them
+require("libraries.addon.components.spawningUtils") -- functions used by the spawn vehicle function
+require("libraries.addon.components.tags") -- functions related to getting tags from components inside of mission and environment locations
+
+require("libraries.addon.script.cache") -- functions relating to the custom 
+require("libraries.addon.script.compatibility") -- functions used for making the mod backwards compatible
+require("libraries.addon.script.debugging") -- functions for debugging
+require("libraries.addon.script.map") -- functions for drawing on the map
+require("libraries.addon.script.matrix") -- custom matrix functions
+require("libraries.addon.script.pathfinding") -- functions for pathfinding
+require("libraries.addon.script.players") -- functions relating to Players
+require("libraries.addon.script.setup") -- functions for script/world setup.
+
+require("libraries.addon.vehicles.ai") -- functions relating to their AI
+
+require("libraries.icm.cargo") -- functions relating to the Convoys and Cargo Vehicles
+require("libraries.icm.island") -- functions relating to islands
+require("libraries.icm.objective") -- functions for the main objectives.
+require("libraries.icm.spawnModifiers") -- functions relating to the Adaptive AI
+require("libraries.icm.squad") -- functions for squads
+require("libraries.icm.vehicle") -- functions related to vehicles, and parsing data on them
+
+require("libraries.utils.math") -- custom math functions
+require("libraries.utils.string") -- custom string functions
+require("libraries.utils.tables") -- custom table functions
 
 --[[
 		Functions
