@@ -6,7 +6,7 @@ require("libraries.utils.tables")
 Cache = {}
 
 ---@param location g_savedata.cache[] where to reset the data, if left blank then resets all cache data
----@param boolean success returns true if successfully cleared the cache
+---@return boolean success returns true if successfully cleared the cache
 function Cache.reset(location) -- resets the cache
 	if not location then
 		g_savedata.cache = {}
@@ -69,7 +69,7 @@ end
 ---@param location g_savedata.cache[] where to check
 ---@return boolean exists if the data exists at the location
 function Cache.exists(location)
-	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and (type(g_savedata.cache[location]) ~= "table" or Tables.length(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
+	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and (type(g_savedata.cache[location]) ~= "table" or table.length(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
 		d.print("g_savedata.Cache."..location.." exists", true, 0)
 
 		return true

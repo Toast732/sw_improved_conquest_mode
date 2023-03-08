@@ -1,145 +1,149 @@
 -- required libraries
+require("libraries.addon.script.addonCommunication")
 require("libraries.addon.script.players")
 require("libraries.utils.tables")
 require("libraries.addon.script.map")
+
+require("libraries.utils.string")
+require("libraries.utils.tables")
 
 -- library name
 Debugging = {}
 
 -- shortened library name
-d = Debugging 
+d = Debugging
+
+--[[
+
+
+	Variables
+
+
+]]
+
+--[[
+
+
+	Classes
+
+
+]]
+
+--[[
+
+
+	Functions
+
+]]
 
 ---@param message string the message you want to print
----@param requires_debug boolean if it requires <debug_type> debug to be enabled
----@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler) 
----@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
-function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glorious debug function" - senty, 2022
-
-	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
-		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
+---@param requires_debug boolean? if it requires <debug_type> debug to be enabled
+---@param debug_id integer? the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler) 
+---@param peer_id integer? if you want to send it to a specific player, leave empty to send to all players
+function Debugging.print(message, requires_debug, debug_id, peer_id) -- "glorious debug function" - senty, 2022
+	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_id, peer_id) or requires_debug and debug_id == 2 and d.getDebug(0, peer_id) or debug_id == 1 and d.getDebug(0, peer_id) then
+		local suffix = debug_id == 1 and " Error:" or debug_id == 2 and " Profiler:" or debug_id == 7 and " Function:" or debug_id == 8 and " Traceback:" or " Debug:"
 		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", ADDON_VERSION)..suffix
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
 			if message then
-				debug.log("SW IMPWEP "..suffix.." | "..string.gsub(message, "\n", " \\n "))
+				debug.log(string.format("SW %s %s | %s", SHORT_ADDON_NAME, suffix, string.gsub(message, "\n", " \\n ")))
 			else
-				debug.log("SW IMPWEP "..suffix.." | (d.print) message is nil!")
+				debug.log(string.format("SW %s %s | (d.print) message is nil!", SHORT_ADDON_NAME, suffix))
 			end
 		end
 		
-		if type(message) == "table" then
-			d.printTable(message, requires_debug, debug_type, peer_id)
+		if type(message) == "table" then -- print the message as a table.
+			d.printTable(message, requires_debug, debug_id, peer_id)
 
-		elseif requires_debug then
-			if pl.isPlayer(peer_id) and peer_id then
-				if d.getDebug(debug_type, peer_id) then
-					s.announce(prefix, message, peer_id)
+		elseif requires_debug then -- if this message requires debug to be enabled
+			if pl.isPlayer(peer_id) and peer_id then -- if its being sent to a specific peer id
+				if d.getDebug(debug_id, peer_id) then -- if this peer has debug enabled
+					server.announce(prefix, message, peer_id) -- send it to them
 				end
 			else
-				for _, player in ipairs(s.getPlayers()) do
-					if d.getDebug(debug_type, player.id) or debug_type == 2 and d.getDebug(0, player.id) then
-						s.announce(prefix, message, player_id)
+				for _, peer in ipairs(server.getPlayers()) do -- if this is being sent to all players with the debug enabled
+					if d.getDebug(debug_id, peer.id) or debug_id == 2 and d.getDebug(0, peer.id) or debug_id == 1 and d.getDebug(0, peer.id) then -- if this player has debug enabled
+						server.announce(prefix, message, peer.id) -- send the message to them
 					end
 				end
 			end
 		else
-			s.announce(prefix, message, peer_id or -1)
+			server.announce(prefix, message, peer_id or -1)
+		end
+	end
+end
+
+function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
+	return debug_types[debug_id]
+end
+
+function Debugging.debugIDFromType(debug_type)
+
+	debug_type = string.friendly(debug_type)
+
+	for debug_id, d_type in pairs(debug_types) do
+		if debug_type == d_type then
+			return debug_id
 		end
 	end
 end
 
 --# prints all data which is in a table (use d.print instead of this)
----@param t table the table of which you want to print
+---@param T table the table of which you want to print
 ---@param requires_debug boolean if it requires <debug_type> debug to be enabled
----@param debug_type integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler)
+---@param debug_id integer the type of message, 0 = debug (debug.chat) | 1 = error (debug.chat) | 2 = profiler (debug.profiler)
 ---@param peer_id integer if you want to send it to a specific player, leave empty to send to all players
-function Debugging.printTable(t, requires_debug, debug_type, peer_id)
-	for k, v in pairs(t) do
-		if type(v) == "table" then
-			d.print("Table: "..tostring(k), requires_debug, debug_type, peer_id)
-			d.printTable(v, requires_debug, debug_type, peer_id)
-		else
-			d.print("k: "..tostring(k).." v: "..tostring(v), requires_debug, debug_type, peer_id)
-		end
-	end
+function Debugging.printTable(T, requires_debug, debug_id, peer_id)
+	d.print(string.fromTable(T), requires_debug, debug_id, peer_id)
 end
 
----@param debug_type integer the type of debug | 0 = debug | 1 = error | 2 = profiler | 3 = map
+---@param debug_id integer the type of debug | 0 = debug | 1 = error | 2 = profiler | 3 = map
 ---@param peer_id ?integer the peer_id of the player you want to check if they have it enabled, leave blank to check globally
 ---@return boolean enabled if the specified type of debug is enabled
-function Debugging.getDebug(debug_type, peer_id)
+function Debugging.getDebug(debug_id, peer_id)
 	if not peer_id or not pl.isPlayer(peer_id) then -- if any player has it enabled
-		if debug_type == -1 then -- any debug
-			if g_savedata.debug.chat or g_savedata.debug.profiler or g_savedata.debug.map then
+		if debug_id == -1 then -- any debug
+			for _, enabled in pairs(g_savedata.debug) do
+				if enabled then 
+					return true 
+				end
+			end
+			if g_savedata.debug.chat.enabled or g_savedata.debug.profiler.enabled or g_savedata.debug.map.enabled then
 				return true
 			end
-		elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
-			if g_savedata.debug.chat then
-				return true
-			end
-		elseif debug_type == 2 then -- profiler debug
-			if g_savedata.debug.profiler then
-				return true
-			end
-		elseif debug_type == 3 then -- map debug
-			if g_savedata.debug.map then
-				return true
-			end
-		elseif debug_type == 4 then -- graph node debug
-			if g_savedata.debug.graph_node then
-				return true
-			end
-		elseif debug_type == 5 then
-			if g_savedata.debug.driving then
-				return true
-			end
-		elseif debug_type == 6 then
-			if g_savedata.debug.vehicle then
-				return true
-			end
-		else
-			d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type!", true, 1)
+			return false
 		end
+
+		-- make sure this debug type is valid
+		if not debug_types[debug_id] then
+			d.print("(d.getDebug) debug_type "..tostring(debug_id).." is not a valid debug type!", true, 1)
+			return false
+		end
+
+		-- check a specific debug
+		return g_savedata.debug[debug_types[debug_id]].enabled
+
 	else -- if a specific player has it enabled
 		local steam_id = pl.getSteamID(peer_id)
 		if steam_id and g_savedata.player_data[steam_id] then -- makes sure the steam id and player data exists
-			if debug_type == -1 then -- any debug
+			if debug_id == -1 then -- any debug
 				if g_savedata.player_data[steam_id].debug.chat or g_savedata.player_data[steam_id].debug.profiler or g_savedata.player_data[steam_id].debug.map then
 					return true
 				end
-			elseif not debug_type or debug_type == 0 or debug_type == 1 then -- chat debug
+			elseif not debug_id or debug_id == 0 or debug_id == 1 then -- chat debug
 				if g_savedata.player_data[steam_id].debug.chat then
 					return true
 				end
-			elseif debug_type == 2 then -- profiler debug
-				if g_savedata.player_data[steam_id].debug.profiler then
-					return true
-				end
-			elseif debug_type == 3 then -- map debug
-				if g_savedata.player_data[steam_id].debug.map then
-					return true
-				end
-			elseif debug_type == 4 then -- graph node debug
-				if g_savedata.player_data[steam_id].debug.graph_node then
-					return true
-				end
-			elseif debug_type == 5 then
-				if g_savedata.player_data[steam_id].debug.driving then
-					return true
-				end
-			elseif debug_type == 6 then
-				if g_savedata.player_data[steam_id].debug.vehicle then
-					return true
-				end
 			else
-				d.print("(d.getDebug) debug_type "..tostring(debug_type).." is not a valid debug type! peer_id requested: "..tostring(peer_id), true, 1)
+				return g_savedata.player_data[steam_id].debug[d.debugTypeFromID(debug_id)]
 			end
 		end
 	end
 	return false
 end
 
-function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
+function Debugging.handleDebug(debug_type, enabled, peer_id)
 	if debug_type == "chat" then
 		return (enabled and "Enabled" or "Disabled").." Chat Debug"
 	elseif debug_type == "error" then
@@ -251,80 +255,372 @@ function Debugging.handleDebug(debug_type, enabled, peer_id, steam_id)
 			end
 		end
 		return (enabled and "Enabled" or "Disabled").." Vehicle Debug"
+	elseif debug_type == "function" then
+		if enabled then
+			-- enable function debug (function debug prints debug output whenever a function is called)
+
+			--- cause the game doesn't like it when you use ... for params, and thinks thats only 1 parametre being passed.
+			local function callFunction(funct, name, ...)
+
+				--[[
+					all functions within this function, other than the one we're wanting to call must be called appended with _ENV_NORMAL
+					as otherwise it will cause the function debug to be printed for that function, causing this function to call itself over and over again.
+				]]
+				
+				-- pack the arguments specified into a table
+				local args = _ENV_NORMAL.table.pack(...)
+				
+				-- if no arguments were specified, call the function with no arguments
+				if #args == 0 then
+					if name == "_ENV.tostring" then
+						return "nil"
+					elseif name == "_ENV.s.getCharacterData" or name == "_ENV.server.getCharacterData" then
+						return nil
+					end
+					local out = _ENV_NORMAL.table.pack(funct())
+					return _ENV_NORMAL.table.unpack(out)
+				elseif #args == 1 then -- if only one argument, call the function with only one argument.
+					local out = _ENV_NORMAL.table.pack(funct(...))
+					return _ENV_NORMAL.table.unpack(out)
+				end
+				--[[
+					if theres two or more arguments, then pack all but the first argument into a table, and then have that as the second param
+					this is to trick SW's number of params specified checker, as it thinks just ... is only 1 argument, even if it contains more than 1.
+				]]
+				local filler = {}
+				for i = 2, #args do
+					_ENV_NORMAL.table.insert(filler, args[i])
+				end
+				local out = _ENV_NORMAL.table.pack(funct(..., _ENV_NORMAL.table.unpack(filler)))
+				return _ENV_NORMAL.table.unpack(out)
+			end
+
+			local function modifyFunction(funct, name)
+				d.print(("setting up function %s()..."):format(name), true, 7)
+				return (function(...)
+
+					local returned = _ENV_NORMAL.table.pack(callFunction(funct, name, ...))
+
+					-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
+					__ENV =  _ENV_NORMAL
+					__ENV._ENV_MODIFIED = _ENV
+					_ENV = __ENV
+
+					-- pack args into a table
+					local args = table.pack(...)
+
+					-- build output string
+					local s = ""
+
+					-- add return values
+					for i = 1, #returned do
+						s = ("%s%s%s"):format(s, returned[i], i ~= #returned and ", " or "")
+					end
+
+					-- add the = if theres any returned values, and also add the function name along with ( proceeding it.
+					s = ("%s%s%s("):format(s, s ~= "" and " = " or "", name)
+
+					-- add the arguments to the function, add a ", " after the argument if thats not the last argument.
+					for i = 1, #args do
+						s = ("%s%s%s"):format(s, args[i], i ~= #args and ", " or "")
+					end
+
+					-- add ) to the end of the string.
+					s = ("%s%s"):format(s, ")")
+
+					-- print the string.
+					d.print(s, true, 7)
+
+					-- switch back to modified environment
+					_ENV = _ENV_MODIFIED
+
+					-- return the value to the function which called it.
+					return _ENV_NORMAL.table.unpack(returned)
+				end)
+			end
+		
+			local function setupFunctionsDebug(t, n)
+
+				-- if this table is empty, return nil.
+				if t == nil then
+					return nil
+				end
+
+				local T = {}
+				-- default name to _ENV
+				n = n or "_ENV"
+				for k, v in pairs(t) do
+					local type_v = type(v)
+					if type_v == "function" then
+						-- "inject" debug into the function
+						T[k] = modifyFunction(v, ("%s.%s"):format(n, k))
+					elseif type_v == "table" then
+						-- go through this table looking for functions
+						local name = ("%s.%s"):format(n, k)
+						T[k] = setupFunctionsDebug(v, name)
+					else
+						-- just save as a variable
+						T[k] = v
+					end
+				end
+
+				-- if we've just finished doing _ENV, then we've built all of _ENV
+				if n == "_ENV" then
+					-- add _ENV_NORMAL to this env before we set it, as otherwise _ENV_NORMAL will no longer exist.
+					T._ENV_NORMAL = _ENV_NORMAL
+					d.print("Completed setting up function debug!", true, 7)
+				end
+
+				return T
+			end
+
+			-- modify all functions in _ENV to have the debug "injected"
+			_ENV = setupFunctionsDebug(table.copy.deep(_ENV))
+		else
+			-- revert _ENV to be the non modified _ENV
+			_ENV = table.copy.deep(_ENV_NORMAL)
+		end
+		return (enabled and "Enabled" or "Disabled").." Function Debug"
+	elseif debug_type == "traceback" then
+		if enabled and not _ENV_NORMAL then
+			-- enable traceback debug (function debug prints debug output whenever a function is called)
+
+			_ENV_NORMAL = nil
+
+			_ENV_NORMAL = table.copy.deep(_ENV)
+
+			local g_tb = g_savedata.debug.traceback
+
+			local function removeAndReturn(...)
+				g_tb.stack_size = g_tb.stack_size - 1
+				return ...
+			end
+			local function setupFunction(funct, name)
+				d.print(("setting up function %s()..."):format(name), true, 8)
+
+				g_tb.funct_count = g_tb.funct_count + 1
+				g_tb.funct_names[g_tb.funct_count] = name
+
+				local funct_index = g_tb.funct_count
+				return (function(...)
+
+					g_tb.stack_size = g_tb.stack_size + 1
+					g_tb.stack[g_tb.stack_size] = {
+						funct_index
+					}
+					if ... ~= nil then
+						g_tb.stack[g_tb.stack_size][2] = {...}
+					end
+
+					return removeAndReturn(funct(...))
+				end)
+			end
+		
+			local function setupTraceback(t, n)
+
+				-- if this table is empty, return nil.
+				if t == nil then
+					return nil
+				end
+
+				local T = {}
+
+				--[[if n == "_ENV.g_savedata" then
+					T = g_savedata
+				end]]
+
+				-- default name to _ENV
+				n = n or "_ENV"
+				for k, v in pairs(t) do
+					if k ~= "_ENV_NORMAL" then
+						local type_v = type(v)
+						if type_v == "function" and k ~= "g_savedata" then
+							-- "inject" debug into the function
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupFunction(v, name)
+						elseif type_v == "table" then
+							-- go through this table looking for functions
+							local name = ("%s.%s"):format(n, k)
+							T[k] = setupTraceback(v, name)
+						else--if not n:match("^_ENV%.g_savedata") then
+							-- just save as a variable
+							T[k] = v
+						end
+					end
+				end
+
+				-- if we've just finished doing _ENV, then we've built all of _ENV
+				if n == "_ENV" then
+					-- add _ENV_NORMAL to this env before we set it, as otherwise _ENV_NORMAL will no longer exist.
+					T._ENV_NORMAL = _ENV_NORMAL
+
+					T.g_savedata = g_savedata
+					d.print("Completed setting up tracebacks!", true, 8)
+				end
+
+				return T
+			end
+
+			-- modify all functions in _ENV to have the debug "injected"
+			_ENV = setupTraceback(table.copy.deep(_ENV))
+
+			--onTick = setupTraceback(onTick, "onTick")
+
+			-- add the error checker
+			ac.executeOnReply(
+				SHORT_ADDON_NAME,
+				"DEBUG.TRACEBACK.ERROR_CHECKER",
+				0,
+				function(self)
+					-- if traceback debug has been disabled, then remove ourselves
+					if not g_savedata.debug.traceback.enabled then
+						self.count = 0
+
+					elseif g_savedata.debug.traceback.stack_size > 0 then
+						-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
+						__ENV =  _ENV_NORMAL
+						__ENV._ENV_MODIFIED = _ENV
+						_ENV = __ENV
+
+						d.trace.print()
+
+						_ENV = _ENV_MODIFIED
+
+						g_savedata.debug.traceback.stack_size = 0
+					end
+				end,
+				-1,
+				-1
+			)
+
+			ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
+		elseif not enabled and _ENV_NORMAL then
+			-- revert modified _ENV functions to be the non modified _ENV
+			--- @param t table the environment thats not been modified, will take all of the functions from this table and put it into the current _ENV
+			--- @param mt table the modified enviroment
+			--[[local function removeTraceback(t, mt)
+				for k, v in _ENV_NORMAL.pairs(t) do
+					local v_type = _ENV_NORMAL.type(v)
+					-- modified table with this indexed
+					if mt[k] then
+						if v_type == "table" then
+							removeTraceback(v, mt[k])
+						elseif v_type == "function" then
+							mt[k] = v
+						end
+					end
+				end
+				return mt
+			end
+
+			_ENV = removeTraceback(_ENV_NORMAL, _ENV)]]
+
+			__ENV = _ENV_NORMAL.table.copy.deep(_ENV_NORMAL, _ENV_NORMAL)
+			__ENV.g_savedata = g_savedata
+			_ENV = __ENV
+
+			_ENV_NORMAL = nil
+		end
+		return (enabled and "Enabled" or "Disabled").." Tracebacks"
 	end
 end
 
-function Debugging.setDebug(d_type, peer_id)
+function Debugging.setDebug(debug_id, peer_id, override_state)
 
 	if not peer_id then
 		d.print("(Debugging.setDebug) peer_id is nil!", true, 1)
 		return "peer_id was nil"
 	end
 
-	local steam_id = pl.getSteamID(peer_id)
+	local player_data
 
-	if not d_type then
-		d.print("(Debugging.setDebug) d_type is nil!", true, 1)
-		return "d_type was nil"
+	if peer_id ~= -1 then
+
+		local steam_id = pl.getSteamID(peer_id)
+
+		player_data = g_savedata.player_data[steam_id]
+
 	end
 
-	local debug_types = {
-		[-1] = "all",
-		[0] = "chat",
-		[1] = "error",
-		[2] = "profiler",
-		[3] = "map",
-		[4] = "graph_node",
-		[5] = "driving",
-		[6] = "vehicle"
-	}
+	if not debug_id then
+		d.print("(Debugging.setDebug) debug_id is nil!", true, 1)
+		return "debug_id was nil"
+	end
 
 	local ignore_all = { -- debug types to ignore from enabling and/or disabling with ?impwep debug all
 		[-1] = "all",
-		[4] = "enable"
+		[4] = "enable",
+		[7] = "enable"
 	}
 
+	if not debug_types[debug_id] then
+		return "Unknown debug type: "..tostring(debug_id)
+	end
+
+	if not player_data and peer_id ~= -1 then
+		return "invalid peer_id: "..tostring(peer_id)
+	end
+
+	if peer_id == -1 then
+		local function setGlobalDebug(debug_id)
+			-- set that this debug should or shouldn't be auto enabled whenever a player joins for that player
+			g_savedata.debug[debug_types[debug_id]].auto_enable = override_state
+
+			for _, peer in ipairs(s.getPlayers()) do
+				d.setDebug(debug_id, peer.id, override_state)
+			end
+		end
+
+		if debug_id == -1 then
+			for _debug_id, _ in pairs(debug_types) do
+				setGlobalDebug(_debug_id)
+			end
+
+		else
+			setGlobalDebug(debug_id)
+		end
+
+		return "Enabled "..debug_types[debug_id].." Globally."
+	end
 	
-	if debug_types[d_type] then
-		if d_type == -1 then
+	if debug_types[debug_id] then
+		if debug_id == -1 then
 			local none_true = true
 			for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
-				if g_savedata.player_data[steam_id].debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
+				if player_data.debug[debug_type_data] and (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") and override_state ~= true then
 					none_true = false
-					g_savedata.player_data[steam_id].debug[debug_type_data] = false
+					player_data.debug[debug_type_data] = false
 				end
 			end
 
-			if none_true then -- if none was enabled, then enable all
+			if none_true and override_state ~= false then -- if none was enabled, then enable all
 				for d_id, debug_type_data in pairs(debug_types) do -- enable all debug
 					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "enable") then
-						g_savedata.debug[debug_type_data] = none_true
-						g_savedata.player_data[steam_id].debug[debug_type_data] = none_true
-						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
+						g_savedata.debug[debug_type_data].enabled = none_true
+						player_data.debug[debug_type_data] = none_true
+						d.handleDebug(debug_type_data, none_true, peer_id)
 					end
 				end
 			else
 				d.checkDebug()
 				for d_id, debug_type_data in pairs(debug_types) do -- disable all debug
 					if (ignore_all[d_id] ~= "all" and ignore_all[d_id] ~= "disable") then
-						d.handleDebug(debug_type_data, none_true, peer_id, steam_id)
+						d.handleDebug(debug_type_data, none_true, peer_id)
 					end
 				end
 			end
 			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
-			g_savedata.player_data[steam_id].debug[debug_types[d_type]] = not g_savedata.player_data[steam_id].debug[debug_types[d_type]]
+			player_data.debug[debug_types[debug_id]] = override_state == nil and not player_data.debug[debug_types[debug_id]] or override_state
 
-			if g_savedata.player_data[steam_id].debug[debug_types[d_type]] then
-				g_savedata.debug[debug_types[d_type]] = true
+			if player_data.debug[debug_types[debug_id]] then
+				g_savedata.debug[debug_types[debug_id]].enabled = true
 			else
 				d.checkDebug()
 			end
 
-			return d.handleDebug(debug_types[d_type], g_savedata.player_data[steam_id].debug[debug_types[d_type]], peer_id, steam_id)
+			return d.handleDebug(debug_types[debug_id], player_data.debug[debug_types[debug_id]], peer_id)
 		end
-	else
-		return "Unknown debug type: "..tostring(d_type)
 	end
 end
 
@@ -333,7 +629,7 @@ function Debugging.checkDebug() -- checks all debugging types to see if anybody 
 
 	-- check all debug types for all players to see if they have it enabled or disabled
 	local player_list = s.getPlayers()
-	for peer_index, peer in pairs(player_list) do
+	for _, peer in pairs(player_list) do
 		local steam_id = pl.getSteamID(peer.id)
 		for debug_type, debug_type_enabled in pairs(g_savedata.player_data[steam_id].debug) do
 			-- if nobody's known to have it enabled
@@ -379,7 +675,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 	if not requires_debug or requires_debug and g_savedata.debug.profiler then
 		if unique_name then
 			if g_savedata.profiler.working[unique_name] then
-				Tables.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
+				table.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][g_savedata.tick_counter] = s.getTimeMillisec()-g_savedata.profiler.working[unique_name]
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-60)] = nil
 				g_savedata.profiler.working[unique_name] = nil
@@ -478,3 +774,42 @@ function Debugging.cleanProfilers() -- resets all profiler data in g_savedata
 		d.print("cleaned all profiler data", true, 2)
 	end
 end
+
+function Debugging.buildArgs(args)
+	local s = ""
+	if args then
+		local arg_len = table.length(args)
+		for i = 1, arg_len do
+			local arg = args[i]
+			-- tempoarily disabled due to how long it makes the outputs.
+			--[[if type(arg) == "table" then
+				arg = string.gsub(string.fromTable(arg), "\n", " ")
+			end]]
+			s = ("%s%s%s"):format(s, arg, i ~= arg_len and ", " or "")
+		end
+	end
+	return s
+end
+
+function Debugging.buildReturn(args)
+	return d.buildArgs(args)
+end
+
+Debugging.trace = {
+
+	print = function()
+		local g_tb = _ENV_MODIFIED.g_savedata.debug.traceback
+
+		local str = ""
+
+		if g_tb.stack_size > 0 then
+			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.stack[g_tb.stack_size][1]], d.buildArgs(g_tb.stack[g_tb.stack_size][2]))
+		end
+
+		for stack_index = g_tb.stack_size - 1, 1, -1 do
+			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.stack[stack_index][1]], d.buildArgs(g_tb.stack[stack_index][2]))
+		end
+
+		d.print(str, false, 8)
+	end
+}

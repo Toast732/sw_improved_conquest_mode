@@ -101,7 +101,7 @@ function Setup.sortSpawnZones(spawn_zones)
 				goto sup_sortSpawnZones_continueZone
 			end
 
-			Tables.tabulate(tile_zones, tile_name, zone_type)
+			table.tabulate(tile_zones, tile_name, zone_type)
 
 			table.insert(tile_zones[tile_name][zone_type], zone)
 
