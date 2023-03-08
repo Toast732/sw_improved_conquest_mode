@@ -453,8 +453,8 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		if Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "attack" or Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
 			target, ally = Objective.getIslandToAttack()
 			if not target then
-				sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
-				sm.train(PUNISH, attack, 5)
+				sm.train(PUNISH, "attack", 5) -- we can no longer spawn attack vehicles
+				sm.train(PUNISH, "attack", 5)
 				v.spawn(nil, nil, nil, nil, purchase_type)
 				return false, "no islands to attack! cancelling spawning of attack vehicle"
 			end
