@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.2.3)"
+ADDON_VERSION = "(0.3.2.4)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -2300,12 +2300,23 @@ function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 
 	if pl.isPlayer(peer_id) then
 		d.print("Player Spawned Vehicle "..vehicle_id, true, 0)
+
+		-- get the mass of it
+		local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+		local mass = nil
+
+		if is_success then
+			mass = vehicle_data.mass
+		end
+
 		-- player spawned vehicle
 		g_savedata.player_vehicles[vehicle_id] = {
 			current_damage = 0, 
 			damage_threshold = 100, 
 			death_pos = nil, 
-			ui_id = s.getMapID()
+			ui_id = s.getMapID(),
+			mass = mass
 		}
 	end
 end
@@ -2314,6 +2325,19 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	if is_dlc_weapons then
 		if g_savedata.player_vehicles[vehicle_id] ~= nil then
 			g_savedata.player_vehicles[vehicle_id] = nil
+
+			-- make sure to clear this vehicle from all AI
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.target_vehicles and squad.target_vehicles[vehicle_id] then
+					squad.target_vehicles[vehicle_id] = nil
+
+					for _, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.target_vehicle_id then
+							vehicle_object.target_vehicle_id = nil
+						end
+					end
+				end
+			end
 		end
 	end
 
@@ -2416,35 +2440,39 @@ function onVehicleUnload(vehicle_id)
 	end
 end
 
-function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
+function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
 	
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-		if vehicle_object.capabilities.target_mass then
-			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+
+		local target_vehicle_id = vehicle_object.target_vehicle_id
+
+		if g_savedata.player_vehicles[target_vehicle_id] and not g_savedata.player_vehicles[target_vehicle_id].mass then
+			local vehicle_data, is_success = s.getVehicleData(target_vehicle_id)
+
 			if is_success then
-				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
+				g_savedata.player_vehicles[target_vehicle_id].mass = vehicle_data.mass
 			end
 		end
+
+		if g_savedata.player_vehicles[target_vehicle_id].mass then -- target vehicle's mass
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", g_savedata.player_vehicles[target_vehicle_id].mass)
+		end
+
 	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50) -- player's mass
+
 	else
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0) -- no target
 	end
-	if target then
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", target.last_known_pos[13])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", target.last_known_pos[14])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", target.last_known_pos[15])
-		if vehicle_object.capabilities.gps_missile then
-			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
-		end
+	if target then -- set the target's position on keypads
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_X", target.last_known_pos[13])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Y", target.last_known_pos[14])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Z", target.last_known_pos[15])
 	end
 end
 
@@ -3467,7 +3495,7 @@ function tickSquadrons()
 							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
 	
-								for island_index, island in pairs(g_savedata.islands) do
+								for _, island in pairs(g_savedata.islands) do
 									if island.assigned_squad_index == squad_index then
 										island.assigned_squad_index = -1
 									end
@@ -3485,25 +3513,41 @@ function tickSquadrons()
 							v.kill(vehicle_id)
 						end
 					end
-					-- check if the vehicle simply needs to a ammo belt, barrel or box
-					local gun_info = isVehicleNeedsReload(vehicle_id)
-					if gun_info[1] and gun_info[2] ~= 0 then
-						local i = 1
-						local successed = false
-						local ammo_data = {}
-						repeat
-							local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..i)
-							if success then
-								if ammo.ammo > 0 then
-									successed = success
-									ammo_data[i] = ammo
+					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
+					local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+					if is_success and vehicle_data.components and vehicle_data.components.guns then
+						for gun_index = 1, #vehicle_data.components.guns do
+							local gun_data = vehicle_data.components.guns[gun_index]
+
+							-- if this is a gun that might need reloading
+							if gun_data.ammo == 0 and (gun_data.name:match("^Ammo %d+$") or (gun_data.name:match("^Gunner %d+$"))) then
+
+								-- the target weapons we can reload from
+								local ammo_group = tonumber(table.pack(gun_data.name:gsub("[%a ]+", ""))[1])
+								local target_pattern = ("Reserve Ammo %i"):format(ammo_group)
+								for reserve_ammo_index = 1, #vehicle_data.components.guns do
+									local reserve_ammo_data = vehicle_data.components.guns[reserve_ammo_index]
+
+									-- we can reload from this weapon
+									if gun_index ~= reserve_ammo_index and reserve_ammo_data.ammo ~= 0 and reserve_ammo_data.name:match(target_pattern) then
+										-- move as much ammo as we can from the reserve ammo to the gun.
+										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
+
+										-- take that away from the reserve ammo container
+										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										
+										-- move that into the gun
+										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+
+										-- if the gun is not at capcity, continue on
+										-- otherwise, break.
+										if gun_data.ammo + ammo_to_move == gun_data.capacity then
+											break
+										end
+									end
 								end
 							end
-							i = i + 1
-						until (not successed)
-						if successed then
-							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
-							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
 					end
 				end
@@ -4228,13 +4272,6 @@ function tickSquadrons()
 					setSquadCommand(squad, SQUAD.COMMAND.NONE)
 				end
 			end
-			if squad.command ~= SQUAD.COMMAND.RETREAT then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
-						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
-					end
-				end
-			end
 		end
 		::break_squadron::
 	end
@@ -4365,6 +4402,18 @@ function tickVision()
 			end
 		end
 	end
+
+	-- update all of the keypads on the AI vehicles which are loaded
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if vehicle_object.state.is_simulating then
+				if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+					setVehicleKeypads(vehicle_id, vehicle_object, squad)
+				end
+			end
+		end
+	end
+
 	d.stopProfiler("tickVision()", true, "onTick()")
 end
 

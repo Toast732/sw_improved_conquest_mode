@@ -104,8 +104,8 @@ end
 function Debugging.getDebug(debug_id, peer_id)
 	if not peer_id or not pl.isPlayer(peer_id) then -- if any player has it enabled
 		if debug_id == -1 then -- any debug
-			for _, enabled in pairs(g_savedata.debug) do
-				if enabled then 
+			for _, debug_data in pairs(g_savedata.debug) do
+				if debug_data.enabled then 
 					return true 
 				end
 			end
@@ -645,7 +645,7 @@ function Debugging.checkDebug() -- checks all debugging types to see if anybody 
 		-- if its not enabled for anybody
 		if not should_keep_enabled then
 			-- disable the debug globally
-			g_savedata.debug[debug_type] = should_keep_enabled
+			g_savedata.debug[debug_type].enabled = should_keep_enabled
 		end
 	end
 end
@@ -655,7 +655,7 @@ function Debugging.startProfiler(unique_name, requires_debug)
 	-- if it doesnt require debug or
 	-- if it requires debug and debug for the profiler is enabled or
 	-- if this is a development version
-	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+	if not requires_debug or requires_debug and g_savedata.debug.profiler.enabled then
 		if unique_name then
 			if not g_savedata.profiler.working[unique_name] then
 				g_savedata.profiler.working[unique_name] = s.getTimeMillisec()
@@ -672,7 +672,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 	-- if it doesnt require debug or
 	-- if it requires debug and debug for the profiler is enabled or
 	-- if this is a development version
-	if not requires_debug or requires_debug and g_savedata.debug.profiler then
+	if not requires_debug or requires_debug and g_savedata.debug.profiler.enabled then
 		if unique_name then
 			if g_savedata.profiler.working[unique_name] then
 				table.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
@@ -689,7 +689,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 end
 
 function Debugging.showProfilers(requires_debug)
-	if g_savedata.debug.profiler then
+	if g_savedata.debug.profiler.enabled then
 		if g_savedata.profiler.total then
 			if not g_savedata.profiler.ui_id then
 				g_savedata.profiler.ui_id = s.getMapID()

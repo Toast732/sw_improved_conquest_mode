@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Minor_Updates" folder_path="data/missions/Improved_Conquest_Mode_Minor_Updates" file_store="4" name="Improved Conquest Mode (0.3.2.dev)">
+<playlist folder_path="data/missions/Improved_Conquest_Mode_Minor_Updates" file_store="4" name="Improved Conquest Mode (0.3.2.dev)">
 	<locations location_id_counter="201" component_id_counter="4332">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
@@ -6571,7 +6571,7 @@
 			<l id="21" name="BOAT - Corvette" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,GPS_TARGET_POSITION,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
-						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
+						<spawn_transform 30="2.197484" 31="6.169627" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
 							<max x="4.125" y="10.625" z="28.125"/>
@@ -6617,7 +6617,7 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.395137" 31="-7.292362" 32="-15.969546"/>
+						<vehicle_parent_transform 30="-0.395137" 31="-4.789134" 32="-15.969546"/>
 						<graph_links/>
 					</c>
 					<c component_type="2" id="2238" name="id_2238" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
@@ -7863,12 +7863,12 @@
 			<l id="30" name="TURRET - Swatter" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="603" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM,size=small,visibility_range=3000,spawning_radius=5,radar,health=425,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
-						<spawn_transform 30="-0.183271" 31="0.143647" 32="-0.183271"/>
+						<spawn_transform 30="-0.183271" 31="1.163527" 32="-0.183271"/>
 						<spawn_bounds>
-							<min x="-4.375" y="-4.125" z="-5.625"/>
-							<max x="2.375" y="2.125" z="-0.125"/>
+							<min x="-4.375" y="-2.125" z="-5.625"/>
+							<max x="2.375" y="2.125" z="0.125"/>
 						</spawn_bounds>
-						<spawn_local_offset x="1" y="1" z="2.875"/>
+						<spawn_local_offset x="1" z="2.75"/>
 						<graph_links/>
 					</c>
 					<c component_type="2" id="604" name="id_604" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
@@ -7880,12 +7880,12 @@
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2237" vehicle_parent_id="603" name="id_2237" zone_radius="7.4" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
-						<spawn_transform 30="-0.425636" 31="2.144163" 32="-1.114572"/>
+						<spawn_transform 30="-0.425636" 31="1.907621" 32="-1.114572"/>
 						<spawn_bounds>
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.242365" 31="2.000516" 32="-0.931301"/>
+						<vehicle_parent_transform 30="-0.242365" 31="0.744094" 32="-0.931301"/>
 						<graph_links/>
 					</c>
 				</components>
@@ -33541,10 +33541,10 @@
 					<c component_type="3" id="2886" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=3000,spawning_radius=5,health=1400,GPS_TARGET_POSITION,TARGET_MASS,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2886.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="0.046147" 31="2.422456" 32="-0.005714"/>
 						<spawn_bounds>
-							<min x="-1.875" y="-1.125" z="-5.875"/>
-							<max x="1.875" y="5.375" z="-2.625"/>
+							<min x="-2.125" y="-1.125" z="-5.875"/>
+							<max x="2.125" y="5.875" z="-2.125"/>
 						</spawn_bounds>
-						<spawn_local_offset y="-2.125" z="4.25"/>
+						<spawn_local_offset y="-2.375" z="4"/>
 						<graph_links/>
 					</c>
 					<c component_type="2" id="2887" name="id_2887" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
