@@ -1,18 +1,26 @@
 -- required libraries
-require("libraries.debugging")
+require("libraries.addon.script.debugging")
 
 -- library name
-local Tags = {}
+Tags = {}
 
-function Tags.has(tags, tag)
+function Tags.has(tags, tag, decrement)
 	if type(tags) ~= "table" then
 		d.print("(Tags.has) was expecting a table, but got a "..type(tags).." instead! searching for tag: "..tag.." (this can be safely ignored)", true, 1)
 		return false
 	end
 
-	for k, v in pairs(tags) do
-		if v == tag then
-			return true
+	if not decrement then
+		for tag_index = 1, #tags do
+			if tags[tag_index] == tag then
+				return true
+			end
+		end
+	else
+		for tag_index = #tags, 1, -1 do
+			if tags[tag_index] == tag then
+				return true
+			end 
 		end
 	end
 

@@ -1,17 +1,17 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.players")
-require("libraries.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.players")
+require("libraries.addon.components.tags")
 
 -- library name
-local Island = {}
+Island = {}
 
 -- shortened library name
-local is = Island
+is = Island
 
 -- checks if this island can spawn the specified vehicle
 ---@param island ISLAND the island you want to check if AI can spawn there
----@param selected_prefab selected_prefab[] the selected_prefab you want to check with the island
+---@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
 ---@return boolean can_spawn if the AI can spawn there
 function Island.canSpawn(island, selected_prefab)
 
@@ -44,7 +44,7 @@ function Island.canSpawn(island, selected_prefab)
 				end
 
 				-- check if this island already has all of the turret spawns filled
-				if turret_count >= #island.zones.turrets then
+				if total_spawned >= #island.zones.turrets then
 					return false
 				end
 			end
@@ -61,10 +61,8 @@ function Island.canSpawn(island, selected_prefab)
 		end
 	end
 
-	local player_list = s.getPlayers()
-
 	-- theres no players within 2500m (cannot see the spawn point)
-	if not pl.noneNearby(player_list, island.transform, 2500, true) then
+	if not pl.noneNearby(s.getPlayers(), island.transform, 2500, true) then
 		return false
 	end
 
@@ -73,7 +71,7 @@ end
 
 --# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
 ---@param vehicle_id integer the vehicle_id of the island's flag vehicle
----@return ISLAND island the island the flag vehicle belongs to
+---@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
 ---@return boolean got_island if the island was gotten
 function Island.getDataFromVehicleID(vehicle_id)
 	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
@@ -81,7 +79,7 @@ function Island.getDataFromVehicleID(vehicle_id)
 	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
 		return g_savedata.player_base_island, true
 	else
-		for island_index, island in pairs(g_savedata.islands) do
+		for _, island in pairs(g_savedata.islands) do
 			if island.flag_vehicle.id == vehicle_id then
 				return island, true
 			end
@@ -119,7 +117,7 @@ end
 
 --# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
 ---@param island_name string the island name you want to get
----@return island[] island the island data from the name
+---@return ISLAND island the island data from the name
 ---@return boolean island_found returns true if the island was found
 function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
 	if island_name then

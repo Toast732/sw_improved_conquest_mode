@@ -23,6 +23,7 @@ invert_horizontal = property.getBool("Invert Horizontal Rotation")
 invert_vertical = property.getBool("Invert Vertical Rotation")
 smart_mode = property.getBool("Aim Mode")
 requires_occupied = property.getBool("Requires Is Occupied?")
+needs_can_fire = property.getBool("Require Can Fire Input?")
 
 -- number properties
 horizontal_type = property.getNumber("Horizontal Pivot Type")
@@ -57,7 +58,7 @@ yaw_modifier = 1
 pitch_modifier = 1
 
 function getAngle(tx, tz, px, pz)
-	return math.atan(px - tx, pz - tz)/tau
+	return math.atan(tx - px, tz - pz)/tau
 end
 
 function getDist(px, pz, tx, tz)
@@ -117,7 +118,7 @@ function onTick()
 	-- if we still have missiles to fire
 	if missiles_fired < total_missiles then
 
-		is_occupied = input.getBool(1)
+		is_occupied = input.getNumber(11) == 1
 
 		-- if the seat is occupied
 			-- if the seat is occupied
@@ -163,7 +164,7 @@ function onTick()
 						-- horizontal
 						if horizontal_type >= 2 then
 							-- velocity
-							yaw = noNaN(((yaw-horizontal_rot*horizontal_modifier)%1+1.5)%1-0.5)
+							yaw = noNaN(((yaw-horizontal_rot)%1+1.5)%1-0.5)
 						end
 	
 						pitch = noNaN(math.clamp(math.atan((target_y-pos_y)/distance)/tau, vertical_min, vertical_max)*pitch_modifier)
@@ -177,7 +178,7 @@ function onTick()
 						if horizontal_type <= 1 and math.abs(horizontal_rot*horizontal_modifier - yaw) <= yaw_threshold or horizontal_type >= 2 and math.abs(yaw) <= yaw_threshold then -- if its within yaw threshold
 							if vertical_type <= 1 and math.abs(vertical_rot*pitch_modifier - pitch) <= pitch_threshold or vertical_type >= 2 and math.abs(pitch) <= pitch_threshold then -- if its within pitch threshold
 								if last_fired_missile == 0 or tick_counter - last_fired_missile >= time_between_missiles * 60 then
-									if distance < max_distance then
+									if distance < max_distance and (not needs_can_fire or input.getBool(missiles_fired+1)) then
 										missiles_fired = missiles_fired + 1
 										output.setBool(missiles_fired, true)
 										last_fired_missile = tick_counter

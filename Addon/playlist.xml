@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist path_id="app_data/data/missions/Improved_Conquest_Mode_Majour_Updates" folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.3.0.dev)">
-	<locations location_id_counter="201" component_id_counter="4331">
+<playlist folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.4.0.dev)">
+	<locations location_id_counter="201" component_id_counter="4332">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -3823,7 +3823,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="11" id="422" name="land_path,precision=0,not_NSO" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="239.079498" 31="7.507212" 32="240.077438"/>
+						<spawn_transform 30="239.079498" 31="7.507212" 32="248.171921"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -3891,7 +3891,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="431" name="land_path,precision=0,not_NSO" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="131.703049" 31="15.743064" 32="235.017639"/>
+						<spawn_transform 30="131.703049" 31="7.287171" 32="247.054977"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -3901,7 +3901,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="432" name="land_path,precision=0,not_NSO" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="26.787014" 31="10.529825" 32="227.652359"/>
+						<spawn_transform 30="26.787014" 31="7.379014" 32="240.736908"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -3911,17 +3911,15 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="433" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-61.075043" 31="8.710292" 32="207.959183"/>
+						<spawn_transform 30="-61.075043" 31="8.710292" 32="217.247208"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
 						</spawn_bounds>
-						<graph_links>
-							<l value="432"/>
-						</graph_links>
+						<graph_links/>
 					</c>
 					<c component_type="11" id="434" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-113.56916" 31="8.539326" 32="187.123611"/>
+						<spawn_transform 30="-113.56916" 31="8.539326" 32="189.79129"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -3981,7 +3979,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="440" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="182.246262" 31="6.143897" 32="96.351402"/>
+						<spawn_transform 30="182.246262" 31="7.352783" 32="96.351402"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -3991,7 +3989,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="441" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="216.40303" 31="4.63075" 32="40.234394"/>
+						<spawn_transform 30="216.40303" 31="4.711591" 32="40.234394"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -4436,7 +4434,6 @@
 							<max x="10" y="10" z="10"/>
 						</spawn_bounds>
 						<graph_links>
-							<l value="440"/>
 							<l value="441"/>
 							<l value="3256"/>
 						</graph_links>
@@ -4809,6 +4806,17 @@
 						<graph_links>
 							<l value="3321"/>
 							<l value="3283"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="4332" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-15.214137" 31="7.483149" 32="233.398148"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="432"/>
+							<l value="433"/>
 						</graph_links>
 					</c>
 				</components>
@@ -6398,16 +6406,8 @@
 					</c>
 				</components>
 			</l>
-			<l id="18" name="LAND - BI-D1" env_mod_spawn_num="1">
+			<l id="18" name="LAND - Fox" env_mod_spawn_num="1">
 				<components>
-					<c component_type="2" id="71" name="id_71" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-6.651525" 31="0.8" 32="2.411588"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 					<c component_type="3" id="72" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=general,visibility_range=800,spawning_radius=12,speed=17,health=825,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_72.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.103493" 31="2.670889" 32="0.422675"/>
 						<spawn_bounds>
@@ -6426,25 +6426,9 @@
 						<vehicle_parent_transform 30="0.206992" 31="-2.328865" 32="-0.930834"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="595" name="id_595" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-5.328805" 31="0.8" 32="1.253732"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="596" name="id_596" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.787671" 31="0.8" 32="0.134651"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 				</components>
 			</l>
-			<l id="19" name="BOAT - BS-H1" env_mod_spawn_num="1">
+			<l id="19" name="BOAT - Patrol" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="67" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=defend,visibility_range=700,spawning_radius=12,speed=20,health=800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_67.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.050188" 31="3.57261" 32="-0.003728"/>
@@ -6455,30 +6439,6 @@
 						<spawn_local_offset z="-14.5"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="68" name="id_68" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.269837" 31="0.800001" 32="9.394883"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="69" name="id_69" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-8.101988" 31="0.800001" 32="5.437479"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="70" name="id_70" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-8.405334" 31="0.800001" 32="1.668161"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 					<c component_type="5" id="303" vehicle_parent_id="67" name="id_103" zone_radius="7.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="2.5">
 						<spawn_transform 30="0.122497" 31="2.55705" 32="-0.41039"/>
 						<spawn_bounds>
@@ -6486,38 +6446,6 @@
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
 						<vehicle_parent_transform 30="0.172685" 31="-1.01556" 32="-0.406662"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="605" name="id_605" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.851953" 31="0.8" 32="-7.136016"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="606" name="id_606" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.481606" 31="0.8" 32="-9.308393"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="607" name="id_607" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.922816" 31="0.8" 32="-7.158028"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="608" name="id_608" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.716148" 31="0.8" 32="-8.976152"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 				</components>
@@ -6533,22 +6461,6 @@
 						<spawn_local_offset y="-0.625" z="7.25"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="82" name="id_82" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-9.343191" 31="0.799999" 32="7.083397"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="83" name="id_83" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-9.198749" 31="0.8" 32="3.154014"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 					<c component_type="5" id="304" vehicle_parent_id="81" name="id_104" zone_radius="5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.3">
 						<spawn_transform 30="-1.662603" 31="7.521031" 32="-5.218024"/>
 						<spawn_bounds>
@@ -6560,47 +6472,15 @@
 					</c>
 				</components>
 			</l>
-			<l id="21" name="BOAT - Destroyer" env_mod_spawn_num="1">
+			<l id="21" name="BOAT - Corvette" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,GPS_MISSILE,GPS_TARGET_POSITION,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
+					<c component_type="3" id="84" name="type=dlc_weapons,vehicle_type=wep_boat,size=large,role=general,visibility_range=2300,spawning_radius=20,radar,speed=16,health=5800" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_84.xml" vehicle_file_store="4">
 						<spawn_transform 30="2.197484" 31="8.672855" 32="-3.847007"/>
 						<spawn_bounds>
 							<min x="-4.125" y="-7.875" z="-26.625"/>
 							<max x="4.125" y="10.625" z="28.125"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-1.375" z="-0.75"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="85" name="id_85" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-12.133891" 31="0.8" 32="2.050385"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="86" name="id_86" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-11.711578" 31="0.8" 32="-0.974912"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="87" name="id_87" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-11.880876" 31="0.8" 32="-3.950166"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="88" name="id_88" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-11.930058" 31="0.8" 32="-7.971265"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="305" vehicle_parent_id="84" name="id_105" zone_radius="10" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="2.5">
@@ -6610,14 +6490,6 @@
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
 						<vehicle_parent_transform 30="-0.395137" 31="-7.292362" 32="-15.969546"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2238" name="id_2238" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-12.292148" 31="0.800001" 32="3.840241"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 				</components>
@@ -6631,30 +6503,6 @@
 							<max x="6.625" y="4.125" z="2.875"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-1.375" z="6.125"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="95" name="id_95" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-15.705664" 31="0.8" 32="7.376842"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="96" name="id_96" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-14.594887" 31="0.8" 32="0.345328"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="97" name="id_97" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-14.497388" 31="0.8" 32="-3.256388"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="306" vehicle_parent_id="94" name="id_106" zone_radius="5.9" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
@@ -6677,22 +6525,6 @@
 							<max x="6.625" y="4.125" z="14.875"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-1.5" z="-6.125"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="99" name="id_99" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-6.513207" 31="0.8" 32="4.133333"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="100" name="id_100" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-6.352247" 31="0.8" 32="1.669989"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="307" vehicle_parent_id="98" name="id_107" zone_radius="5.6" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
@@ -7787,14 +7619,6 @@
 						<spawn_local_offset y="-1.375" z="0.75"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="598" name="id_598" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.687985" 31="0.8" 32="2.922008"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 					<c component_type="5" id="2755" vehicle_parent_id="597" name="id_2755" zone_radius="1.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
 						<spawn_transform 30="-0.150925" 31="1.748506" 32="2.650729"/>
 						<spawn_bounds>
@@ -7806,7 +7630,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="29" name="LAND - AI-C1" env_mod_spawn_num="1">
+			<l id="29" name="LAND - Wolf" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="599" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=1600,radar,spawning_radius=8,speed=9,health=1050,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_599.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.223219" 31="1.852892" 32="-0.199396"/>
@@ -7815,30 +7639,6 @@
 							<max x="1.875" y="2.375" z="1.375"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-0.75" z="3"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="600" name="id_600" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.664571" 31="0.8" 32="1.085275"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="601" name="id_601" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.548593" 31="0.8" 32="0.306825"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="602" name="id_602" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.163543" 31="0.8" 32="-0.566463"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2754" vehicle_parent_id="599" name="id_2754" zone_radius="7.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
@@ -7852,23 +7652,15 @@
 					</c>
 				</components>
 			</l>
-			<l id="30" name="TURRET - CD-E1" env_mod_spawn_num="1">
+			<l id="30" name="TURRET - Swatter" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="603" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM,size=small,visibility_range=3000,spawning_radius=5,radar,health=425,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
-						<spawn_transform 30="-0.183271" 31="0.143647" 32="-0.183271"/>
+						<spawn_transform 30="-0.183271" 31="0.865812" 32="-0.183271"/>
 						<spawn_bounds>
-							<min x="-4.375" y="-4.125" z="-5.625"/>
-							<max x="2.375" y="2.125" z="-0.125"/>
+							<min x="-4.375" y="-2.875" z="-5.625"/>
+							<max x="2.375" y="2.125" z="0.125"/>
 						</spawn_bounds>
-						<spawn_local_offset x="1" y="1" z="2.875"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="604" name="id_604" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.001373" 31="0.8" 32="0.90122"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
+						<spawn_local_offset x="1" y="0.375" z="2.75"/>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2237" vehicle_parent_id="603" name="id_2237" zone_radius="7.4" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
@@ -7877,7 +7669,7 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.242365" 31="2.000516" 32="-0.931301"/>
+						<vehicle_parent_transform 30="-0.242365" 31="1.278351" 32="-0.931301"/>
 						<graph_links/>
 					</c>
 				</components>
@@ -11617,30 +11409,6 @@
 							<max x="1.375" y="1.875" z="1.125"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-0.25" z="1.5"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="932" name="id_932" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-2.807883" 31="0.8" 32="2.144901"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="933" name="id_933" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.027652" 31="0.8" 32="1.381535"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="934" name="id_934" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.38141" 31="0.8" 32="0.623445"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2756" vehicle_parent_id="931" name="id_2756" zone_radius="4" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true">
@@ -21957,7 +21725,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="1969" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="88.284439" 31="28.705584" 32="409.576752"/>
+						<spawn_transform 30="85.312355" 31="28.705584" 32="407.426239"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -21967,7 +21735,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="1970" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="113.004097" 31="30.873922" 32="396.94577"/>
+						<spawn_transform 30="111.807976" 31="30.873922" 32="393.854156"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -21977,7 +21745,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="1971" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="147.517639" 31="32.096176" 32="380.192719"/>
+						<spawn_transform 30="147.517639" 31="32.096176" 32="376.710846"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -22017,7 +21785,7 @@
 						</graph_links>
 					</c>
 					<c component_type="11" id="1975" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="316.181458" 31="21.348124" 32="327.85556"/>
+						<spawn_transform 30="316.181458" 31="21.348124" 32="326.796387"/>
 						<spawn_bounds>
 							<min x="-10" y="-10" z="-10"/>
 							<max x="10" y="10" z="10"/>
@@ -33120,14 +32888,6 @@
 						<spawn_local_offset y="-2" z="-8.625"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="2839" name="id_2839" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-2.535081" 31="0.8" 32="6.44243"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 					<c component_type="5" id="2853" name="id_2853" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="0.5">
 						<spawn_transform 30="-3.167185" 31="2.802754" 32="2.574462"/>
 						<spawn_bounds>
@@ -33146,7 +32906,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="151" name="LAND - AT-C1CT" env_mod_spawn_num="1">
+			<l id="151" name="LAND - Mule" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2840" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=cargo,visibility_range=800,spawning_radius=10,speed=26,health=1750,cargo_per_type=2109.375" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2840.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.072611" 31="1.856387" 32="0.02461"/>
@@ -33155,22 +32915,6 @@
 							<max x="1.625" y="2.875" z="0.125"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-1" z="4.25"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2841" name="id_2841" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-2.939364" 31="0.8" 32="3.310845"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2842" name="id_2842" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.042803" 31="0.8" 32="2.723179"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2852" vehicle_parent_id="2840" name="id_2852" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.3">
@@ -33186,37 +32930,13 @@
 			</l>
 			<l id="152" name="BOAT - Griffon" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2843" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=general,visibility_range=1500,spawning_radius=25,radar,GPS_TARGET_POSITION,speed=10,health=3000,sonar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2843.xml" vehicle_file_store="4">
+					<c component_type="3" id="2843" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=general,visibility_range=1500,spawning_radius=25,radar,speed=10,health=3000,sonar" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2843.xml" vehicle_file_store="4">
 						<spawn_transform 30="-0.013405" 31="4.603729" 32="0.05137"/>
 						<spawn_bounds>
 							<min x="-3.625" y="-3.375" z="-15.375"/>
 							<max x="3.625" y="10.125" z="10.375"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-3.375" z="2.5"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2844" name="id_2844" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.407321" 31="0.8" 32="1.658084"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2845" name="id_2845" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.516114" 31="0.8" 32="0.831275"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2846" name="id_2846" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.407828" 31="0.8" 32="-0.637661"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2850" vehicle_parent_id="2843" name="id_2850" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="2">
@@ -33228,25 +32948,9 @@
 						<vehicle_parent_transform 30="0.111174" 31="-5.078757" 32="-2.667238"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="2855" name="id_2855" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.224298" 31="0.8" 32="-1.661771"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2856" name="id_2856" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.260929" 31="0.8" 32="-2.546723"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 				</components>
 			</l>
-			<l id="153" name="LAND - ET-C1" env_mod_spawn_num="1">
+			<l id="153" name="LAND - Rodent" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2847" name="type=dlc_weapons,vehicle_type=wep_land,size=small,role=attack,visibility_range=950,spawning_radius=6.25,speed=22,health=850" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2847.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.101365" 31="1.638125" 32="0.169985"/>
@@ -33255,22 +32959,6 @@
 							<max x="1.625" y="2.875" z="3.375"/>
 						</spawn_bounds>
 						<spawn_local_offset x="-0.125" y="-1.125" z="-0.125"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2848" name="id_2848" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.538821" 31="0.8" 32="1.37737"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2849" name="id_2849" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.856892" 31="0.8" 32="0.231427"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2851" vehicle_parent_id="2847" name="id_2851" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.5">
@@ -33470,81 +33158,17 @@
 						<vehicle_parent_transform 30="-0.08192" 31="0.121388" 32="-0.089302"/>
 						<graph_links/>
 					</c>
-					<c component_type="2" id="2863" name="id_2863" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.1027" 31="0.8" 32="1.835122"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2864" name="id_2864" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.110009" 31="0.8" 32="1.091768"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2865" name="id_2865" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.162575" 31="0.8" 32="0.324116"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2866" name="id_2866" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.187725" 31="0.8" 32="-0.407315"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2867" name="id_2867" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.150436" 31="0.8" 32="-1.082216"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2868" name="id_2868" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.194948" 31="0.8" 32="-1.71263"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2869" name="id_2869" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.140308" 31="0.8" 32="-2.353871"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
 				</components>
 			</l>
-			<l id="157" name="TURRET - HD-C1" env_mod_spawn_num="1">
+			<l id="157" name="TURRET - Guardian" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2886" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=3000,spawning_radius=5,health=1400,GPS_TARGET_POSITION,TARGET_MASS,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2886.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="2886" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=3000,spawning_radius=5,health=1400,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2886.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="0.046147" 31="2.422456" 32="-0.005714"/>
 						<spawn_bounds>
-							<min x="-1.875" y="-1.125" z="-5.875"/>
-							<max x="1.875" y="5.375" z="-2.625"/>
+							<min x="-2.125" y="-1.125" z="-5.875"/>
+							<max x="2.125" y="5.875" z="-2.125"/>
 						</spawn_bounds>
-						<spawn_local_offset y="-2.125" z="4.25"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2887" name="id_2887" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-0.266167" 31="0.8" 32="-2.896755"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
+						<spawn_local_offset y="-2.375" z="4"/>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2888" vehicle_parent_id="2886" name="id_2888" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.2">
@@ -33560,37 +33184,13 @@
 			</l>
 			<l id="158" name="LAND - Rook" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,GPS_TARGET_POSITION,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
+					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.034774" 31="2.382319" 32="0.087677"/>
 						<spawn_bounds>
 							<min x="-2.875" y="-0.625" z="-1.125"/>
 							<max x="2.875" y="4.625" z="11.875"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-2" z="-5.375"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2910" name="id_2910" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-3.926722" 31="0.8" 32="1.758123"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2911" name="id_2911" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.02931" 31="0.8" 32="0.894959"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2912" name="id_2912" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-4.08727" 31="0.8" 32="0.033758"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2913" vehicle_parent_id="2909" name="id_2913" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="0.8">
@@ -33604,23 +33204,15 @@
 					</c>
 				</components>
 			</l>
-			<l id="159" name="TURRET - CD-C1" env_mod_spawn_num="1">
+			<l id="159" name="TURRET - Spider" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="2914" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=2500,spawning_radius=10,health=1000,GPS_TARGET_POSITION,TARGET_MASS,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2914.xml" vehicle_file_store="4" vehicle_is_static="true">
+					<c component_type="3" id="2914" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM_small,size=small,visibility_range=2500,spawning_radius=10,health=1000,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2914.xml" vehicle_file_store="4" vehicle_is_static="true">
 						<spawn_transform 30="-0.240471" 31="1.381314" 32="-0.296938"/>
 						<spawn_bounds>
 							<min x="-3.875" y="-2.125" z="-6.125"/>
 							<max x="2.375" y="2.375" z="-0.375"/>
 						</spawn_bounds>
 						<spawn_local_offset x="0.75" y="-0.125" z="3.25"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2915" name="id_2915" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="3.734584" 31="0.8" 32="-0.219031"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2916" vehicle_parent_id="2914" name="id_2916" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="0.8">
@@ -33634,7 +33226,7 @@
 					</c>
 				</components>
 			</l>
-			<l id="160" name="BOAT - A988-1 Supply" env_mod_spawn_num="1">
+			<l id="160" name="BOAT - Supply" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2918" name="type=dlc_weapons,vehicle_type=wep_boat,size=medium,role=cargo,visibility_range=1750,spawning_radius=50.25,speed=6,health=5500,cargo_per_type=8437.5" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2918.xml" vehicle_file_store="4">
 						<spawn_transform 30="1.839838" 31="4.56963" 32="0.039105"/>
@@ -33643,14 +33235,6 @@
 							<max x="4.625" y="14.125" z="38.625"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-5.875" z="-13.5"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="2919" name="id_2919" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-9.703031" 31="0.8" 32="-2.76985"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="2920" vehicle_parent_id="2918" name="id_2920" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.5">
@@ -33666,29 +33250,13 @@
 			</l>
 			<l id="163" name="PLANE - Hornet" env_mod_spawn_num="1">
 				<components>
-					<c component_type="3" id="3169" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=attack,visibility_range=2250,spawning_radius=7,strategy=strafing,speed=157,health=1100,GPS_TARGET_POSITION" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_3169.xml" vehicle_file_store="4">
+					<c component_type="3" id="3169" name="type=dlc_weapons,vehicle_type=wep_plane,size=small,role=attack,visibility_range=2250,spawning_radius=7,strategy=strafing,speed=157,health=1100" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_3169.xml" vehicle_file_store="4">
 						<spawn_transform 30="0.02668" 31="2.883643" 32="0.025698"/>
 						<spawn_bounds>
 							<min x="-6.375" y="-0.875" z="-1.375"/>
 							<max x="6.375" y="3.875" z="17.125"/>
 						</spawn_bounds>
 						<spawn_local_offset y="-1.5" z="-7.875"/>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="3170" name="id_3170" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.429773" 31="0.8" 32="5.299248"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
-						<graph_links/>
-					</c>
-					<c component_type="2" id="3171" name="id_3171" dynamic_object_type="2" character_outfit_category="5" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="-7.210026" 31="0.8" 32="4.244887"/>
-						<spawn_bounds>
-							<min x="-0.11" y="-0.8" z="-0.11"/>
-							<max x="0.11" y="0.8" z="0.11"/>
-						</spawn_bounds>
 						<graph_links/>
 					</c>
 					<c component_type="5" id="3172" vehicle_parent_id="3169" name="id_3172" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1" is_fire_lit="false" is_explosion="true" explosion_magnitude="1.2">
@@ -33707,10 +33275,10 @@
 					<c component_type="3" name="LICENSE" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_0.xml" vehicle_file_store="4">
 						<spawn_transform 30="-22.512417" 31="4.375004" 32="-11.289178"/>
 						<spawn_bounds>
-							<min x="-3.625" y="-2.625" z="0.125"/>
-							<max x="0.125" y="6.125" z="3.875"/>
+							<min x="-4.125" y="-7.875" z="-26.625"/>
+							<max x="4.125" y="10.625" z="28.125"/>
 						</spawn_bounds>
-						<spawn_local_offset x="1.75" y="-1.75" z="-2"/>
+						<spawn_local_offset y="-1.375" z="-0.75"/>
 						<graph_links/>
 					</c>
 				</components>

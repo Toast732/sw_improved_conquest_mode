@@ -1,15 +1,82 @@
+--[[
+
+
+	Library Setup
+
+
+]]
+
 -- required libraries
-require("libraries.squad")
-require("libraries.debugging")
-require("libraries.matrix")
-require("libraries.math")
-require("libraries.pathfinding")
-require("libraries.tags")
-require("libraries.tables")
-require("libraries.vehicle")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.matrix")
+require("libraries.addon.script.pathfinding")
+
+require("libraries.icm.objective")
+require("libraries.icm.squad")
+require("libraries.icm.vehicle")
+
+require("libraries.utils.math")
+require("libraries.utils.tables")
 
 -- library name
-local Cargo = {}
+Cargo = {}
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+s = s or server
+
+---@type table<integer|SWTankFluidTypeEnum, string>
+i_fluid_types = {
+	[0] = "fresh water",
+	"diesel",
+	"jet_fuel",
+	"air",
+	"exhaust",
+	"oil",
+	"sea water",
+	"steam"
+}
+
+---@type table<string, integer|SWTankFluidTypeEnum>
+s_fluid_types = {
+	["fresh water"] = 0,
+	diesel = 1,
+	["jet_fuel"] = 2,
+	air = 3,
+	exhaust = 4,
+	oil = 5,
+	["sea water"] = 6,
+	steam = 7
+}
+
+--[[
+
+
+	Classes
+
+
+]]
+
+---@class ICMResupplyWeights
+---@field oil number the weight for oil
+---@field diesel number the weight for diesel
+---@field jet_fuel number the weight for jet fuel
+
+
+--[[
+
+
+	Functions         
+
+
+]]
 
 --- @param vehicle_id integer the vehicle's id you want to clean
 function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it exists
@@ -51,7 +118,7 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 					local squad_index, squad = Squad.getSquad(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id)
 
 					if squad_index then
-						killVehicle(squad_index, g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id, true, true)
+						v.kill(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id, true, true)
 					end
 				end
 			end
@@ -62,7 +129,7 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 	end
 
 	-- check if its a convoy vehicle
-	for cargo_vehicle_index, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
+	for _, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 		for convoy_index, convoy_vehicle_id in ipairs(cargo_vehicle.convoy) do
 			if vehicle_id == convoy_vehicle_id then
 				table.remove(cargo_vehicle.convoy, convoy_index)
@@ -94,7 +161,7 @@ function Cargo.refund(vehicle_id) -- refunds the cargo to the island which was s
 end
 
 ---@param cargo_vehicle vehicle_object the cargo vehicle you want to get escorts for
----@param island island[] the island to try to spawn escorts at
+---@param island ISLAND the island to try to spawn escorts at
 function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the cargo vehicle
 
 	local possible_escorts = {} -- vehicles which are valid escort options
@@ -108,7 +175,7 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 
 	local max_distance = 7500 -- the max distance the vehicle must be to use as an escort
 
-	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+	for _, squad in pairs(g_savedata.ai_army.squadrons) do
 		--? if their vehicle type is the same as we're requesting
 		if squad.vehicle_type == cargo_vehicle.vehicle_type then
 			--? check if they have a command which we can take from
@@ -119,9 +186,9 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 					break
 				end
 			end
-			
+
 			if valid_command then
-				for vehicle_index, vehicle_object in pairs(squad.vehicles) do
+				for _, vehicle_object in pairs(squad.vehicles) do
 					-- if the vehicle is within range
 					if m.xzDistance(cargo_vehicle.transform, vehicle_object.transform) <= max_distance then
 						table.insert(possible_escorts, vehicle_object)
@@ -144,7 +211,7 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 		end
 	elseif #possible_escorts > RULES.LOGISTICS.CONVOY.max_escorts then
 		for escort_index, escort in pairs(possible_escorts) do
-			possible_escorts[escort_index].escort_weight = Cargo.getEscortWeight(escort)
+			possible_escorts[escort_index].escort_weight = Cargo.getEscortWeight(cargo_vehicle, escort)
 		end
 
 		table.sort(possible_escorts, function(a, b)
@@ -160,22 +227,25 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 	g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[1 + math.floor(#possible_escorts/2)] = cargo_vehicle.id
 
 	for escort_index, escort in ipairs(possible_escorts) do
-		local squad_index, squad = Squad.getSquad(cargo_vehicle.id)
-		transferToSquadron(escort, squad_index, true)
-		p.resetPath(escort)
-		if cargo_vehicle.transform then
-			p.addPath(escort, cargo_vehicle.transform)
-		else
-			d.print("(Cargo.getEscorts) cargo_vehicle.transform is nil!", true, 0)
-		end
+		local squad_index, _ = Squad.getSquad(cargo_vehicle.id)
 
-		-- insert the escorts into the table for the convoy
-		if not math.isWhole(escort_index/2) then 
-			--* put this vehicle at the front as its index is odd
-			g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[1 + math.floor(#possible_escorts/2) + math.ceil(escort_index/2)] = escort.id
-		else
-			--* put this vehicle at the back as index is even
-			g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[(1 + math.floor(#possible_escorts/2)) - math.ceil(escort_index/2)] = escort.id
+		if squad_index then
+			transferToSquadron(escort, squad_index, true)
+			p.resetPath(escort)
+			if cargo_vehicle.transform then
+				p.addPath(escort, cargo_vehicle.transform)
+			else
+				d.print("(Cargo.getEscorts) cargo_vehicle.transform is nil!", true, 0)
+			end
+
+			-- insert the escorts into the table for the convoy
+			if not math.isWhole(escort_index/2) then 
+				--* put this vehicle at the front as its index is odd
+				g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[1 + math.floor(#possible_escorts/2) + math.ceil(escort_index/2)] = escort.id
+			else
+				--* put this vehicle at the back as index is even
+				g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[(1 + math.floor(#possible_escorts/2)) - math.ceil(escort_index/2)] = escort.id
+			end
 		end
 	end
 end
@@ -197,7 +267,7 @@ function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight
 	end
 
 	-- calculate weight based on difference of speed
-	speed_weight = cargo_vehicle.pseudo_speed - escort_vehicle.pseudo_speed
+	speed_weight = v.getSpeed(cargo_vehicle) - v.getSpeed(escort_vehicle)
 	
 	--? if the escort vehicle is slower, then make it affect the weight more
 	if speed_weight > 0 then
@@ -217,7 +287,7 @@ function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight
 end
 
 --- @param vehicle_id number the vehicle's id
---- @return table cargo the contents of the cargo vehicle's tanks
+--- @return table|nil cargo the contents of the cargo vehicle's tanks
 --- @return boolean got_tanks wether or not we were able to get the tanks
 function Cargo.getTank(vehicle_id)
 
@@ -266,11 +336,11 @@ function Cargo.getTank(vehicle_id)
 			local tank_data, got_data = s.getVehicleTank(vehicle_id, "RESOURCE_TYPE_"..tank_set.."_"..tank_index)
 
 			if got_data then
-				if tank_data.value <= 0 then
+				if tank_data.value > 0 then
 					cargo[tank_set + 1].amount = cargo[tank_set + 1].amount + tank_data.value
-					--d.print("(Cargo.getTank) Got Tank.", true, 0)
+					--[[d.print(("(Cargo.getTank) Got Tank. tank_set: %i tank_index: %i amount in tank: %s"):format(tank_set, tank_index, tank_data.value), true, 0)
 				else
-					--d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)
+					d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)]]
 				end
 			else
 				d.print("(Cargo.getTank) Error getting tank data for "..vehicle_id.." Tank set: "..tank_set.." Tank index: "..tank_index, true, 1)
@@ -285,26 +355,23 @@ end
 ---@param tank_name string the name of the tank to set
 ---@param fluid_type string fluid type to set the tank to
 ---@param amount number what to set the tank to
----@param set_tank boolean if true then set the tank, if false then just add the amount to the tank
+---@param set_tank boolean? if true then set the tank, if false then just add the amount to the tank
 ---@return boolean set_successful if the tank was set successfully
----@return boolean error_message an error message if it was not successfully set
----@return number excess amount of fluid that was excess
+---@return string error_message an error message if it was not successfully set
+---@return number? excess amount of fluid that was excess
 function Cargo.setTank(vehicle_id, tank_name, fluid_type, amount, set_tank)
 	local fluid_type = string.lower(fluid_type)
+	
+	local fluid_id = s_fluid_types[fluid_type]
 
-	-- get proper fluid type
-	if fluid_type == "oil" then fluid_type = 5 end
-	if fluid_type == "diesel" then fluid_type = 1 end
-	if fluid_type == "jet_fuel" then fluid_type = 2 end
-
-	-- make sure the fluid type is not a string
-	if type(fluid_type) ~= "number" then
+	-- make sure the fluid type is valid
+	if not fluid_id then
 		return false, "unknown fluid type "..tostring(fluid_type)
 	end
 
 	if set_tank then
 		-- set the tank
-		s.setVehicleTank(vehicle_id, tank_name, amount, fluid_type)
+		s.setVehicleTank(vehicle_id, tank_name, amount, fluid_id)
 		return true, "no error"
 	else
 		-- add the amount to the tank
@@ -316,14 +383,14 @@ function Cargo.setTank(vehicle_id, tank_name, fluid_type, amount, set_tank)
 		end
 
 		-- fluid type check
-		if tank_data.fluid_type ~= fluid_type and tank_data.value >= 1 and tank_data.fluid_type ~= 0 then
-			return false, "tank is not the same fluid type, and its not empty | tank's fluid type: "..tank_data.fluid_type.." requested_fluid_type: "..fluid_type.." | tank name: "..tank_name.." tank contents: "..tank_data.value.."L"
+		if tank_data.fluid_type ~= fluid_id and tank_data.value >= 1 and tank_data.fluid_type ~= 0 then
+			return false, "tank is not the same fluid type, and its not empty | tank's fluid type: "..tank_data.fluid_type.." requested_fluid_type: "..fluid_id.." | tank name: "..tank_name.." tank contents: "..tank_data.value.."L"
 		end
 
 		local excess = math.max((tank_data.value + amount) - tank_data.capacity, 0)
 		local amount_to_set = math.min(tank_data.value + amount, tank_data.capacity)
 
-		s.setVehicleTank(vehicle_id, tank_name, amount_to_set, fluid_type)
+		s.setVehicleTank(vehicle_id, tank_name, amount_to_set, fluid_id)
 
 		return true, "no error", excess
 	end
@@ -333,12 +400,7 @@ end
 ---@param keypad_name string the name of the keypad to set
 ---@param cargo_type string the type of cargo to set the keypad to
 function Cargo.setKeypad(vehicle_id, keypad_name, cargo_type)
-	-- get proper cargo type
-	if cargo_type == "oil" then cargo_type = 5 end
-	if cargo_type == "diesel" then cargo_type = 1 end
-	if cargo_type == "jet_fuel" then cargo_type = 2 end
-
-	s.setVehicleKeypad(vehicle_id, keypad_name, cargo_type)
+	s.setVehicleKeypad(vehicle_id, keypad_name, s_fluid_types[cargo_type])
 end
 
 ---@param recipient any the island or vehicle object thats getting the cargo
@@ -471,7 +533,12 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	elseif recipient.object_type == "vehicle" then
 		-- the recipient is a vehicle
 
-		local recipient, squad, squad_index = Squad.getVehicle(recipient.id)
+		local recipient, _, _ = Squad.getVehicle(recipient.id)
+
+		if not recipient then
+			d.print("(Cargo.transfer) failed to get vehicle_object, returned recipient is nil!")
+			return false, "error"
+		end
 
 		-- set the variables
 		for cargo_type, amount in pairs(cargo_to_transfer) do
@@ -512,7 +579,7 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	return false, "transfer incomplete"
 end
 
----@param island island[] the island you want to produce the cargo at
+---@param island ISLAND the island you want to produce the cargo at
 ---@param natural_production string the natural production of this island
 function Cargo.produce(island, natural_production)
 
@@ -533,8 +600,10 @@ function Cargo.produce(island, natural_production)
 
 	-- multiply the amount produced/consumed by the modifier
 	for usage_type, usage_data in pairs(cargo) do
-		for resource, amount in pairs(usage_data) do
-			cargo[usage_type][resource] = amount * g_savedata.settings.CARGO_GENERATION_MULTIPLIER
+		if type(usage_data) == "table" then
+			for resource, amount in pairs(usage_data) do
+				cargo[usage_type][resource] = amount * g_savedata.settings.CARGO_GENERATION_MULTIPLIER
+			end
 		end
 	end
 	
@@ -562,7 +631,7 @@ function Cargo.produce(island, natural_production)
 	end
 end
 
----@return island island[] the island thats best to resupply
+---@return island ISLAND the island thats best to resupply
 ---@return weight weight[] the weights of all of the cargo types for the resupply island
 function Cargo.getBestResupplyIsland()
 
@@ -608,16 +677,16 @@ function Cargo.getBestResupplyIsland()
 	return resupply_island, resupply_resource
 end
 
----@param resupply_weights weights[] the weights of all of the cargo types for the resupply island
----@return island[] island the resupplier island
----@return weights[] resupplier_weights the weights of all the cargo types for the resupplier island, sorted from most to least weight
+---@param resupply_weights ICMResupplyWeights the weights of all of the cargo types for the resupply island
+---@return ISLAND island the resupplier island
+---@return ICMResupplyWeights resupplier_weights the weights of all the cargo types for the resupplier island, sorted from most to least weight
 function Cargo.getBestResupplierIsland(resupply_weights)
 
 	local island_weights = {}
 
 	-- get all island resupplier weights (except for player main base)
 
-	for island_index, island in pairs(g_savedata.islands) do
+	for _, island in pairs(g_savedata.islands) do
 		table.insert(island_weights, {
 			island = island,
 			weight = Cargo.getResupplierWeight(island)
@@ -660,7 +729,7 @@ function Cargo.getBestResupplierIsland(resupply_weights)
 	return resupplier_island, resupplier_resource
 end
 
----@param island island[] the island you want to get the resupply weight of
+---@param island ISLAND the island you want to get the resupply weight of
 ---@return weight[] weights the weights of all of the cargo types for the resupply island
 function Cargo.getResupplyWeight(island) -- get the weight of the island (for resupplying the island)
 	-- weight by how much cargo the island has
@@ -671,7 +740,7 @@ function Cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	-- weight by how many vehicles the island has defending
 	local weight_modifier = 1 * math.max(5 - island.defenders, 1) -- defenders
 
-	local target_island, origin_island = getObjectiveIsland()
+	local target_island, origin_island = Objective.getIslandToAttack()
 	if origin_island.name == island.name then -- if this island the ai is using to attack from
 		weight_modifier = weight_modifier * 1.2 -- increase weight
 	end
@@ -687,8 +756,8 @@ function Cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	return weight
 end
 
----@param island island[] the island you want to get the resupplier weight of
----@return weight[] weights the weights of all of the cargo types for the resupplier island
+---@param island ISLAND|AI_ISLAND the island you want to get the resupplier weight of
+---@return ICMResupplyWeights weights the weights of all of the cargo types for the resupplier island
 function Cargo.getResupplierWeight(island) -- get weight of the island (for using it to resupply another island)
 	local oil_weight = (island.cargo.oil/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.9)) -- oil
 	local diesel_weight = (island.cargo.diesel/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.45)) -- diesel
@@ -725,7 +794,7 @@ end
 
 
 ---@param cargo_weight weight[] the weight for the cargo trip
----@param vehicle_object vehicle_object[] the vehicle data for the first cargo trip
+---@param vehicle_object vehicle_object the vehicle data for the first cargo trip
 ---@return requestedCargo requested_cargo the cargo type for each tank set, and the amount for each tank set
 function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 
@@ -800,15 +869,19 @@ function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 
 	-- make sure no cargo amounts are nil
 	for slot, cargo in pairs(cargo_config) do
-		requested_cargo[slot] = Cargo.newRequestedCargoItem(cargo.cargo_type, vehicle_object.cargo.capacity)
+
+		local cargo_capacity = vehicle_object.cargo.capacity
+		if type(cargo_capacity) ~= "string" then
+			requested_cargo[slot] = Cargo.newRequestedCargoItem(cargo.cargo_type, cargo_capacity)
+		end
 	end
 
 	-- return the requested cargo
 	return requested_cargo
 end
 
----@param origin_island island[] the island of which the cargo is coming from
----@param dest_island island[] the island of which the cargo is going to
+---@param origin_island ISLAND the island of which the cargo is coming from
+---@param dest_island ISLAND the island of which the cargo is going to
 ---@return route[] best_route the best route to go from the origin to the destination
 function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier island | dest = resupply island
 	local start_time = s.getTimeMillisec()
@@ -894,13 +967,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				local movement_speed = 0.1
 				local vehicle_type = string.gsub(Tags.getValue(vehicle_object.vehicle.tags, "vehicle_type", true), "wep_", "")
 				if vehicle_type == VEHICLE.TYPE.BOAT then
-					movement_speed = Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed") or VEHICLE.SPEED.BOAT
+					movement_speed = tonumber(Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed")) or VEHICLE.SPEED.BOAT
 				elseif vehicle_type == VEHICLE.TYPE.PLANE then
-					movement_speed = Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed") or VEHICLE.SPEED.PLANE
+					movement_speed = tonumber(Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed")) or VEHICLE.SPEED.PLANE
 				elseif vehicle_type == VEHICLE.TYPE.HELI then
-					movement_speed = Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed") or VEHICLE.SPEED.HELI
+					movement_speed = tonumber(Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed")) or VEHICLE.SPEED.HELI
 				elseif vehicle_type == VEHICLE.TYPE.LAND then
-					movement_speed = Tags.getValue(vehicle_object.vehicle.tags, "road_speed_normal") or Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed") or VEHICLE.SPEED.LAND
+					movement_speed = tonumber(Tags.getValue(vehicle_object.vehicle.tags, "road_speed_normal")) or tonumber(Tags.getValue(vehicle_object.vehicle.tags, "pseudo_speed")) or VEHICLE.SPEED.LAND
 				end
 
 				transport_vehicle[vehicle_index].movement_speed = movement_speed
@@ -946,8 +1019,8 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 			end
 
-			paths[island_index] = { 
-				island = island, 
+			paths[g_savedata.ai_base_island.index] = { 
+				island = g_savedata.ai_base_island, 
 				distance = distance
 			}
 
@@ -1292,20 +1365,20 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 end
 
 ---@param vehicle_type string the type of vehicle, such as air, boat or land
----@return vehicle_prefab vehicle_prefab[] the vehicle to spawn
+---@return PREFAB_DATA|nil vehicle_prefab the vehicle to spawn
 function Cargo.getTransportVehicle(vehicle_type)
-	local vehicle_prefab = sm.spawn(true, "cargo", vehicle_type)
-	if not vehicle_prefab then
-		d.print("(Cargo.getTransportVehicle) vehicle_prefab is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
-		vehicle_prefab = nil
+	local prefab_data = sm.spawn(true, "cargo", vehicle_type)
+	if not prefab_data then
+		d.print("(Cargo.getTransportVehicle) prefab_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
+		return
 	else
-		vehicle_prefab.name = vehicle_prefab.location.data.name
+		prefab_data.name = prefab_data.location_data.name
 	end
-	return vehicle_prefab
+	return prefab_data
 end
 
----@param island1 island[] the first island you want to get the distance from
----@param island2 island[] the second island you want to get the distance to
+---@param island1 ISLAND|AI_ISLAND|PLAYER_ISLAND the first island you want to get the distance from
+---@param island2 ISLAND|AI_ISLAND|PLAYER_ISLAND the second island you want to get the distance to
 ---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
 function Cargo.getIslandDistance(island1, island2)
 
@@ -1360,7 +1433,7 @@ function Cargo.getIslandDistance(island1, island2)
 			distance.sea = 0
 			local ocean1_transform = s.getOceanTransform(island1.transform, 0, 500)
 			local ocean2_transform = s.getOceanTransform(island2.transform, 0, 500)
-			if Tables.noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
+			if table.noneNil(true, "cargo_distance_sea", ocean1_transform, ocean2_transform) then
 				local paths = s.pathfind(ocean1_transform, ocean2_transform, "ocean_path", "tight_area")
 				for path_index, path in pairs(paths) do
 					if path_index ~= #paths then
@@ -1392,7 +1465,7 @@ function Cargo.getIslandDistance(island1, island2)
 				
 					distance.land = 0
 					local start_transform = island1.zones.land[math.random(1, #island1.zones.land)].transform
-					if Tables.noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
+					if table.noneNil(true, "cargo_distance_land", start_transform, island2.transform) then
 						local paths = s.pathfind(start_transform, island2.transform, "land_path", "")
 						for path_index, path in pairs(paths) do
 							if path_index ~= #paths then
@@ -1410,7 +1483,7 @@ function Cargo.getIslandDistance(island1, island2)
 	return distance
 end
 
----@param island ?island[] the island of which you want to reset the cargo of, leave blank for all islands
+---@param island ?ISLAND the island of which you want to reset the cargo of, leave blank for all islands
 ---@param cargo_type ?string the type of cargo you want to reset, leave blank for all types | "oil", "diesel" or "jet_fuel"
 ---@return boolean was_reset if it was reset
 ---@return string error if was_reset is false, it will return an error code, otherwise its "reset"

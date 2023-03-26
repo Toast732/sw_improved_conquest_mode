@@ -1,7 +1,54 @@
----@param x number the number to check if is whole
----@return boolean is_whole returns true if x is whole, false if not, nil if x is nil
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+-- (none)
+
+-- library name
+-- (not applicable)
+
+-- shortened library name
+-- (not applicable)
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+-- pre-calculated pi*2
+math.tau = math.pi*2
+-- pre-calculated pi*0.5
+math.half_pi = math.pi*0.5
+
+--[[
+
+
+	Classes
+
+
+]]
+
+--[[
+
+
+	Functions         
+
+
+]]
+
+
+--- @param x number the number to check if is whole
+--- @return boolean is_whole returns true if x is whole, false if not, nil if x is nil
 function math.isWhole(x) -- returns wether x is a whole number or not
-	return math.tointeger(x)
+	return math.type(x) == "integer"
 end
 
 --- if a number is nil, it sets it to 0
@@ -11,10 +58,10 @@ function math.noNil(x)
 	return x ~= x and 0 or x
 end
 
----@param x number the number to clamp
----@param min number the minimum value
----@param max number the maximum value
----@return number clamped_x the number clamped between the min and max
+--- @param x number the number to clamp
+--- @param min number the minimum value
+--- @param max number the maximum value
+--- @return number clamped_x the number clamped between the min and max
 function math.clamp(x, min, max)
 	return math.noNil(max<x and max or min>x and min or x)
 end
@@ -81,4 +128,31 @@ function math.randChance(t)
 		end
 	end
 	return win_name
+end
+
+---@param x1 number x coordinate of position 1
+---@param x2 number x coordinate of position 2
+---@param z1 number z coordinate of position 1
+---@param z2 number z coordinate of position 2
+---@param y1 number? y coordinate of position 1 (exclude for 2D distance, include for 3D distance)
+---@param y2 number? y coordinate of position 2 (exclude for 2D distance, include for 3D distance)
+---@return number distance the euclidean distance between position 1 and position 2
+function math.euclideanDistance(...)
+	local c = table.pack(...)
+
+	local rx = c[1] - c[2]
+	local rz = c[3] - c[4]
+
+	if cause_error then
+		rx = rx * nil
+		--d.trace.print()
+	end
+	if #c == 4 then
+		-- 2D distance
+		return math.sqrt(rx*rx+rz*rz)
+	else
+		-- 3D distance
+		local ry = c[5] - c[6]
+		return math.sqrt(rx*rx+ry*ry+rz*rz)
+	end
 end
