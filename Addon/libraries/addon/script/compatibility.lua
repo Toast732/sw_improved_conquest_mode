@@ -32,7 +32,8 @@ local version_updates = {
 	"(0.3.0.82)",
 	"(0.3.1.2)",
 	"(0.3.2.2)",
-	"(0.3.2.6)"
+	"(0.3.2.6)",
+	"(0.3.2.8)"
 }
 
 --[[
@@ -562,6 +563,12 @@ function Compatibility.update()
 		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
 
 		g_savedata.settings.PERFORMANCE_MODE = true
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.8)" then -- 0.3.2.8 changes
+
+		g_savedata.settings.CONVOY_FREQUENCY = 38 * time.minute
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
