@@ -80,10 +80,10 @@ end
 
 function Debugging.debugIDFromType(debug_type)
 
-	debug_type = string.friendly(debug_type)
+	debug_type = string.friendly(debug_type, true)
 
 	for debug_id, d_type in pairs(debug_types) do
-		if debug_type == d_type then
+		if debug_type == string.friendly(d_type, true) then
 			return debug_id
 		end
 	end
