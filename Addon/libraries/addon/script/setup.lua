@@ -7,9 +7,9 @@
 ]]
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.tables")
-require("libraries.tags")
+require("libraries.addon.script.debugging")
+require("libraries.utils.tables")
+require("libraries.addon.components.tags")
 
 -- library name
 Setup = {}
@@ -101,7 +101,7 @@ function Setup.sortSpawnZones(spawn_zones)
 				goto sup_sortSpawnZones_continueZone
 			end
 
-			Tables.tabulate(tile_zones, tile_name, zone_type)
+			table.tabulate(tile_zones, tile_name, zone_type)
 
 			table.insert(tile_zones[tile_name][zone_type], zone)
 

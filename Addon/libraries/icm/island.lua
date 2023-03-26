@@ -1,7 +1,7 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.players")
-require("libraries.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.script.players")
+require("libraries.addon.components.tags")
 
 -- library name
 Island = {}

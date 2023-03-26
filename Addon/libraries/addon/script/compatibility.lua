@@ -7,9 +7,9 @@
 ]]
 
 -- required libraries
-require("libraries.debugging")
-require("libraries.island")
-require("libraries.setup")
+require("libraries.addon.script.debugging")
+require("libraries.icm.island")
+require("libraries.addon.script.setup")
 
 -- library name
 Compatibility = {}
@@ -30,7 +30,11 @@ local version_updates = {
 	"(0.3.0.78)",
 	"(0.3.0.79)",
 	"(0.3.0.82)",
-	"(0.3.1.2)"
+	"(0.3.1.2)",
+	"(0.3.2.2)",
+	"(0.3.2.6)",
+	"(0.3.2.8)",
+	"(0.3.2.9)"
 }
 
 --[[
@@ -490,6 +494,88 @@ function Compatibility.update()
 			-- disable graph_node debug globally
 			g_savedata.debug.graph_node = false
 		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.2.2)" then -- 0.3.2.2 changes
+
+		local temp_g_savedata_debug = {
+			chat = {
+				enabled = g_savedata.debug.chat,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			error = {
+				enabled = g_savedata.debug.error,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			profiler = {
+				enabled = g_savedata.debug.profiler,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			map = {
+				enabled = g_savedata.debug.map,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			graph_node = {
+				enabled = g_savedata.debug.graph_node,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			driving = {
+				enabled = g_savedata.debug.driving,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			vehicle = {
+				enabled = g_savedata.debug.vehicle,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			["function"] = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true
+			},
+			traceback = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true,
+				stack = {},
+				stack_size = 0,
+				funct_names = {},
+				funct_count = 0
+			}
+		}
+
+		g_savedata.debug = temp_g_savedata_debug
+
+		for _, player in pairs(g_savedata.player_data) do
+			player.debug["function"] = false
+			player.debug.traceback = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.6)" then -- 0.3.2.6 changes
+
+		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
+
+		g_savedata.settings.PERFORMANCE_MODE = true
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.8)" then -- 0.3.2.8 changes
+
+		g_savedata.settings.CONVOY_FREQUENCY = 38 * time.minute
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.9)" then -- 0.3.2.9 changes
+
+		g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER = time.hour
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end

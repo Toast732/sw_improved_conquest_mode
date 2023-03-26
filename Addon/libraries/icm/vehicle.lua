@@ -1,15 +1,15 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.squad")
-require("libraries.string")
-require("libraries.island")
-require("libraries.spawningUtils")
-require("libraries.tags")
-require("libraries.players")
-require("libraries.matrix")
-require("libraries.spawnModifiers")
-require("libraries.cargo")
-require("libraries.objective")
+require("libraries.addon.script.debugging")
+require("libraries.icm.squad")
+require("libraries.utils.string")
+require("libraries.icm.island")
+require("libraries.addon.components.spawningUtils")
+require("libraries.addon.components.tags")
+require("libraries.addon.script.players")
+require("libraries.addon.script.matrix")
+require("libraries.icm.spawnModifiers")
+require("libraries.icm.cargo")
+require("libraries.icm.objective")
 
 -- library name
 Vehicle = {}
@@ -453,8 +453,8 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		if Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "attack" or Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
 			target, ally = Objective.getIslandToAttack()
 			if not target then
-				sm.train(PUNISH, attack, 5) -- we can no longer spawn attack vehicles
-				sm.train(PUNISH, attack, 5)
+				sm.train(PUNISH, "attack", 5) -- we can no longer spawn attack vehicles
+				sm.train(PUNISH, "attack", 5)
 				v.spawn(nil, nil, nil, nil, purchase_type)
 				return false, "no islands to attack! cancelling spawning of attack vehicle"
 			end

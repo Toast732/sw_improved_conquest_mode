@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.1)"
+ADDON_VERSION = "(0.3.2)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -63,7 +63,7 @@ VEHICLE = {
 				NORMAL = 0.9,
 				ROAD = 1,
 				BRIDGE = 0.7,
-				OFFROAD = 0.5
+				OFFROAD = 0.75
 			}
 		}
 	}
@@ -72,6 +72,19 @@ VEHICLE = {
 CONVOY = {
 	MOVING = "moving",
 	WAITING = "waiting"
+}
+
+debug_types = {
+	[-1] = "all",
+	[0] = "chat",
+	"error",
+	"profiler",
+	"map",
+	"graph_node",
+	"driving",
+	"vehicle",
+	"function",
+	"traceback"
 }
 
 time = { -- the time unit in ticks, irl time, not in game
@@ -273,13 +286,55 @@ g_savedata = {
 		ui_id = nil
 	},
 	debug = {
-		chat = false,
-		error = false,
-		profiler = false,
-		map = false,
-		graph_node = false,
-		driving = false,
-		vehicle = false
+		chat = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		error = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		profiler = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		map = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		graph_node = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		driving = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		vehicle = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = false
+		},
+		["function"] = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = true
+		},
+		traceback = {
+			enabled = false,
+			default = false,
+			needs_setup_on_reload = true,
+			stack = {},
+			stack_size = 0,
+			funct_names = {},
+			funct_count = 0
+		}
 	},
 	tick_extensions = {
 		cargo_vehicle_spawn = 0
@@ -292,26 +347,31 @@ g_savedata = {
 }
 
 -- libraries
-require("libraries.ai") -- functions relating to their AI
-require("libraries.cache") -- functions relating to the custom 
-require("libraries.cargo") -- functions relating to the Convoys and Cargo Vehicles
-require("libraries.compatibility") -- functions used for making the mod backwards compatible
-require("libraries.debugging") -- functions for debugging
-require("libraries.island") -- functions relating to islands
-require("libraries.map") -- functions for drawing on the map
-require("libraries.math") -- custom math functions
-require("libraries.matrix") -- custom matrix functions
-require("libraries.objective") -- functions for the main objectives.
-require("libraries.pathfinding") -- functions for pathfinding
-require("libraries.players") -- functions relating to Players
-require("libraries.setup") -- functions for script/world setup.
-require("libraries.spawningUtils") -- functions used by the spawn vehicle function
-require("libraries.spawnModifiers") -- functions relating to the Adaptive AI
-require("libraries.squad") -- functions for squads
-require("libraries.string") -- custom string functions
-require("libraries.tables") -- custom table functions
-require("libraries.tags") -- functions related to getting tags from components inside of mission and environment locations
-require("libraries.vehicle") -- functions related to vehicles, and parsing data on them
+require("libraries.addon.components.spawningUtils") -- functions used by the spawn vehicle function
+require("libraries.addon.components.tags") -- functions related to getting tags from components inside of mission and environment locations
+
+require("libraries.addon.script.addonCommunication") -- functions for addon to addon communication
+require("libraries.addon.script.cache") -- functions relating to the custom 
+require("libraries.addon.script.compatibility") -- functions used for making the mod backwards compatible
+require("libraries.addon.script.debugging") -- functions for debugging
+require("libraries.addon.script.map") -- functions for drawing on the map
+require("libraries.addon.script.matrix") -- custom matrix functions
+require("libraries.addon.script.pathfinding") -- functions for pathfinding
+require("libraries.addon.script.players") -- functions relating to Players
+require("libraries.addon.script.setup") -- functions for script/world setup.
+
+require("libraries.addon.vehicles.ai") -- functions relating to their AI
+
+require("libraries.icm.cargo") -- functions relating to the Convoys and Cargo Vehicles
+require("libraries.icm.island") -- functions relating to islands
+require("libraries.icm.objective") -- functions for the main objectives.
+require("libraries.icm.spawnModifiers") -- functions relating to the Adaptive AI
+require("libraries.icm.squad") -- functions for squads
+require("libraries.icm.vehicle") -- functions related to vehicles, and parsing data on them
+
+require("libraries.utils.math") -- custom math functions
+require("libraries.utils.string") -- custom string functions
+require("libraries.utils.tables") -- custom table functions
 
 --[[
 		Functions
@@ -328,7 +388,7 @@ function setupRules()
 				transfer_time = time.minute * 3, -- how long it takes to transfer the cargo
 
 				VEHICLES = { --? rules for the vehicles which transport the cargo
-					spawn_time = time.minute * 38 -- how long after a cargo vehicle is killed can another be spawned
+					spawn_time = g_savedata.settings.CONVOY_FREQUENCY -- how long after a cargo vehicle is killed can another be spawned
 				},
 				ISLANDS = { --? rules for the islands
 					max_capacity = 10000 *  g_savedata.settings.CARGO_CAPACITY_MULTIPLIER, -- the max amount of each resource islands can hold
@@ -432,6 +492,16 @@ function setupRules()
 				},
 				max = nil,
 				input_multiplier = 1
+			},
+			CONVOY_FREQUENCY = {
+				min = nil,
+				max = nil,
+				input_multiplier = time.minute
+			},
+			CARGO_VEHICLE_DESPAWN_TIMER = {
+				min = nil,
+				max = nil,
+				input_multiplier = time.minute
 			}
 		}
 	}
@@ -477,10 +547,12 @@ function warningChecks(peer_id)
 end
 
 -- checkbox settings
-local SINKING_MODE_BOX = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
-local ISLAND_CONTESTING_BOX = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
-local CARGO_MODE_BOX = property.checkbox("Cargo Mode (AI needs to transport resources to make more vehicles)", "true")
-local AIR_CRASH_MODE_BOX = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
+local PERFORMANCE_MODE = property.checkbox("Performance Mode (Disables tracebacks.)", "true")
+local SINKING_MODE = property.checkbox("Sinking Mode (Ships sink then explode)", "true")
+local ISLAND_CONTESTING = property.checkbox("Point Contesting (Factions can block eachothers progress)", "true")
+local CARGO_MODE = property.checkbox("Cargo Mode (AI needs to transport resources to make more vehicles)", "true")
+local AIR_CRASH_MODE = property.checkbox("Air Crash Mode (Air vehicles explode whenever they crash)", "true")
+local PAUSE_WHEN_NONE_ONLINE = property.checkbox("Pause the addon when nobody's online (For dedicated servers - so the AI doesn't keep advancing when people are asleep.)", "true")
 
 function onCreate(is_world_create)
 
@@ -490,13 +562,14 @@ function onCreate(is_world_create)
 	-- setup settings
 	if not g_savedata.settings then
 		g_savedata.settings = {
-			SINKING_MODE = SINKING_MODE_BOX,
-			CONTESTED_MODE = ISLAND_CONTESTING_BOX,
-			CARGO_MODE = CARGO_MODE_BOX,
-			AIR_CRASH_MODE = AIR_CRASH_MODE_BOX,
+			PERFORMANCE_MODE = PERFORMANCE_MODE,
+			SINKING_MODE = SINKING_MODE,
+			CONTESTED_MODE = ISLAND_CONTESTING,
+			CARGO_MODE = CARGO_MODE,
+			AIR_CRASH_MODE = AIR_CRASH_MODE,
 			ENEMY_HP_MODIFIER = property.slider("AI HP Modifier", 0.1, 10, 0.1, 1),
-			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * 60 * 60,
-			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5", 10, 600, 1, 60) * 60 * 60,
+			AI_PRODUCTION_TIME_BASE = property.slider("AI Production Time (Mins)", 1, 60, 1, 15) * time.minute,
+			CAPTURE_TIME = property.slider("AI Capture Time (Mins) | Player Capture Time (Mins) / 5", 10, 600, 1, 60) * time.minute,
 			MAX_BOAT_AMOUNT = property.slider("Max amount of AI Ships", 0, 40, 1, 10),
 			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
 			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
@@ -507,7 +580,12 @@ function onCreate(is_world_create)
 			ISLAND_COUNT = property.slider("Island Count", 7, 25, 1, 25),
 			CARGO_GENERATION_MULTIPLIER = property.slider("Cargo Generation Multiplier (multiplies cargo generated by this)", 0.1, 5, 0.1, 1),
 			CARGO_CAPACITY_MULTIPLIER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
+			CONVOY_FREQUENCY = property.slider("Cargo Convoy Cooldown (Mins)", 5, 60, 1, 38) * time.minute,
+			CARGO_VEHICLE_DESPAWN_TIMER = property.slider("Cargo Vehicle Despawn Timer (Mins)", 0, 120, 1, 60) * time.minute,
+			PAUSE_WHEN_NONE_ONLINE = PAUSE_WHEN_NONE_ONLINE,
 		}
+
+		g_savedata.debug.traceback.default = not g_savedata.settings.PERFORMANCE_MODE
 	end
 
 	comp.verify() -- backwards compatibility check
@@ -534,8 +612,6 @@ function onCreate(is_world_create)
 	warningChecks(-1)
 
 	if is_dlc_weapons then
-
-		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..ADDON_VERSION, 0)
 
 		setupRules()
 		
@@ -797,8 +873,8 @@ function onCreate(is_world_create)
 			table.sort(g_savedata.sweep_and_prune.flags.z, function(a, b) return a.z < b.z end)
 
 			-- sets up scouting data
-			for island_index, island in pairs(g_savedata.islands) do
-				Tables.tabulate(g_savedata.ai_knowledge.scout, island.name)
+			for _, island in pairs(g_savedata.islands) do
+				table.tabulate(g_savedata.ai_knowledge.scout, island.name)
 				g_savedata.ai_knowledge.scout[island.name].scouted = 0
 			end
 
@@ -842,7 +918,20 @@ function onCreate(is_world_create)
 			s.removeMapObject(-1, g_savedata.ai_base_island.ui_id)
 		end
 	end
-	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
+
+	for debug_type, debug_setting in pairs(g_savedata.debug) do
+		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
+			local debug_id = d.debugIDFromType(debug_type)
+
+			if debug_setting.needs_setup_on_reload then
+				d.handleDebug(debug_id, true, 0)
+			end
+
+			d.setDebug(debug_id, -1, true)
+		end
+	end
+
+	d.print(("%s%.3f%s"):format("ICM setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), false, 0)
 end
 
 function buildPrefabs(location_index)
@@ -888,7 +977,7 @@ function buildPrefabs(location_index)
 				local vehicle_type = string.gsub(Tags.getValue(vehicle.tags, "vehicle_type", true), "wep_", "") or "unknown"
 				local strategy = Tags.getValue(vehicle.tags, "strategy", true) or "general"
 
-				Tables.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
+				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
 
 				local vehicle_exists = false
 				local cv_id = nil
@@ -908,7 +997,7 @@ function buildPrefabs(location_index)
 				g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id = vehicle_index
 				d.print("set id: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].id.." | # of vehicles: "..#g_savedata.constructable_vehicles[role][vehicle_type][strategy].." vehicle name: "..g_savedata.constructable_vehicles[role][vehicle_type][strategy][#g_savedata.constructable_vehicles[role][vehicle_type][strategy]].location.data.name, true, 0)
 			else
-				Tables.tabulate(g_savedata.constructable_vehicles, varient)
+				table.tabulate(g_savedata.constructable_vehicles, varient)
 				table.insert(g_savedata.constructable_vehicles["varient"], prefab_data)
 			end
 		end
@@ -969,7 +1058,7 @@ player_commands = {
 		},
 		debug = {
 			short_desc = "enables or disables debug mode",
-			desc = "lets you toggle debug mode, also shows all the AI vehicles on the map with tons of info valid debug types: \"all\", \"chat\", \"profiler\" and \"map\"",
+			desc = "lets you toggle debug mode, also shows all the AI vehicles on the map with tons of info. Valid debug types: \"all\", \"chat\", \"error\" \"profiler\", \"map\", \"graph_node\", \"driving\", \"vehicle\" and \"traceback\"",
 			args = "(debug_type) [peer_id]",
 			example = "?impwep debug all\n?impwep debug map 0",
 		},
@@ -1092,12 +1181,19 @@ player_commands = {
 			desc = "forces all air vehicles to have their target coordinates set to the target's position, when they have a target.",
 			args = "",
 			example = "?icm air_vehicles_kamikaze"
+		},
+		causeerror = {
+			short_desc = "causes an error when the specified function is called.",
+			desc = "causes an error when the specified function is called. Useful for debugging the traceback debug, or trying to reproduce an error.",
+			args = "<function_name>",
+			example = "?icm cause_error math.euclideanDistance"
 		}
 	},
 	host = {}
 }
 
 command_aliases = {
+	dbg = "debug",
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
@@ -1436,39 +1532,32 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 		elseif command == "debug" then
 
-			local debug_types = {
-				all = -1,
-				chat = 0,
-				error = 1,
-				profiler = 2,
-				map = 3,
-				graphnode = 4,
-				driving = 5,
-				vehicle = 6
-			}
-
 			if not arg[1] then
-				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\"", false, 1, peer_id)
+				d.print("You need to specify a type to debug! valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\" | \"traceback\"", false, 1, peer_id)
 				return
 			end
 
 			--* make the debug type arg friendly
-			arg[1] = string.friendly(arg[1], true)
+			local selected_debug = string.friendly(arg[1], true)
 
-			if debug_types[arg[1]] then
-				arg[1] = debug_types[arg[1]]
-			else
+			-- turn the specified debug type into its integer index
+			local selected_debug_id = d.debugIDFromType(selected_debug)
+
+			if not selected_debug_id then
 				-- unknown debug type
-				d.print("Unknown debug type: "..tostring(arg[1]).." valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\"", false, 1, peer_id)
+				d.print(("Unknown debug type: %s valid types are: \"all\" | \"chat\" | \"error\" | \"profiler\" | \"map\" | \"graph_node\" | \"driving\" | \"traceback\""):format(tostring(arg[1])), false, 1, peer_id)
+				return
+			elseif selected_debug_id == 7 then
+				d.print("Function debug is currently disabled due to unrecoverable errors.", false, 1, peer_id)
 				return
 			end
 
 			-- if they specified a player, then toggle it for that specified player
 			if arg[2] then
 				local player_list = s.getPlayers()
-				for player_index, player in pairs(player_list) do
+				for _, player in pairs(player_list) do
 					if player.id == tonumber(arg[2]) then
-						local debug_output = d.setDebug(tonumber(arg[1]), tonumber(arg[2]))
+						local debug_output = d.setDebug(selected_debug_id, tonumber(arg[2]))
 						d.print(s.getPlayerName(peer_id).." "..debug_output.." for you", false, 0, tonumber(arg[2]))
 						d.print(debug_output.." for "..s.getPlayerName(tonumber(arg[2])), false, 0, peer_id)
 						return
@@ -1476,7 +1565,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				end
 				d.print("unknown peer id: "..arg[2], false, 1, peer_id)
 			else -- if they did not specify a player
-				local debug_output = d.setDebug(tonumber(arg[1]), peer_id)
+				local debug_output = d.setDebug(selected_debug_id, peer_id)
 				d.print(debug_output, false, 0, peer_id)
 			end
 
@@ -1849,6 +1938,41 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "airvehicleskamikaze" then
 			g_air_vehicles_kamikaze = not g_air_vehicles_kamikaze
 			d.print(("g_air_vehicles_kamikaze set to %s"):format(tostring(g_air_vehicles_kamikaze)))
+		elseif command == "causeerror" then
+			local function_path = arg[1]
+			if not function_path then
+				d.print("You need to specify a function path!", false, 1, peer_id)
+				return
+			end
+
+			local value_at_path, got_path = table.getValueAtPath(function_path)
+
+			if not got_path then
+				d.print(("failed to get path. returned value:\n%s"):format(string.fromTable(value_at_path)), false, 1, peer_id)
+				return
+			end
+
+			if type(value_at_path) ~= "function" then
+				d.print(("value at path is not a function! returned type: %s, returned value:\n%s"):format(type(value_at_path), string.fromTable(value_at_path)), false, 1, peer_id)
+			end
+
+			d.print(("Warning, %s set function %s to cause an error when its called."):format(s.getPlayerName(peer_id), function_path), false, 0, -1)
+
+			local value_at_path = table.copy.deep(value_at_path)
+			
+			local value_was_set = table.setValueAtPath(function_path, function(...)
+				return (function(...)
+					local x = nil + nil
+					return ...
+				end)(value_at_path(...))
+			end)
+
+			if not value_was_set then
+				d.print("Failed to set the function!", false, 1, peer_id)
+				return
+			end
+
+			d.print(("successfully set the function %s to cause an error when its called."):format(function_path), false, 0, peer_id)
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -2082,7 +2206,9 @@ function onPlayerJoin(steam_id, name, peer_id)
 				map = false,
 				graph_node = false,
 				driving = false,
-				vehicle = false
+				vehicle = false,
+				["function"] = false,
+				traceback = false
 			},
 			acknowledgements = {} -- used for settings to confirm that the player knows the side affects of what they're setting the setting to
 		}
@@ -2113,6 +2239,12 @@ function onPlayerJoin(steam_id, name, peer_id)
 
 		s.removeMapObject(peer_id, g_savedata.player_base_island.ui_id)
 		s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
+	end
+
+	for debug_type, debug_data in pairs(g_savedata.debug) do
+		if debug_data.auto_enable then
+			d.setDebug(d.debugIDFromType(debug_type), peer_id, true)
+		end
 	end
 end
 
@@ -2151,7 +2283,7 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 			-- for all the <valid ai>, add the damage dealt to the player / <ai_amount> to their damage dealt property
 			-- this is used to tell if that vehicle, the type of vehicle, its strategy and its role was effective
 			for vehicle_id, vehicle_object in pairs(valid_ai_vehicles) do
-				vehicle_object.damage_dealt[vehicle_id] = vehicle_object.damage_dealt[vehicle_id] + amount/Tables.length(valid_ai_vehicles)
+				vehicle_object.damage_dealt[vehicle_id] = vehicle_object.damage_dealt[vehicle_id] + amount/table.length(valid_ai_vehicles)
 			end
 		end
 
@@ -2222,12 +2354,23 @@ function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 
 	if pl.isPlayer(peer_id) then
 		d.print("Player Spawned Vehicle "..vehicle_id, true, 0)
+
+		-- get the mass of it
+		local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+		local mass = nil
+
+		if is_success then
+			mass = vehicle_data.mass
+		end
+
 		-- player spawned vehicle
 		g_savedata.player_vehicles[vehicle_id] = {
 			current_damage = 0, 
 			damage_threshold = 100, 
 			death_pos = nil, 
-			ui_id = s.getMapID()
+			ui_id = s.getMapID(),
+			mass = mass
 		}
 	end
 end
@@ -2236,6 +2379,19 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	if is_dlc_weapons then
 		if g_savedata.player_vehicles[vehicle_id] ~= nil then
 			g_savedata.player_vehicles[vehicle_id] = nil
+
+			-- make sure to clear this vehicle from all AI
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.target_vehicles and squad.target_vehicles[vehicle_id] then
+					squad.target_vehicles[vehicle_id] = nil
+
+					for _, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.target_vehicle_id then
+							vehicle_object.target_vehicle_id = nil
+						end
+					end
+				end
+			end
 		end
 	end
 
@@ -2299,7 +2455,7 @@ function cleanVehicle(squad_index, vehicle_id)
 	g_savedata.ai_army.squad_vehicles[vehicle_id] = nil -- reset squad vehicle list
 
 	if squad_index ~= RESUPPLY_SQUAD_INDEX then
-		if Tables.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
+		if table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 			g_savedata.ai_army.squadrons[squad_index] = nil
 
 			for island_index, island in pairs(g_savedata.islands) do
@@ -2338,35 +2494,39 @@ function onVehicleUnload(vehicle_id)
 	end
 end
 
-function setKeypadTargetCoords(vehicle_id, vehicle_object, squad)
+function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
 	
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
-		if vehicle_object.capabilities.target_mass then
-			local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+
+		local target_vehicle_id = vehicle_object.target_vehicle_id
+
+		if g_savedata.player_vehicles[target_vehicle_id] and not g_savedata.player_vehicles[target_vehicle_id].mass then
+			local vehicle_data, is_success = s.getVehicleData(target_vehicle_id)
+
 			if is_success then
-				s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
+				g_savedata.player_vehicles[target_vehicle_id].mass = vehicle_data.mass
 			end
 		end
+
+		if g_savedata.player_vehicles[target_vehicle_id].mass then -- target vehicle's mass
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", g_savedata.player_vehicles[target_vehicle_id].mass)
+		end
+
 	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+
 		target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 50) -- player's mass
+
 	else
-		if vehicle_object.capabilities.target_mass then
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0)
-		end
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", 0) -- no target
 	end
-	if target then
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_X", target.last_known_pos[13])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Y", target.last_known_pos[14])
-		s.setVehicleKeypad(vehicle_id, "AI_GPS_TARGET_Z", target.last_known_pos[15])
-		if vehicle_object.capabilities.gps_missile then
-			s.pressVehicleButton(vehicle_id, "AI_GPS_FIRE")
-		end
+	if target then -- set the target's position on keypads
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_X", target.last_known_pos[13])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Y", target.last_known_pos[14])
+		s.setVehicleKeypad(vehicle_id, "AI_TARGET_Z", target.last_known_pos[15])
 	end
 end
 
@@ -3211,77 +3371,6 @@ function getAlliedIslands()
 	return alliedIslandIndexes
 end
 
----@param ignore_scouted boolean true if you want to ignore islands that are already fully scouted
----@return table target_island returns the island which the ai should target
----@return table origin_island returns the island which the ai should attack from
-function Objective.getIslandToAttack(ignore_scouted)
-	local origin_island = nil
-	local target_island = nil
-	local target_best_distance = nil
-	for island_index, island in pairs(g_savedata.islands) do
-		if island.faction ~= ISLAND.FACTION.AI then
-			for ai_island_index, ai_island in pairs(g_savedata.islands) do
-				if ai_island.faction == ISLAND.FACTION.AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
-					if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
-						if not target_island then
-							origin_island = ai_island
-							target_island = island
-							if island.faction == ISLAND.FACTION.PLAYER then
-								target_best_distance = m.xzDistance(ai_island.transform, island.transform)/1.5
-							else
-								target_best_distance = m.xzDistance(ai_island.transform, island.transform)
-							end
-						elseif island.faction == ISLAND.FACTION.PLAYER then -- if the player owns the island we are checking
-							if target_island.faction == ISLAND.FACTION.PLAYER and m.xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
-								origin_island = ai_island
-								target_island = island
-								target_best_distance = m.xzDistance(ai_island.transform, island.transform)
-							elseif target_island.faction ~= ISLAND.FACTION.PLAYER and m.xzDistance(ai_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
-								origin_island = ai_island
-								target_island = island
-								target_best_distance = m.xzDistance(ai_island.transform, island.transform)/1.5
-							end
-						elseif island.faction ~= ISLAND.FACTION.PLAYER and m.xzDistance(ai_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
-							origin_island = ai_island
-							target_island = island
-							target_best_distance = m.xzDistance(ai_island.transform, island.transform)
-						end
-					end
-				end
-			end
-		end
-	end
-	if not target_island then
-		origin_island = g_savedata.ai_base_island
-		for island_index, island in pairs(g_savedata.islands) do
-			if island.faction ~= ISLAND.FACTION.AI or ignore_scouted and g_savedata.ai_knowledge.scout[island.name].scouted >= scout_requirement then
-				if not ignore_scouted or g_savedata.ai_knowledge.scout[island.name].scouted < scout_requirement then
-					if not target_island then
-						target_island = island
-						if island.faction == ISLAND.FACTION.PLAYER then
-							target_best_distance = m.xzDistance(origin_island.transform, island.transform)/1.5
-						else
-							target_best_distance = m.xzDistance(origin_island.transform, island.transform)
-						end
-					elseif island.faction == ISLAND.FACTION.PLAYER then
-						if target_island.faction == ISLAND.FACTION.PLAYER and m.xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player also owned the island that we detected was the best to attack
-							target_island = island
-							target_best_distance = m.xzDistance(origin_island.transform, island.transform)
-						elseif target_island.faction ~= ISLAND.FACTION.PLAYER and m.xzDistance(origin_island.transform, island.transform)/1.5 < target_best_distance then -- if the player does not own the best match for an attack target so far
-							target_island = island
-							target_best_distance = m.xzDistance(origin_island.transform, island.transform)/1.5
-						end
-					elseif island.faction ~= ISLAND.FACTION.PLAYER and m.xzDistance(origin_island.transform, island.transform) < target_best_distance then -- if the player does not own the island we are checking
-						target_island = island
-						target_best_distance = m.xzDistance(origin_island.transform, island.transform)
-					end
-				end
-			end
-		end
-	end
-	return target_island, origin_island
-end
-
 function getResupplyIsland(ai_vehicle_transform)
 	local closest = g_savedata.ai_base_island
 	local closest_dist = m.distance(ai_vehicle_transform, g_savedata.ai_base_island.transform)
@@ -3351,7 +3440,7 @@ function transferToSquadron(vehicle_object, squad_index, force) --* moves a vehi
 	if old_squad_index and g_savedata.ai_army.squadrons[old_squad_index] and g_savedata.ai_army.squadrons[old_squad_index].vehicles then
 		g_savedata.ai_army.squadrons[old_squad_index].vehicles[vehicle_object.id] = nil
 		--? if the squad is now empty then delete the squad and if its not the resupply squad
-		if Tables.length(g_savedata.ai_army.squadrons[old_squad_index].vehicles) == 0 and old_squad_index ~= RESUPPLY_SQUAD_INDEX then
+		if table.length(g_savedata.ai_army.squadrons[old_squad_index].vehicles) == 0 and old_squad_index ~= RESUPPLY_SQUAD_INDEX then
 			g_savedata.ai_army.squadrons[old_squad_index] = nil
 		end
 	end
@@ -3373,7 +3462,7 @@ function addToSquadron(vehicle_object)
 						local _, squad_leader = getSquadLeader(squad)
 						if squad.vehicle_type ~= VEHICLE.TYPE.TURRET or vehicle_object.home_island.name == squad_leader.home_island.name then
 							if vehicle_object.role ~= "scout" and squad.role ~= "scout" and vehicle_object.role ~= "cargo" and squad.role ~= "cargo" then
-								if Tables.length(squad.vehicles) < MAX_SQUAD_SIZE then
+								if table.length(squad.vehicles) < MAX_SQUAD_SIZE then
 									squad.vehicles[vehicle_object.id] = vehicle_object
 									g_savedata.ai_army.squad_vehicles[vehicle_object.id] = squad_index
 									new_squad = squad
@@ -3418,7 +3507,7 @@ function tickSquadrons()
 					vehicle_object.death_timer = vehicle_object.death_timer + 1
 
 					if vehicle_object.role == SQUAD.COMMAND.CARGO then
-						if vehicle_object.death_timer >= time.hour/squadron_tick_rate then
+						if vehicle_object.death_timer >= g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER/squadron_tick_rate then
 							v.kill(vehicle_id, true)
 						end
 					elseif vehicle_object.role == SQUAD.COMMAND.SCOUT then
@@ -3457,10 +3546,10 @@ function tickSquadrons()
 
 							d.print(tostring(vehicle_id).." leaving squad "..tostring(squad_index).." to resupply", true, 0)
 
-							if g_savedata.ai_army.squadrons[squad_index] and Tables.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
+							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
 	
-								for island_index, island in pairs(g_savedata.islands) do
+								for _, island in pairs(g_savedata.islands) do
 									if island.assigned_squad_index == squad_index then
 										island.assigned_squad_index = -1
 									end
@@ -3478,25 +3567,41 @@ function tickSquadrons()
 							v.kill(vehicle_id)
 						end
 					end
-					-- check if the vehicle simply needs to a ammo belt, barrel or box
-					local gun_info = isVehicleNeedsReload(vehicle_id)
-					if gun_info[1] and gun_info[2] ~= 0 then
-						local i = 1
-						local successed = false
-						local ammo_data = {}
-						repeat
-							local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..i)
-							if success then
-								if ammo.ammo > 0 then
-									successed = success
-									ammo_data[i] = ammo
+					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
+					local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+					if is_success and vehicle_data.components and vehicle_data.components.guns then
+						for gun_index = 1, #vehicle_data.components.guns do
+							local gun_data = vehicle_data.components.guns[gun_index]
+
+							-- if this is a gun that might need reloading
+							if gun_data.ammo == 0 and (gun_data.name:match("^Ammo %d+$") or (gun_data.name:match("^Gunner %d+$"))) then
+
+								-- the target weapons we can reload from
+								local ammo_group = tonumber(table.pack(gun_data.name:gsub("[%a ]+", ""))[1])
+								local target_pattern = ("Reserve Ammo %i"):format(ammo_group)
+								for reserve_ammo_index = 1, #vehicle_data.components.guns do
+									local reserve_ammo_data = vehicle_data.components.guns[reserve_ammo_index]
+
+									-- we can reload from this weapon
+									if gun_index ~= reserve_ammo_index and reserve_ammo_data.ammo ~= 0 and reserve_ammo_data.name:match(target_pattern) then
+										-- move as much ammo as we can from the reserve ammo to the gun.
+										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
+
+										-- take that away from the reserve ammo container
+										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										
+										-- move that into the gun
+										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+
+										-- if the gun is not at capcity, continue on
+										-- otherwise, break.
+										if gun_data.ammo + ammo_to_move == gun_data.capacity then
+											break
+										end
+									end
 								end
 							end
-							i = i + 1
-						until (not successed)
-						if successed then
-							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2].." - "..#ammo_data, 0)
-							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
 					end
 				end
@@ -4221,13 +4326,6 @@ function tickSquadrons()
 					setSquadCommand(squad, SQUAD.COMMAND.NONE)
 				end
 			end
-			if squad.command ~= SQUAD.COMMAND.RETREAT then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
-						if vehicle_object.capabilities.gps_target then setKeypadTargetCoords(vehicle_id, vehicle_object, squad) end
-					end
-				end
-			end
 		end
 		::break_squadron::
 	end
@@ -4358,6 +4456,18 @@ function tickVision()
 			end
 		end
 	end
+
+	-- update all of the keypads on the AI vehicles which are loaded
+	for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
+			if vehicle_object.state.is_simulating then
+				if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+					setVehicleKeypads(vehicle_id, vehicle_object, squad)
+				end
+			end
+		end
+	end
+
 	d.stopProfiler("tickVision()", true, "onTick()")
 end
 
@@ -4896,7 +5006,7 @@ function tickVehicles()
 								as if a vehicle is unloaded, clients will not recieve the vehicle's position from the server, causing it
 								to instead be drawn at 0, 0
 							]]
-							if peer.id == 0 or vehicle.is_simulating then
+							if peer.id == 0 or vehicle_object.state.is_simulating then
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
 								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
@@ -5006,7 +5116,7 @@ function tickModifiers()
 			if island.faction == ISLAND.FACTION.AI then
 				local player_list = s.getPlayers()
 				for player_index, player in pairs(player_list) do
-					local player_pos = s.getPlayerPos(player)
+					local player_pos = s.getPlayerPos(player.id)
 					local player_island_dist = m.xzDistance(player_pos, island.transform)
 					if player_island_dist < 1000 then
 						g_savedata.ai_history.defended_charge = g_savedata.ai_history.defended_charge + 3
@@ -5052,7 +5162,7 @@ function tickCargo()
 		end
 
 		-- ticks resupplying islands
-		if Tables.length(g_savedata.cargo_vehicles) ~= 0 then
+		if table.length(g_savedata.cargo_vehicles) ~= 0 then
 			g_savedata.tick_extensions.cargo_vehicle_spawn = g_savedata.tick_extensions.cargo_vehicle_spawn + 1
 		elseif isTickID(g_savedata.tick_extensions.cargo_vehicle_spawn, RULES.LOGISTICS.CARGO.VEHICLES.spawn_time) then -- attempt to spawn a cargo vehicle
 			d.print("attempting to spawn cargo vehicle", true, 0)
@@ -5438,7 +5548,7 @@ function tickControls()
 
 			--? is the driver incapcitated, dead or non existant
 			local driver_data = s.getCharacterData(vehicle_object.survivors[1].id)
-			if not driver_data or driver_data.dead or driver_data.incapcitated then
+			if not driver_data or driver_data.dead or driver_data.incapacitated then
 				goto break_control_vehicle
 			end
 
@@ -5683,27 +5793,43 @@ end
 
 
 function onTick()
-	if is_dlc_weapons then
-		g_savedata.tick_counter = g_savedata.tick_counter + 1
 
-		d.startProfiler("onTick()", true)
-
-		tickUpdateVehicleData()
-		tickVision()
-		tickGamemode()
-		tickAI()
-		tickSquadrons()
-		tickVehicles()
-		tickControls() -- ticks custom ai driving
-		tickCargoVehicles()
-		tickCargo()
-		tickIslands()
-		tickModifiers()
-		-- tickOther()
-
-		d.stopProfiler("onTick()", true, "onTick()")
-		d.showProfilers()
+	if g_savedata.debug.traceback.enabled then
+		ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
 	end
+
+	if not is_dlc_weapons then
+		return
+	end
+	
+	if g_savedata.settings.PAUSE_WHEN_NONE_ONLINE then
+		if #s.getPlayers() <= 0 then
+			-- addon paused as nobody is online
+			return
+		end
+	end
+
+	g_savedata.tick_counter = g_savedata.tick_counter + 1
+
+	d.startProfiler("onTick()", true)
+
+	tickUpdateVehicleData()
+	tickVision()
+	tickGamemode()
+	tickAI()
+	tickSquadrons()
+	tickVehicles()
+	tickControls() -- ticks custom ai driving
+	tickCargoVehicles()
+	tickCargo()
+	tickIslands()
+	tickModifiers()
+	-- tickOther()
+
+	d.stopProfiler("onTick()", true, "onTick()")
+	d.showProfilers()
+
+	
 end
 
 function refuel(vehicle_id)

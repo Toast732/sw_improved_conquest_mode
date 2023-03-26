@@ -1,9 +1,9 @@
 -- required libraries
-require("libraries.debugging")
-require("libraries.ai")
-require("libraries.spawnModifiers")
-require("libraries.matrix")
-require("libraries.tags")
+require("libraries.addon.script.debugging")
+require("libraries.addon.vehicles.ai")
+require("libraries.icm.spawnModifiers")
+require("libraries.addon.script.matrix")
+require("libraries.addon.components.tags")
 
 -- library name
 Pathfinding = {}
@@ -231,6 +231,9 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 		return false
 	end
 
+	-- indexed by name, this is so we dont have to constantly call server.getTileTransform for the same tiles. 
+	local tile_locations = {}
+
 	local start_time = s.getTimeMillisec()
 	d.print("Creating Path Y...", true, 0)
 	local total_paths = 0
@@ -242,16 +245,25 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 				local LOCATION_DATA = s.getLocationData(addon_index, location_index)
 				if LOCATION_DATA.env_mod and LOCATION_DATA.component_count > 0 then
 					for component_index = 0, LOCATION_DATA.component_count - 1 do
-						local COMPONENT_DATA, getLocationComponentData = s.getLocationComponentData(
+						local COMPONENT_DATA = s.getLocationComponentData(
 							addon_index, location_index, component_index
 						)
 						if COMPONENT_DATA.type == "zone" then
 							local graph_node = isGraphNode(COMPONENT_DATA.tags[1])
 							if graph_node then
-								local transform_matrix, gotTileTransform = s.getTileTransform(
-									empty_matrix, LOCATION_DATA.tile, 100000
-								)
-								if gotTileTransform then
+
+								local transform_matrix = tile_locations[LOCATION_DATA.tile]
+								if not transform_matrix then
+									tile_locations[LOCATION_DATA.tile] = s.getTileTransform(
+										empty_matrix,
+										LOCATION_DATA.tile,
+										100000
+									)
+
+									transform_matrix = tile_locations[LOCATION_DATA.tile]
+								end
+
+								if transform_matrix then
 									local real_transform = matrix.multiplyXZ(COMPONENT_DATA.transform, transform_matrix)
 									local x = (path_res):format(real_transform[13])
 									local last_tag = COMPONENT_DATA.tags[#COMPONENT_DATA.tags]
