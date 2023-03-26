@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.2.6)"
+ADDON_VERSION = "(0.3.2.7)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -3117,6 +3117,8 @@ function Compatibility.update()
 	elseif version_data.newer_versions[1] == "(0.3.2.6)" then -- 0.3.2.6 changes
 
 		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
+
+		g_savedata.settings.PERFORMANCE_MODE = true
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end

@@ -561,6 +561,8 @@ function Compatibility.update()
 
 		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
 
+		g_savedata.settings.PERFORMANCE_MODE = true
+
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
 
