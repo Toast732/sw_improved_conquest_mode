@@ -30,11 +30,15 @@ local version_updates = {
 	"(0.3.0.78)",
 	"(0.3.0.79)",
 	"(0.3.0.82)",
+<<<<<<< HEAD:Addon/libraries/addon/script/compatibility.lua
 	"(0.3.1.2)",
 	"(0.3.2.2)",
 	"(0.3.2.6)",
 	"(0.3.2.8)",
 	"(0.3.2.9)"
+=======
+	"(0.3.1.2)"
+>>>>>>> main:Addon/libraries/compatibility.lua
 }
 
 --[[
@@ -496,6 +500,7 @@ function Compatibility.update()
 		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+<<<<<<< HEAD:Addon/libraries/addon/script/compatibility.lua
 	elseif version_data.newer_versions[1] == "(0.3.2.2)" then -- 0.3.2.2 changes
 
 		local temp_g_savedata_debug = {
@@ -588,6 +593,18 @@ function Compatibility.update()
 		comp.update()
 	end
 
+=======
+	end
+
+	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+
+	-- this means that theres still newer versions
+	if #version_data.newer_versions > 1 then
+		-- migrate to the next version
+		comp.update()
+	end
+
+>>>>>>> main:Addon/libraries/compatibility.lua
 	-- we've finished migrating!
 	comp.showSaveMessage()
 end

@@ -23,7 +23,11 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
+<<<<<<< HEAD
 ADDON_VERSION = "(0.3.2)"
+=======
+ADDON_VERSION = "(0.3.1)"
+>>>>>>> main
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -75,6 +79,7 @@ CONVOY = {
 	WAITING = "waiting"
 }
 
+<<<<<<< HEAD
 debug_types = {
 	[-1] = "all",
 	[0] = "chat",
@@ -88,6 +93,8 @@ debug_types = {
 	"traceback"
 }
 
+=======
+>>>>>>> main
 time = { -- the time unit in ticks, irl time, not in game
 	second = 60,
 	minute = 3600,
@@ -809,6 +816,7 @@ function table.setValueAtPath(path, set_value)
 	d.print("(table.setValueAtPath) never reached end of path?", true, 1)
 	return false
 end
+<<<<<<< HEAD
 
 -- a table containing a bunch of functions for making a copy of tables, to best fit each scenario performance wise.
 table.copy = {
@@ -860,6 +868,8 @@ table.copy = {
 ]]
 
 -- required libraries
+=======
+>>>>>>> main
 --[[
 
 
@@ -869,6 +879,18 @@ table.copy = {
 ]]
 
 -- required libraries
+<<<<<<< HEAD
+=======
+--[[
+
+
+	Library Setup
+
+
+]]
+
+-- required libraries
+>>>>>>> main
 -- (none)
 
 -- library name
@@ -1100,6 +1122,7 @@ function Map.addMapCircle(peer_id, ui_id, center_matrix, radius, width, r, g, b,
 		local start_matrix, end_matrix = m.translation(x1, 0, z1), m.translation(x2, 0, z2)
 		s.addMapLine(peer_id, ui_id, start_matrix, end_matrix, width, r, g, b, a)
 		last_angle = new_angle
+<<<<<<< HEAD
 	end
 end
 ---@param str string the string to make the first letter uppercase
@@ -1216,6 +1239,8 @@ function string.fromTable(t)
 		S = ("%s\n%s}"):format(S, string.gsub(ind, "  ", "", 1))
 
 		return S
+=======
+>>>>>>> main
 	end
 
 	return tableToString(t)
@@ -1259,6 +1284,7 @@ d = Debugging
 
 	Classes
 
+<<<<<<< HEAD
 
 ]]
 
@@ -1276,6 +1302,10 @@ d = Debugging
 function Debugging.print(message, requires_debug, debug_id, peer_id) -- "glorious debug function" - senty, 2022
 	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_id, peer_id) or requires_debug and debug_id == 2 and d.getDebug(0, peer_id) or debug_id == 1 and d.getDebug(0, peer_id) then
 		local suffix = debug_id == 1 and " Error:" or debug_id == 2 and " Profiler:" or debug_id == 7 and " Function:" or debug_id == 8 and " Traceback:" or " Debug:"
+=======
+	if IS_DEVELOPMENT_VERSION or not requires_debug or requires_debug and d.getDebug(debug_type, peer_id) or requires_debug and debug_type == 2 and d.getDebug(0, peer_id) then
+		local suffix = debug_type == 1 and " Error:" or debug_type == 2 and " Profiler:" or " Debug:"
+>>>>>>> main
 		local prefix = string.gsub(s.getAddonData((s.getAddonIndex())).name, "%(.*%)", ADDON_VERSION)..suffix
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
@@ -1289,6 +1319,7 @@ function Debugging.print(message, requires_debug, debug_id, peer_id) -- "gloriou
 		if type(message) == "table" then -- print the message as a table.
 			d.printTable(message, requires_debug, debug_id, peer_id)
 
+<<<<<<< HEAD
 		elseif requires_debug then -- if this message requires debug to be enabled
 			if pl.isPlayer(peer_id) and peer_id then -- if its being sent to a specific peer id
 				if d.getDebug(debug_id, peer_id) then -- if this peer has debug enabled
@@ -1298,10 +1329,22 @@ function Debugging.print(message, requires_debug, debug_id, peer_id) -- "gloriou
 				for _, peer in ipairs(server.getPlayers()) do -- if this is being sent to all players with the debug enabled
 					if d.getDebug(debug_id, peer.id) or debug_id == 2 and d.getDebug(0, peer.id) or debug_id == 1 and d.getDebug(0, peer.id) then -- if this player has debug enabled
 						server.announce(prefix, message, peer.id) -- send the message to them
+=======
+		elseif requires_debug then
+			if pl.isPlayer(peer_id) and peer_id then
+				if d.getDebug(debug_type, peer_id) then
+					s.announce(prefix, message, peer_id)
+				end
+			else
+				for _, player in ipairs(s.getPlayers()) do
+					if d.getDebug(debug_type, player.id) or debug_type == 2 and d.getDebug(0, player.id) then
+						s.announce(prefix, message, player_id)
+>>>>>>> main
 					end
 				end
 			end
 		else
+<<<<<<< HEAD
 			server.announce(prefix, message, peer_id or -1)
 		end
 	end
@@ -1318,6 +1361,9 @@ function Debugging.debugIDFromType(debug_type)
 	for debug_id, d_type in pairs(debug_types) do
 		if debug_type == string.friendly(d_type, true) then
 			return debug_id
+=======
+			s.announce(prefix, message, peer_id or -1)
+>>>>>>> main
 		end
 	end
 end
@@ -2704,7 +2750,12 @@ function Compatibility.migrateVersionSystem(overwrite_g_savedata)
 		g_savedata.info.version_history = {}
 	end
 
+<<<<<<< HEAD
 	migrated_g_savedata.info.version_history = {}
+=======
+		-- calculates route
+		local path_list = s.pathfind(path_start_pos, m.translation(target_dest[13], 0, target_dest[15]), "ocean_path", exclude)
+>>>>>>> main
 
 	--[[
 		create the version history data, with the previous version the creation version 
@@ -2751,6 +2802,7 @@ function Compatibility.getVersionID(version)
 	return nil, false
 end
 
+<<<<<<< HEAD
 --# splits a version into 
 ---@param version string the version you want split
 ---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
@@ -2762,6 +2814,47 @@ function Compatibility.splitVersion(version) -- credit to woe
 
 	for S in version:gmatch("([^%.]*)%.*") do
 		T[#T+1] = tonumber(S) or S
+=======
+		local dest_at_vehicle_y = m.translation(target_dest[13], vehicle_object.transform[14], target_dest[15])
+
+		local path_list = s.pathfind(path_start_pos, dest_at_vehicle_y, "land_path", exclude)
+		for path_index, path in pairs(path_list) do
+
+			local path_matrix = m.translation(path.x, path.y, path.z)
+
+			local distance = m.distance(vehicle_object.transform, path_matrix)
+
+			if path_index ~= 1 or #path_list == 1 or m.distance(vehicle_object.transform, dest_at_vehicle_y) > m.distance(dest_at_vehicle_y, path_matrix) and distance >= 7 then
+				
+				if not path.y then
+					--d.print("not path.y\npath.x: "..tostring(path.x).."\npath.y: "..tostring(path.y).."\npath.z: "..tostring(path.z), true, 1)
+					break
+				end
+
+				table.insert(vehicle_object.path, { 
+					x =  path.x, 
+					y = (path.y + y_modifier), 
+					z = path.z, 
+					ui_id = s.getMapID() 
+				})
+			end
+		end
+
+		if #vehicle_object.path > 1 then
+			-- remove paths which are a waste (eg, makes the vehicle needlessly go backwards when it could just go to the next waypoint)
+			local next_path_matrix = m.translation(vehicle_object.path[2].x, vehicle_object.path[2].y, vehicle_object.path[2].z)
+			if m.xzDistance(vehicle_object.transform, next_path_matrix) < m.xzDistance(m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), next_path_matrix) then
+				p.nextPath(vehicle_object)
+			end
+		end
+	else
+		table.insert(vehicle_object.path, { 
+			x = target_dest[13], 
+			y = target_dest[14], 
+			z = target_dest[15], 
+			ui_id = s.getMapID() 
+		})
+>>>>>>> main
 	end
 
 	T = {
@@ -2821,12 +2914,52 @@ function Compatibility.getVersionData(version)
 		and lastly, we want to return the data
 	]]
 
+<<<<<<< HEAD
 	-- (1) check if the version system is not migrated
 	if not g_savedata.info.version_history then
 		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
 		if not is_success then
 			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
 			return nil, false
+=======
+	local start_time = s.getTimeMillisec()
+	d.print("Creating Path Y...", true, 0)
+	local total_paths = 0
+	local empty_matrix = m.translation(0, 0, 0)
+	for addon_index = 0, s.getAddonCount() - 1 do
+		local ADDON_DATA = s.getAddonData(addon_index)
+		if ADDON_DATA.location_count and ADDON_DATA.location_count > 0 then
+			for location_index = 0, ADDON_DATA.location_count - 1 do
+				local LOCATION_DATA = s.getLocationData(addon_index, location_index)
+				if LOCATION_DATA.env_mod and LOCATION_DATA.component_count > 0 then
+					for component_index = 0, LOCATION_DATA.component_count - 1 do
+						local COMPONENT_DATA, getLocationComponentData = s.getLocationComponentData(
+							addon_index, location_index, component_index
+						)
+						if COMPONENT_DATA.type == "zone" then
+							local graph_node = isGraphNode(COMPONENT_DATA.tags[1])
+							if graph_node then
+								local transform_matrix, gotTileTransform = s.getTileTransform(
+									empty_matrix, LOCATION_DATA.tile, 100000
+								)
+								if gotTileTransform then
+									local real_transform = matrix.multiplyXZ(COMPONENT_DATA.transform, transform_matrix)
+									local x = (path_res):format(real_transform[13])
+									local last_tag = COMPONENT_DATA.tags[#COMPONENT_DATA.tags]
+									g_savedata.graph_nodes.nodes[x] = g_savedata.graph_nodes.nodes[x] or {}
+									g_savedata.graph_nodes.nodes[x][(path_res):format(real_transform[15])] = { 
+										y = real_transform[14],
+										type = graph_node,
+										NSO = last_tag == "NSO" and 1 or last_tag == "not_NSO" and 2 or 0
+									}
+									total_paths = total_paths + 1
+								end
+							end
+						end
+					end
+				end
+			end
+>>>>>>> main
 		end
 
 		-- set copied_g_savedata as migrated_g_savedata
@@ -3946,7 +4079,19 @@ Objective = {}
 	Variables
    
 
+<<<<<<< HEAD
 ]]
+=======
+		if #island.zones.turrets == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no turret spawn zones!"):format(island.name), true, 1)
+			return false, ("Island %s has no turret spawn zones!"):format(island.name)
+		end
+
+		-- count the amount of turrets this island has spawned
+		for turret_zone_index = 1, #island.zones.turrets do
+			if island.zones.turrets[turret_zone_index].is_spawned then 
+				turret_count = turret_count + 1
+>>>>>>> main
 
 --[[
 
@@ -4041,6 +4186,15 @@ function Objective.getIslandToAttack(ignore_scouted)
 	return target_island, origin_island
 end
 
+<<<<<<< HEAD
+=======
+		if #unoccupied_zones == 0 then
+			d.print(("(v.spawn) Unable to spawn turret, Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true)), true, 1)
+			return false, ("Island %s has no free turret spawn zones with the type of %s!"):format(island.name, Tags.getValue(selected_prefab.vehicle.tags, "role", true))
+		end
+
+		-- pick a spawn location out of the list which is unoccupied
+>>>>>>> main
 
 -- library name
 Vehicle = {}
@@ -5557,10 +5711,36 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 
 		local recipient, _, _ = Squad.getVehicle(recipient.id)
 
+<<<<<<< HEAD
 		if not recipient then
 			d.print("(Cargo.transfer) failed to get vehicle_object, returned recipient is nil!")
 			return false, "error"
 		end
+=======
+-- library name
+Compatibility = {}
+
+-- shortened library name
+comp = Compatibility
+
+--[[
+
+
+	Variables
+   
+
+]]
+
+--# stores which versions require compatibility updates
+local version_updates = {
+	"(0.3.0.78)",
+	"(0.3.0.79)",
+	"(0.3.0.82)",
+	"(0.3.1.2)"
+}
+
+--[[
+>>>>>>> main
 
 		-- set the variables
 		for cargo_type, amount in pairs(cargo_to_transfer) do
@@ -5778,12 +5958,43 @@ function Cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	return weight
 end
 
+<<<<<<< HEAD
 ---@param island ISLAND|AI_ISLAND the island you want to get the resupplier weight of
 ---@return ICMResupplyWeights weights the weights of all of the cargo types for the resupplier island
 function Cargo.getResupplierWeight(island) -- get weight of the island (for using it to resupply another island)
 	local oil_weight = (island.cargo.oil/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.9)) -- oil
 	local diesel_weight = (island.cargo.diesel/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.45)) -- diesel
 	local jet_fuel_weight = (island.cargo.jet_fuel/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.45)) -- jet fuel
+=======
+--# splits a version into 
+---@param version string the version you want split
+---@return table version [1] = release version, [2] = majour version, [3] = minor version, [4] = commit version
+function Compatibility.splitVersion(version) -- credit to woe
+	local T = {}
+
+	-- remove ( and )
+	version = version:match("[%d.]+")
+
+	for S in version:gmatch("([^%.]*)%.*") do
+		T[#T+1] = tonumber(S) or S
+	end
+
+	T = {
+		T[1], -- release
+		T[2], -- majour
+		T[3], -- minor
+		T[4] -- commit
+	}
+
+	return T
+end
+
+--# returns the version from the version_id
+---@param version_id integer the id of the version
+---@return string version the version associated with the id
+---@return boolean is_success if it successfully got the version from the id
+function Compatibility.getVersion(version_id)
+>>>>>>> main
 
 	local controller_weight = 1
 	if island.faction == ISLAND.FACTION.NEUTRAL then
@@ -5865,6 +6076,7 @@ function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 			})
 		end
 
+<<<<<<< HEAD
 		-- check if we found the highest weight
 		if not highest_weight then
 			-- all cargo types have the same weight, use randomness
@@ -5895,6 +6107,49 @@ function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 		local cargo_capacity = vehicle_object.cargo.capacity
 		if type(cargo_capacity) ~= "string" then
 			requested_cargo[slot] = Cargo.newRequestedCargoItem(cargo.cargo_type, cargo_capacity)
+=======
+	-- (4) count how many versions out of date the data is
+
+	local current_version = comp.splitVersion(version_data.data_version)
+
+	local ids_to_versions = {
+		"Release",
+		"Majour",
+		"Minor",
+		"Commit"
+	}
+
+	for _, version_name in ipairs(version_updates) do
+
+		--[[
+			first, we want to check if the release version is greater (x.#.#.#)
+			if not, second we want to check if the majour version is greater (#.x.#.#)
+			if not, third we want to check if the minor version is greater (#.#.x.#)
+			if not, lastly we want to check if the commit version is greater (#.#.#.x)
+		]]
+
+		local update_version = comp.splitVersion(version_name)
+
+		--[[
+			go through each version, and check if its newer than our current version
+		]]
+		for i = 1, #current_version do
+			if not current_version[i] or current_version[i] > update_version[i] then
+				--[[
+					if theres no commit version for the current version, all versions with the same stable, majour and minor version will be older.
+					OR, current version is newer, then dont continue, as otherwise that could trigger a false positive with things like 0.3.0.2 vs 0.3.1.1
+				]]
+				d.print(("(comp.getVersionData) %s Version %s is older than current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+				break
+			elseif current_version[i] < update_version[i] then
+				-- current version is older, so we need to migrate data.
+				table.insert(version_data.newer_versions, version_name)
+				d.print(("Found new %s version: %s current version: %s"):format(ids_to_versions[i], version_name, version_data.data_version), false, 0)
+				break
+			end
+
+			d.print(("(comp.getVersionData) %s Version %s is the same as current %s Version: %s"):format(ids_to_versions[i], update_version[i], ids_to_versions[i], current_version[i]), true, 0)
+>>>>>>> main
 		end
 	end
 
@@ -6404,8 +6659,12 @@ end
 ---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
 function Cargo.getIslandDistance(island1, island2)
 
+<<<<<<< HEAD
 	local first_cache_index = island2.index
 	local second_cache_index = island1.index
+=======
+	d.print(SHORT_ADDON_NAME.."'s data is "..version_data.versions_outdated.." version"..(version_data.versions_outdated > 1 and "s" or "").." out of date!", false, 0)
+>>>>>>> main
 
 	if island1.index > island2.index then
 		first_cache_index = island1.index
@@ -6417,6 +6676,7 @@ function Cargo.getIslandDistance(island1, island2)
 		air = nil
 	}
 
+<<<<<<< HEAD
 	------
 	-- get distance for air vehicles
 	------
@@ -6426,6 +6686,21 @@ function Cargo.getIslandDistance(island1, island2)
 		if Cache.exists("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]") then
 			
 			-- pull from cache
+=======
+	d.print("Creating new version history for "..version_data.newer_versions[1].."...", false, 0)
+	local version_history_data = comp.createVersionHistoryData(version_data.newer_versions[1])
+	g_savedata.info.version_history[#g_savedata.info.version_history+1] = version_history_data
+	d.print("Successfully created new version history for "..version_data.newer_versions[1]..".", false, 0)
+
+	-- check for 0.3.0.78 changes
+	if version_data.newer_versions[1] == "(0.3.0.78)" then
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1]..", Cleaning up old data...", false, 0)
+
+		-- clean up old data
+		g_savedata.info.creation_version = nil
+		g_savedata.info.full_reload_versions = nil
+		g_savedata.info.awaiting_reload = nil
+>>>>>>> main
 
 			distance.air = Cache.read("cargo.island_distances.air["..first_cache_index.."]["..second_cache_index.."]")
 		else
@@ -6469,6 +6744,7 @@ function Cargo.getIslandDistance(island1, island2)
 		end
 	end
 
+<<<<<<< HEAD
 	------
 	-- get distance for land vehicles
 	------
@@ -6481,6 +6757,11 @@ function Cargo.getIslandDistance(island1, island2)
 			else
 				
 				-- calculate the distance
+=======
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.0.82)" then -- 0.3.0.82 changes
+>>>>>>> main
 
 				-- makes sure that theres at least 1 land spawn
 				if #island1.zones.land > 0 then
@@ -6501,6 +6782,7 @@ function Cargo.getIslandDistance(island1, island2)
 				end
 			end
 		end
+<<<<<<< HEAD
 	end
 	return distance
 end
@@ -6534,6 +6816,79 @@ function Cargo.reset(island, cargo_type)
 					return false, "(Cargo.reset) inputted cargo_type doesn't exist! cargo_type: "..cargo_type
 				end
 			end
+=======
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.1.2)" then -- 0.3.1.2 changes
+
+		d.print(("Migrating %s data..."):format(SHORT_ADDON_NAME), false, 0)
+
+		-- check if we've initialised the graph_node debug before
+		if g_savedata.graph_nodes.init_debug then
+
+			-- generate a global map id for all graph nodes
+			g_savedata.graph_nodes.ui_id = server.getMapID()
+
+			d.print("Cleaning up old data...", false, 0)
+
+			-- go through and remove all of the graph node's map ids from the map
+			for x, x_data in pairs(g_savedata.graph_nodes.nodes) do
+				for z, z_data in pairs(x_data) do
+					s.removeMapID(-1, z_data.ui_id)
+					z_data.ui_id = nil
+				end
+			end
+
+			-- go through all of the player data and set graph_node debug to false
+			for _, player_data in pairs(g_savedata.player_data) do
+				player_data.debug.graph_node = false
+			end
+
+			-- disable graph_node debug globally
+			g_savedata.debug.graph_node = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	end
+
+	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
+
+	-- this means that theres still newer versions
+	if #version_data.newer_versions > 1 then
+		-- migrate to the next version
+		comp.update()
+	end
+
+	-- we've finished migrating!
+	comp.showSaveMessage()
+end
+
+--# prints outdated message and starts update
+function Compatibility.outdated()
+	-- print that its outdated
+	d.print(SHORT_ADDON_NAME.." data is outdated! attempting to automatically update...", false, 0)
+
+	-- start update process
+	comp.update()
+end
+
+--# verifies that the mod is currently up to date
+function Compatibility.verify()
+	d.print("verifying if "..SHORT_ADDON_NAME.." data is up to date...", false, 0)
+	--[[
+		first, check if the versioning system is up to date
+	]]
+	if not g_savedata.info.version_history then
+		-- the versioning system is not up to date
+		comp.outdated()
+	else
+		-- check if we're outdated
+		local version_data, is_success = comp.getVersionData()
+
+		if not is_success then
+			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
+			return
+>>>>>>> main
 		end
 	else
 		if not cargo_type then
@@ -6558,9 +6913,17 @@ function Cargo.reset(island, cargo_type)
 		end
 	end
 
+<<<<<<< HEAD
 	return true, "reset"
 end
  -- functions relating to the Convoys and Cargo Vehicles -- functions relating to islands -- functions for the main objectives. -- functions relating to the Adaptive AI -- functions for squads -- functions related to vehicles, and parsing data on them -- custom math functions -- custom string functions -- custom table functions
+=======
+--# shows the message saying that the addon was fully migrated
+function Compatibility.showSaveMessage()
+	d.print(SHORT_ADDON_NAME.." Data has been fully migrated!", false, 0)
+end
+ -- functions used for making the mod backwards compatible -- functions for debugging -- functions relating to islands -- functions for drawing on the map -- custom math functions -- custom matrix functions -- functions for the main objectives. -- functions for pathfinding -- functions relating to Players -- functions for script/world setup. -- functions used by the spawn vehicle function -- functions relating to the Adaptive AI -- functions for squads -- custom string functions -- custom table functions -- functions related to getting tags from components inside of mission and environment locations -- functions related to vehicles, and parsing data on them
+>>>>>>> main
 
 --[[
 		Functions
@@ -6802,6 +7165,11 @@ function onCreate(is_world_create)
 
 	if is_dlc_weapons then
 
+<<<<<<< HEAD
+=======
+		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..ADDON_VERSION, 0)
+
+>>>>>>> main
 		setupRules()
 		
 		p.updatePathfinding()
@@ -7382,7 +7750,10 @@ player_commands = {
 }
 
 command_aliases = {
+<<<<<<< HEAD
 	dbg = "debug",
+=======
+>>>>>>> main
 	pseudospeed = "speed",
 	sv = "spawnvehicle",
 	dv = "deletevehicle",
@@ -8428,12 +8799,15 @@ function onPlayerJoin(steam_id, name, peer_id)
 
 		s.removeMapObject(peer_id, g_savedata.player_base_island.ui_id)
 		s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
+<<<<<<< HEAD
 	end
 
 	for debug_type, debug_data in pairs(g_savedata.debug) do
 		if debug_data.auto_enable then
 			d.setDebug(d.debugIDFromType(debug_type), peer_id, true)
 		end
+=======
+>>>>>>> main
 	end
 end
 
@@ -11195,7 +11569,11 @@ function tickVehicles()
 								as if a vehicle is unloaded, clients will not recieve the vehicle's position from the server, causing it
 								to instead be drawn at 0, 0
 							]]
+<<<<<<< HEAD
 							if peer.id == 0 or vehicle_object.state.is_simulating then
+=======
+							if peer.id == 0 or vehicle.is_simulating then
+>>>>>>> main
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
 								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
