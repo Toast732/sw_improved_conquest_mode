@@ -31,7 +31,8 @@ local version_updates = {
 	"(0.3.0.79)",
 	"(0.3.0.82)",
 	"(0.3.1.2)",
-	"(0.3.2.2)"
+	"(0.3.2.2)",
+	"(0.3.2.6)"
 }
 
 --[[
@@ -553,6 +554,12 @@ function Compatibility.update()
 			player.debug["function"] = false
 			player.debug.traceback = false
 		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.6)" then -- 0.3.2.6 changes
+
+		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
