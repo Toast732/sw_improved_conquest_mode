@@ -396,7 +396,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return ...
 			end
 			local function setupFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 8)
+				--d.print(("setting up function %s()..."):format(name), true, 8)
 
 				local funct_index = nil
 
