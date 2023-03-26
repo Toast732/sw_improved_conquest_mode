@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.2.4)"
+ADDON_VERSION = "(0.3.2.5)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -63,7 +63,7 @@ VEHICLE = {
 				NORMAL = 0.9,
 				ROAD = 1,
 				BRIDGE = 0.7,
-				OFFROAD = 0.5
+				OFFROAD = 0.75
 			}
 		}
 	}
@@ -861,7 +861,7 @@ function onCreate(is_world_create)
 			table.sort(g_savedata.sweep_and_prune.flags.z, function(a, b) return a.z < b.z end)
 
 			-- sets up scouting data
-			for island_index, island in pairs(g_savedata.islands) do
+			for _, island in pairs(g_savedata.islands) do
 				table.tabulate(g_savedata.ai_knowledge.scout, island.name)
 				g_savedata.ai_knowledge.scout[island.name].scouted = 0
 			end
@@ -1168,6 +1168,12 @@ player_commands = {
 			desc = "forces all air vehicles to have their target coordinates set to the target's position, when they have a target.",
 			args = "",
 			example = "?icm air_vehicles_kamikaze"
+		},
+		causeerror = {
+			short_desc = "causes an error when the specified function is called.",
+			desc = "causes an error when the specified function is called. Useful for debugging the traceback debug, or trying to reproduce an error.",
+			args = "<function_name>",
+			example = "?icm cause_error math.euclideanDistance"
 		}
 	},
 	host = {}
@@ -1919,6 +1925,41 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "airvehicleskamikaze" then
 			g_air_vehicles_kamikaze = not g_air_vehicles_kamikaze
 			d.print(("g_air_vehicles_kamikaze set to %s"):format(tostring(g_air_vehicles_kamikaze)))
+		elseif command == "causeerror" then
+			local function_path = arg[1]
+			if not function_path then
+				d.print("You need to specify a function path!", false, 1, peer_id)
+				return
+			end
+
+			local value_at_path, got_path = table.getValueAtPath(function_path)
+
+			if not got_path then
+				d.print(("failed to get path. returned value:\n%s"):format(string.fromTable(value_at_path)), false, 1, peer_id)
+				return
+			end
+
+			if type(value_at_path) ~= "function" then
+				d.print(("value at path is not a function! returned type: %s, returned value:\n%s"):format(type(value_at_path), string.fromTable(value_at_path)), false, 1, peer_id)
+			end
+
+			d.print(("Warning, %s set function %s to cause an error when its called."):format(s.getPlayerName(peer_id), function_path), false, 0, -1)
+
+			local value_at_path = table.copy.deep(value_at_path)
+			
+			local value_was_set = table.setValueAtPath(function_path, function(...)
+				return (function(...)
+					local x = nil + nil
+					return ...
+				end)(value_at_path(...))
+			end)
+
+			if not value_was_set then
+				d.print("Failed to set the function!", false, 1, peer_id)
+				return
+			end
+
+			d.print(("successfully set the function %s to cause an error when its called."):format(function_path), false, 0, peer_id)
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -5494,7 +5535,7 @@ function tickControls()
 
 			--? is the driver incapcitated, dead or non existant
 			local driver_data = s.getCharacterData(vehicle_object.survivors[1].id)
-			if not driver_data or driver_data.dead or driver_data.incapcitated then
+			if not driver_data or driver_data.dead or driver_data.incapacitated then
 				goto break_control_vehicle
 			end
 

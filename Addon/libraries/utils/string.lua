@@ -70,7 +70,14 @@ function string.removePrefix(vehicle_name, keep_caps)
 	return vehicle_name
 end
 
+--- Returns a string in a format that looks like how the table would be written.
+---@param t table the table you want to turn into a string
+---@return string str the table but in string form.
 function string.fromTable(t)
+
+	if type(t) ~= "table" then
+		d.print(("(string.fromTable) t is not a table! type of t: %s t: %s"):format(type(t), t), true, 1)
+	end
 
 	local function tableToString(T, S, ind)
 		S = S or "{"
@@ -92,7 +99,7 @@ function string.fromTable(t)
 
 			if type(value) == "table" then
 				S = ("%s{"):format(S)
-				S = tableoString(value, S, ind.."  ")
+				S = tableToString(value, S, ind.."  ")
 			elseif type(value) == "string" then
 				S = ("%s\"%s\""):format(S, tostring(value))
 			else
@@ -108,4 +115,23 @@ function string.fromTable(t)
 	end
 
 	return tableToString(t)
+end
+
+--- returns the number of instances of that character in the string
+---@param str string the string we are wanting to check
+---@param char any the character(s) we are wanting to count for in str, note that this is as a lua pattern
+---@return number count the number of instances of char, if there was an error, count will be 0, and is_success will be false
+---@return boolean is_success if we successfully got the number of instances of the character
+function string.countCharInstances(str, char)
+
+	if type(str) ~= "string" then
+		d.print(("(string.countCharInstances) str is not a string! type of str: %s str: %s"):format(type(str), str), true, 1)
+		return 0, false
+	end
+
+	char = tostring(char)
+
+	local _, count = string.gsub(str, char, "")
+
+	return count, true
 end

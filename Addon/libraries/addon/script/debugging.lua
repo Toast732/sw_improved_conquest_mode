@@ -398,20 +398,51 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			local function setupFunction(funct, name)
 				d.print(("setting up function %s()..."):format(name), true, 8)
 
-				g_tb.funct_count = g_tb.funct_count + 1
-				g_tb.funct_names[g_tb.funct_count] = name
+				local funct_index = nil
 
-				local funct_index = g_tb.funct_count
+				-- check if this function is already indexed
+				if g_tb.funct_names then
+					for saved_funct_index = 1, g_tb.funct_count do
+						if g_tb.funct_names[saved_funct_index] == name then
+							funct_index = saved_funct_index
+							break
+						end
+					end
+				end
+
+				-- this function is not yet indexed, so add it to the index.
+				if not funct_index then
+					g_tb.funct_count = g_tb.funct_count + 1
+					g_tb.funct_names[g_tb.funct_count] = name
+
+					funct_index = g_tb.funct_count
+				end
+
+				-- return this as the new function
 				return (function(...)
 
+					-- increase the stack size before we run the function
 					g_tb.stack_size = g_tb.stack_size + 1
+
+					-- add this function to the stack
 					g_tb.stack[g_tb.stack_size] = {
 						funct_index
 					}
+
+					-- if this function was given parametres, add them to the stack
 					if ... ~= nil then
 						g_tb.stack[g_tb.stack_size][2] = {...}
 					end
 
+					--[[ 
+						run this function
+						if theres no error, it will then be removed from the stack, and then we will return the function's returned value
+						if there is an error, it will never be removed from the stack, so we can detect the error.
+
+						we have to do this via a function call, as we need to save the returned value before we return it
+						as we have to first remove it from the stack
+						we could use table.pack or {}, but that will cause a large increase in the performance impact.
+					]]
 					return removeAndReturn(funct(...))
 				end)
 			end
@@ -432,9 +463,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					if k ~= "_ENV_NORMAL" then
+					if k ~= "_ENV_NORMAL" and k ~= "g_savedata" then
 						local type_v = type(v)
-						if type_v == "function" and k ~= "g_savedata" then
+						if type_v == "function" then
 							-- "inject" debug into the function
 							local name = ("%s.%s"):format(n, k)
 							T[k] = setupFunction(v, name)
@@ -455,14 +486,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					T._ENV_NORMAL = _ENV_NORMAL
 
 					T.g_savedata = g_savedata
-					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
+			local start_traceback_setup_time = s.getTimeMillisec()
+
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
+			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -611,15 +645,27 @@ function Debugging.setDebug(debug_id, peer_id, override_state)
 			end
 			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
-			player_data.debug[debug_types[debug_id]] = override_state == nil and not player_data.debug[debug_types[debug_id]] or override_state
 
-			if player_data.debug[debug_types[debug_id]] then
-				g_savedata.debug[debug_types[debug_id]].enabled = true
+			local debug_type = debug_types[debug_id]
+
+			-- if the override is set, then set to the override.
+			if override_state ~= nil then
+				player_data.debug[debug_type] = override_state
+			else -- if the override is not set, then just toggle the state.
+				player_data.debug[debug_type] = not player_data.debug[debug_type]
+			end
+
+			-- check if we need to enable or disable the debug's functionality
+			if player_data.debug[debug_type] then
+				-- enable the debug's functionality
+				g_savedata.debug[debug_type].enabled = true
 			else
+				-- we disabled it, check if we can just disable it's functionality.
 				d.checkDebug()
 			end
 
-			return d.handleDebug(debug_types[debug_id], player_data.debug[debug_types[debug_id]], peer_id)
+			-- return the handle debug message.
+			return d.handleDebug(debug_type, player_data.debug[debug_type], peer_id)
 		end
 	end
 end

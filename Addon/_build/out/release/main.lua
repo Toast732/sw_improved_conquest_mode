@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.3.2.4)"
+ADDON_VERSION = "(0.3.2.5)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -64,7 +64,7 @@ VEHICLE = {
 				NORMAL = 0.9,
 				ROAD = 1,
 				BRIDGE = 0.7,
-				OFFROAD = 0.5
+				OFFROAD = 0.75
 			}
 		}
 	}
@@ -726,6 +726,90 @@ function table.fromString(S)
 	return table.pack(stringToTable(S, 1))[1]
 end
 
+--- Returns the value at the path in _ENV
+---@param path string the path we want to get the value at
+---@return any value the value at the path, if it reached a nil value in the given path, it will return the value up to that point, and is_success will be false.
+---@return boolean is_success if it successfully got the value at the path
+function table.getValueAtPath(path)
+	if type(path) ~= "string" then
+		d.print(("path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return nil, false
+	end
+
+	local cur_path
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end
+
+	local cur_path_string = "_ENV"
+
+	for index in string.gmatch(path, "([^%.]+)") do
+		if not cur_path[index] then
+			d.print(("%s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return cur_path, false
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	return cur_path, true
+end
+
+--- Sets the value at the path in _ENV
+---@param path string the path we want to set the value at
+---@param set_value any the value we want to set the value of what the path is
+---@return boolean is_success if it successfully got the value at the path
+function table.setValueAtPath(path, set_value)
+	if type(path) ~= "string" then
+		d.print(("(table.setValueAtPath) path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return false
+	end
+
+	local cur_path = _ENV
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	--[[if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end]]
+
+	local cur_path_string = "_ENV"
+
+	local index_count = 0
+
+	local last_index, got_count = string.countCharInstances(path, "%.")
+
+	last_index = last_index + 1
+
+	if not got_count then
+		d.print(("(table.setValueAtPath) failed to get count! path: %s"):format(path))
+		return false
+	end
+	
+	for index in string.gmatch(path, "([^%.]+)") do
+		index_count = index_count + 1
+
+		if not cur_path[index] then
+			d.print(("(table.setValueAtPath) %s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return false
+		end
+
+		if index_count == last_index then
+			cur_path[index] = set_value
+
+			return true
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	d.print("(table.setValueAtPath) never reached end of path?", true, 1)
+	return false
+end
+
 -- a table containing a bunch of functions for making a copy of tables, to best fit each scenario performance wise.
 table.copy = {
 
@@ -1092,6 +1176,10 @@ end
 
 function string.fromTable(t)
 
+	if type(t) ~= "table" then
+		d.print(("(string.fromTable) t is not a table! type of t: %s t: %s"):format(type(t), t), true, 1)
+	end
+
 	local function tableToString(T, S, ind)
 		S = S or "{"
 		ind = ind or "  "
@@ -1112,7 +1200,7 @@ function string.fromTable(t)
 
 			if type(value) == "table" then
 				S = ("%s{"):format(S)
-				S = tableoString(value, S, ind.."  ")
+				S = tableToString(value, S, ind.."  ")
 			elseif type(value) == "string" then
 				S = ("%s\"%s\""):format(S, tostring(value))
 			else
@@ -1128,6 +1216,25 @@ function string.fromTable(t)
 	end
 
 	return tableToString(t)
+end
+
+--- returns the number of instances of that character in the string
+---@param str string the string we are wanting to check
+---@param char any the character(s) we are wanting to count for in str, note that this is as a lua pattern
+---@return number count the number of instances of char, if there was an error, count will be 0, and is_success will be false
+---@return boolean is_success if we successfully got the number of instances of the character
+function string.countCharInstances(str, char)
+
+	if type(str) ~= "string" then
+		d.print(("(string.countCharInstances) str is not a string! type of str: %s str: %s"):format(type(str), str), true, 1)
+		return 0, false
+	end
+
+	char = tostring(char)
+
+	local _, count = string.gsub(str, char, "")
+
+	return count, true
 end
 
 -- library name
@@ -1521,20 +1628,51 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			local function setupFunction(funct, name)
 				d.print(("setting up function %s()..."):format(name), true, 8)
 
-				g_tb.funct_count = g_tb.funct_count + 1
-				g_tb.funct_names[g_tb.funct_count] = name
+				local funct_index = nil
 
-				local funct_index = g_tb.funct_count
+				-- check if this function is already indexed
+				if g_tb.funct_names then
+					for saved_funct_index = 1, g_tb.funct_count do
+						if g_tb.funct_names[saved_funct_index] == name then
+							funct_index = saved_funct_index
+							break
+						end
+					end
+				end
+
+				-- this function is not yet indexed, so add it to the index.
+				if not funct_index then
+					g_tb.funct_count = g_tb.funct_count + 1
+					g_tb.funct_names[g_tb.funct_count] = name
+
+					funct_index = g_tb.funct_count
+				end
+
+				-- return this as the new function
 				return (function(...)
 
+					-- increase the stack size before we run the function
 					g_tb.stack_size = g_tb.stack_size + 1
+
+					-- add this function to the stack
 					g_tb.stack[g_tb.stack_size] = {
 						funct_index
 					}
+
+					-- if this function was given parametres, add them to the stack
 					if ... ~= nil then
 						g_tb.stack[g_tb.stack_size][2] = {...}
 					end
 
+					--[[ 
+						run this function
+						if theres no error, it will then be removed from the stack, and then we will return the function's returned value
+						if there is an error, it will never be removed from the stack, so we can detect the error.
+
+						we have to do this via a function call, as we need to save the returned value before we return it
+						as we have to first remove it from the stack
+						we could use table.pack or {}, but that will cause a large increase in the performance impact.
+					]]
 					return removeAndReturn(funct(...))
 				end)
 			end
@@ -1555,9 +1693,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					if k ~= "_ENV_NORMAL" then
+					if k ~= "_ENV_NORMAL" and k ~= "g_savedata" then
 						local type_v = type(v)
-						if type_v == "function" and k ~= "g_savedata" then
+						if type_v == "function" then
 							-- "inject" debug into the function
 							local name = ("%s.%s"):format(n, k)
 							T[k] = setupFunction(v, name)
@@ -1578,14 +1716,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					T._ENV_NORMAL = _ENV_NORMAL
 
 					T.g_savedata = g_savedata
-					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
+			local start_traceback_setup_time = s.getTimeMillisec()
+
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
+			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -1734,15 +1875,27 @@ function Debugging.setDebug(debug_id, peer_id, override_state)
 			end
 			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
-			player_data.debug[debug_types[debug_id]] = override_state == nil and not player_data.debug[debug_types[debug_id]] or override_state
 
-			if player_data.debug[debug_types[debug_id]] then
-				g_savedata.debug[debug_types[debug_id]].enabled = true
+			local debug_type = debug_types[debug_id]
+
+			-- if the override is set, then set to the override.
+			if override_state ~= nil then
+				player_data.debug[debug_type] = override_state
+			else -- if the override is not set, then just toggle the state.
+				player_data.debug[debug_type] = not player_data.debug[debug_type]
+			end
+
+			-- check if we need to enable or disable the debug's functionality
+			if player_data.debug[debug_type] then
+				-- enable the debug's functionality
+				g_savedata.debug[debug_type].enabled = true
 			else
+				-- we disabled it, check if we can just disable it's functionality.
 				d.checkDebug()
 			end
 
-			return d.handleDebug(debug_types[debug_id], player_data.debug[debug_types[debug_id]], peer_id)
+			-- return the handle debug message.
+			return d.handleDebug(debug_type, player_data.debug[debug_type], peer_id)
 		end
 	end
 end
@@ -6203,7 +6356,7 @@ function Cargo.getTransportVehicle(vehicle_type)
 		d.print("(Cargo.getTransportVehicle) prefab_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
 		return
 	else
-		prefab_data.name = prefab_data.location_data.name
+		prefab_data.name = prefab_data.location.data.name
 	end
 	return prefab_data
 end
@@ -6859,7 +7012,7 @@ function onCreate(is_world_create)
 			table.sort(g_savedata.sweep_and_prune.flags.z, function(a, b) return a.z < b.z end)
 
 			-- sets up scouting data
-			for island_index, island in pairs(g_savedata.islands) do
+			for _, island in pairs(g_savedata.islands) do
 				table.tabulate(g_savedata.ai_knowledge.scout, island.name)
 				g_savedata.ai_knowledge.scout[island.name].scouted = 0
 			end
@@ -7166,6 +7319,12 @@ player_commands = {
 			desc = "forces all air vehicles to have their target coordinates set to the target's position, when they have a target.",
 			args = "",
 			example = "?icm air_vehicles_kamikaze"
+		},
+		causeerror = {
+			short_desc = "causes an error when the specified function is called.",
+			desc = "causes an error when the specified function is called. Useful for debugging the traceback debug, or trying to reproduce an error.",
+			args = "<function_name>",
+			example = "?icm cause_error math.euclideanDistance"
 		}
 	},
 	host = {}
@@ -7917,6 +8076,41 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		elseif command == "airvehicleskamikaze" then
 			g_air_vehicles_kamikaze = not g_air_vehicles_kamikaze
 			d.print(("g_air_vehicles_kamikaze set to %s"):format(tostring(g_air_vehicles_kamikaze)))
+		elseif command == "causeerror" then
+			local function_path = arg[1]
+			if not function_path then
+				d.print("You need to specify a function path!", false, 1, peer_id)
+				return
+			end
+
+			local value_at_path, got_path = table.getValueAtPath(function_path)
+
+			if not got_path then
+				d.print(("failed to get path. returned value:\n%s"):format(string.fromTable(value_at_path)), false, 1, peer_id)
+				return
+			end
+
+			if type(value_at_path) ~= "function" then
+				d.print(("value at path is not a function! returned type: %s, returned value:\n%s"):format(type(value_at_path), string.fromTable(value_at_path)), false, 1, peer_id)
+			end
+
+			d.print(("Warning, %s set function %s to cause an error when its called."):format(s.getPlayerName(peer_id), function_path), false, 0, -1)
+
+			local value_at_path = table.copy.deep(value_at_path)
+			
+			local value_was_set = table.setValueAtPath(function_path, function(...)
+				return (function(...)
+					local x = nil + nil
+					return ...
+				end)(value_at_path(...))
+			end)
+
+			if not value_was_set then
+				d.print("Failed to set the function!", false, 1, peer_id)
+				return
+			end
+
+			d.print(("successfully set the function %s to cause an error when its called."):format(function_path), false, 0, peer_id)
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -8325,7 +8519,7 @@ function onVehicleDespawn(vehicle_id, peer_id)
 			g_savedata.player_vehicles[vehicle_id] = nil
 
 			-- make sure to clear this vehicle from all AI
-			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
 				if squad.target_vehicles and squad.target_vehicles[vehicle_id] then
 					squad.target_vehicles[vehicle_id] = nil
 
