@@ -294,7 +294,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			end
 
 			local function modifyFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 7)
+				--d.print(("setting up function %s()..."):format(name), true, 7)
 				return (function(...)
 
 					local returned = _ENV_NORMAL.table.pack(callFunction(funct, name, ...))
@@ -394,22 +394,51 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return ...
 			end
 			local function setupFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 8)
+				--d.print(("setting up function %s()..."):format(name), true, 8)
+				local funct_index = nil
 
-				g_tb.funct_count = g_tb.funct_count + 1
-				g_tb.funct_names[g_tb.funct_count] = name
+				-- check if this function is already indexed
+				if g_tb.funct_names then
+					for saved_funct_index = 1, g_tb.funct_count do
+						if g_tb.funct_names[saved_funct_index] == name then
+							funct_index = saved_funct_index
+							break
+						end
+					end
+				end
 
-				local funct_index = g_tb.funct_count
+				-- this function is not yet indexed, so add it to the index.
+				if not funct_index then
+					g_tb.funct_count = g_tb.funct_count + 1
+					g_tb.funct_names[g_tb.funct_count] = name
+
+					funct_index = g_tb.funct_count
+				end
+
+				-- return this as the new function
 				return (function(...)
 
+					-- increase the stack size before we run the function
 					g_tb.stack_size = g_tb.stack_size + 1
-					g_tb.trace[g_tb.stack_size] = {
+
+					-- add this function to the stack
+					g_tb.stack[g_tb.stack_size] = {
 						funct_index
 					}
+
+					-- if this function was given parametres, add them to the stack
 					if ... ~= nil then
-						g_tb.trace[g_tb.stack_size][2] = {...}
+						g_tb.stack[g_tb.stack_size][2] = {...}
 					end
 
+					--[[ 
+						run this function
+						if theres no error, it will then be removed from the stack, and then we will return the function's returned value
+						if there is an error, it will never be removed from the stack, so we can detect the error.
+						we have to do this via a function call, as we need to save the returned value before we return it
+						as we have to first remove it from the stack
+						we could use table.pack or {}, but that will cause a large increase in the performance impact.
+					]]
 					return removeAndReturn(funct(...))
 				end)
 			end
@@ -430,9 +459,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					if k ~= "_ENV_NORMAL" then
+					if k ~= "_ENV_NORMAL" and k ~= "g_savedata" then
 						local type_v = type(v)
-						if type_v == "function" and k ~= "g_savedata" then
+						if type_v == "function" then
 							-- "inject" debug into the function
 							local name = ("%s.%s"):format(n, k)
 							T[k] = setupFunction(v, name)
@@ -453,14 +482,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					T._ENV_NORMAL = _ENV_NORMAL
 
 					T.g_savedata = g_savedata
-					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
+			local start_traceback_setup_time = s.getTimeMillisec()
+
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
+			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -793,11 +825,11 @@ Debugging.trace = {
 		local str = ""
 
 		if g_tb.stack_size > 0 then
-			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.trace[g_tb.stack_size][1]], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
+			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.stack[g_tb.stack_size][1]], d.buildArgs(g_tb.stack[g_tb.stack_size][2]))
 		end
 
 		for trace = g_tb.stack_size - 1, 1, -1 do
-			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.trace[trace][1]], d.buildArgs(g_tb.trace[trace][2]))
+			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.stack[trace][1]], d.buildArgs(g_tb.stack[trace][2]))
 		end
 
 		d.print(str, false, 8)

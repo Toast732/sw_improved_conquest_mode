@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.8)"
+ADDON_VERSION = "(0.4.0.9)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -64,7 +64,7 @@ VEHICLE = {
 				NORMAL = 0.9,
 				ROAD = 1,
 				BRIDGE = 0.7,
-				OFFROAD = 0.5
+				OFFROAD = 0.75
 			}
 		}
 	}
@@ -336,7 +336,7 @@ g_savedata = {
 			enabled = false,
 			default = false,
 			needs_setup_on_reload = true,
-			trace = {},
+			stack = {},
 			stack_size = 0,
 			funct_names = {},
 			funct_count = 0
@@ -1444,7 +1444,14 @@ function string.removePrefix(vehicle_name, keep_caps)
 	return vehicle_name
 end
 
+--- Returns a string in a format that looks like how the table would be written.
+---@param t table the table you want to turn into a string
+---@return string str the table but in string form.
 function string.fromTable(t)
+
+	if type(t) ~= "table" then
+		d.print(("(string.fromTable) t is not a table! type of t: %s t: %s"):format(type(t), t), true, 1)
+	end
 
 	local function tableToString(T, S, ind)
 		S = S or "{"
@@ -1466,7 +1473,7 @@ function string.fromTable(t)
 
 			if type(value) == "table" then
 				S = ("%s{"):format(S)
-				S = tableoString(value, S, ind.."  ")
+				S = tableToString(value, S, ind.."  ")
 			elseif type(value) == "string" then
 				S = ("%s\"%s\""):format(S, tostring(value))
 			else
@@ -1482,6 +1489,25 @@ function string.fromTable(t)
 	end
 
 	return tableToString(t)
+end
+
+--- returns the number of instances of that character in the string
+---@param str string the string we are wanting to check
+---@param char any the character(s) we are wanting to count for in str, note that this is as a lua pattern
+---@return number count the number of instances of char, if there was an error, count will be 0, and is_success will be false
+---@return boolean is_success if we successfully got the number of instances of the character
+function string.countCharInstances(str, char)
+
+	if type(str) ~= "string" then
+		d.print(("(string.countCharInstances) str is not a string! type of str: %s str: %s"):format(type(str), str), true, 1)
+		return 0, false
+	end
+
+	char = tostring(char)
+
+	local _, count = string.gsub(str, char, "")
+
+	return count, true
 end
 -- required libraries
 
@@ -1612,6 +1638,90 @@ function table.fromString(S)
 	end
 
 	return table.pack(stringToTable(S, 1))[1]
+end
+
+--- Returns the value at the path in _ENV
+---@param path string the path we want to get the value at
+---@return any value the value at the path, if it reached a nil value in the given path, it will return the value up to that point, and is_success will be false.
+---@return boolean is_success if it successfully got the value at the path
+function table.getValueAtPath(path)
+	if type(path) ~= "string" then
+		d.print(("path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return nil, false
+	end
+
+	local cur_path
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end
+
+	local cur_path_string = "_ENV"
+
+	for index in string.gmatch(path, "([^%.]+)") do
+		if not cur_path[index] then
+			d.print(("%s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return cur_path, false
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	return cur_path, true
+end
+
+--- Sets the value at the path in _ENV
+---@param path string the path we want to set the value at
+---@param set_value any the value we want to set the value of what the path is
+---@return boolean is_success if it successfully got the value at the path
+function table.setValueAtPath(path, set_value)
+	if type(path) ~= "string" then
+		d.print(("(table.setValueAtPath) path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return false
+	end
+
+	local cur_path = _ENV
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	--[[if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end]]
+
+	local cur_path_string = "_ENV"
+
+	local index_count = 0
+
+	local last_index, got_count = string.countCharInstances(path, "%.")
+
+	last_index = last_index + 1
+
+	if not got_count then
+		d.print(("(table.setValueAtPath) failed to get count! path: %s"):format(path))
+		return false
+	end
+
+	for index in string.gmatch(path, "([^%.]+)") do
+		index_count = index_count + 1
+
+		if not cur_path[index] then
+			d.print(("(table.setValueAtPath) %s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return false
+		end
+
+		if index_count == last_index then
+			cur_path[index] = set_value
+
+			return true
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	d.print("(table.setValueAtPath) never reached end of path?", true, 1)
+	return false
 end
 
 -- a table containing a bunch of functions for making a copy of tables, to best fit each scenario performance wise.
@@ -1945,7 +2055,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			end
 
 			local function modifyFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 7)
+				--d.print(("setting up function %s()..."):format(name), true, 7)
 				return (function(...)
 
 					local returned = _ENV_NORMAL.table.pack(callFunction(funct, name, ...))
@@ -2045,22 +2155,51 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				return ...
 			end
 			local function setupFunction(funct, name)
-				d.print(("setting up function %s()..."):format(name), true, 8)
+				--d.print(("setting up function %s()..."):format(name), true, 8)
+				local funct_index = nil
 
-				g_tb.funct_count = g_tb.funct_count + 1
-				g_tb.funct_names[g_tb.funct_count] = name
+				-- check if this function is already indexed
+				if g_tb.funct_names then
+					for saved_funct_index = 1, g_tb.funct_count do
+						if g_tb.funct_names[saved_funct_index] == name then
+							funct_index = saved_funct_index
+							break
+						end
+					end
+				end
 
-				local funct_index = g_tb.funct_count
+				-- this function is not yet indexed, so add it to the index.
+				if not funct_index then
+					g_tb.funct_count = g_tb.funct_count + 1
+					g_tb.funct_names[g_tb.funct_count] = name
+
+					funct_index = g_tb.funct_count
+				end
+
+				-- return this as the new function
 				return (function(...)
 
+					-- increase the stack size before we run the function
 					g_tb.stack_size = g_tb.stack_size + 1
-					g_tb.trace[g_tb.stack_size] = {
+
+					-- add this function to the stack
+					g_tb.stack[g_tb.stack_size] = {
 						funct_index
 					}
+
+					-- if this function was given parametres, add them to the stack
 					if ... ~= nil then
-						g_tb.trace[g_tb.stack_size][2] = {...}
+						g_tb.stack[g_tb.stack_size][2] = {...}
 					end
 
+					--[[ 
+						run this function
+						if theres no error, it will then be removed from the stack, and then we will return the function's returned value
+						if there is an error, it will never be removed from the stack, so we can detect the error.
+						we have to do this via a function call, as we need to save the returned value before we return it
+						as we have to first remove it from the stack
+						we could use table.pack or {}, but that will cause a large increase in the performance impact.
+					]]
 					return removeAndReturn(funct(...))
 				end)
 			end
@@ -2081,9 +2220,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				-- default name to _ENV
 				n = n or "_ENV"
 				for k, v in pairs(t) do
-					if k ~= "_ENV_NORMAL" then
+					if k ~= "_ENV_NORMAL" and k ~= "g_savedata" then
 						local type_v = type(v)
-						if type_v == "function" and k ~= "g_savedata" then
+						if type_v == "function" then
 							-- "inject" debug into the function
 							local name = ("%s.%s"):format(n, k)
 							T[k] = setupFunction(v, name)
@@ -2104,14 +2243,17 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					T._ENV_NORMAL = _ENV_NORMAL
 
 					T.g_savedata = g_savedata
-					d.print("Completed setting up tracebacks!", true, 8)
 				end
 
 				return T
 			end
 
+			local start_traceback_setup_time = s.getTimeMillisec()
+
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
+
+			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -2444,11 +2586,11 @@ Debugging.trace = {
 		local str = ""
 
 		if g_tb.stack_size > 0 then
-			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.trace[g_tb.stack_size][1]], d.buildArgs(g_tb.trace[g_tb.stack_size][2]))
+			str = ("Error in function: %s(%s)"):format(g_tb.funct_names[g_tb.stack[g_tb.stack_size][1]], d.buildArgs(g_tb.stack[g_tb.stack_size][2]))
 		end
 
 		for trace = g_tb.stack_size - 1, 1, -1 do
-			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.trace[trace][1]], d.buildArgs(g_tb.trace[trace][2]))
+			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.stack[trace][1]], d.buildArgs(g_tb.stack[trace][2]))
 		end
 
 		d.print(str, false, 8)
@@ -2858,6 +3000,146 @@ end
 ]]
 
 -- required libraries
+-- required libraries
+
+-- library name
+Island = {}
+
+-- shortened library name
+is = Island
+
+-- checks if this island can spawn the specified vehicle
+---@param island ISLAND the island you want to check if AI can spawn there
+---@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
+---@return boolean can_spawn if the AI can spawn there
+function Island.canSpawn(island, selected_prefab)
+
+	-- if this island is owned by the AI
+	if island.faction ~= ISLAND.FACTION.AI then
+		return false
+	end
+
+	-- if this vehicle is a turret
+	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
+		local has_spawn = false
+		local total_spawned = 0
+
+		-- check if this island even has any turret zones
+		if not #island.zones.turrets then
+			return false
+		end
+
+		for turret_zone_index = 1, #island.zones.turrets do
+			if not island.zones.turrets[turret_zone_index].is_spawned then
+				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
+					has_spawn = true
+				end
+			else
+				total_spawned = total_spawned + 1
+
+				-- already max amount of turrets
+				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
+					return false
+				end
+
+				-- check if this island already has all of the turret spawns filled
+				if total_spawned >= #island.zones.turrets then
+					return false
+				end
+			end
+		end
+
+		-- if no valid turret spawn was found
+		if not has_spawn then
+			return false
+		end
+	else
+		-- this island can spawn this specific vehicle
+		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
+			return false
+		end
+	end
+
+	-- theres no players within 2500m (cannot see the spawn point)
+	if not pl.noneNearby(s.getPlayers(), island.transform, 2500, true) then
+		return false
+	end
+
+	return true
+end
+
+--# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param vehicle_id integer the vehicle_id of the island's flag vehicle
+---@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
+---@return boolean got_island if the island was gotten
+function Island.getDataFromVehicleID(vehicle_id)
+	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.ai_base_island, true
+	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
+		return g_savedata.player_base_island, true
+	else
+		for _, island in pairs(g_savedata.islands) do
+			if island.flag_vehicle.id == vehicle_id then
+				return island, true
+			end
+		end
+	end
+
+	return nil, false
+end
+
+--# returns the island data from the provided island index (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param island_index integer the island index you want to get
+---@return ISLAND island the island data from the index
+---@return boolean island_found returns true if the island was found
+function Island.getDataFromIndex(island_index)
+	if not island_index then -- if the island_index wasn't specified
+		d.print("(Island.getDataFromIndex) island_index was never inputted!", true, 1)
+		return nil, false
+	end
+
+	if g_savedata.islands[island_index] then
+		-- if its a normal island
+		return g_savedata.islands[island_index], true
+	elseif island_index == g_savedata.ai_base_island.index then
+		-- if its the ai's main base
+		return g_savedata.ai_base_island, true
+	elseif island_index == g_savedata.player_base_island.index then
+		-- if its the player's main base
+		return g_savedata.player_base_island, true 
+	end
+
+	d.print("(Island.getDataFromIndex) island was not found! inputted island_index: "..tostring(island_index), true, 1)
+
+	return nil, false
+end
+
+--# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
+---@param island_name string the island name you want to get
+---@return ISLAND island the island data from the name
+---@return boolean island_found returns true if the island was found
+function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
+	if island_name then
+		island_name = string.friendly(island_name)
+		if island_name == string.friendly(g_savedata.ai_base_island.name) then
+			-- if its the ai's main base
+			return g_savedata.ai_base_island, true
+		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
+			-- if its the player's main base
+			return g_savedata.player_base_island, true
+		else
+			-- check all other islands
+			for _, island in pairs(g_savedata.islands) do
+				if island_name == string.friendly(island.name) then
+					return island, true
+				end
+			end
+		end
+	else
+		return nil, false
+	end
+	return nil, false
+end
 --[[
 
 
@@ -3165,146 +3447,6 @@ function Setup.createVehiclePrefabs()
 		::createVehiclePrefabs_continue_addon::
 	end
 end
--- required libraries
-
--- library name
-Island = {}
-
--- shortened library name
-is = Island
-
--- checks if this island can spawn the specified vehicle
----@param island ISLAND the island you want to check if AI can spawn there
----@param selected_prefab PREFAB_DATA the selected_prefab you want to check with the island
----@return boolean can_spawn if the AI can spawn there
-function Island.canSpawn(island, selected_prefab)
-
-	-- if this island is owned by the AI
-	if island.faction ~= ISLAND.FACTION.AI then
-		return false
-	end
-
-	-- if this vehicle is a turret
-	if Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
-		local has_spawn = false
-		local total_spawned = 0
-
-		-- check if this island even has any turret zones
-		if not #island.zones.turrets then
-			return false
-		end
-
-		for turret_zone_index = 1, #island.zones.turrets do
-			if not island.zones.turrets[turret_zone_index].is_spawned then
-				if not has_spawn and Tags.has(island.zones.turrets[turret_zone_index].tags, "turret_type="..Tags.getValue(selected_prefab.vehicle.tags, "role", true)) then
-					has_spawn = true
-				end
-			else
-				total_spawned = total_spawned + 1
-
-				-- already max amount of turrets
-				if total_spawned >= g_savedata.settings.MAX_TURRET_AMOUNT then 
-					return false
-				end
-
-				-- check if this island already has all of the turret spawns filled
-				if total_spawned >= #island.zones.turrets then
-					return false
-				end
-			end
-		end
-
-		-- if no valid turret spawn was found
-		if not has_spawn then
-			return false
-		end
-	else
-		-- this island can spawn this specific vehicle
-		if not Tags.has(island.tags, "can_spawn="..string.gsub(Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true), "wep_", "")) and not Tags.has(selected_prefab.vehicle.tags, "role=scout") then -- if it can spawn at the island
-			return false
-		end
-	end
-
-	-- theres no players within 2500m (cannot see the spawn point)
-	if not pl.noneNearby(s.getPlayers(), island.transform, 2500, true) then
-		return false
-	end
-
-	return true
-end
-
---# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param vehicle_id integer the vehicle_id of the island's flag vehicle
----@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
----@return boolean got_island if the island was gotten
-function Island.getDataFromVehicleID(vehicle_id)
-	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
-		return g_savedata.ai_base_island, true
-	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
-		return g_savedata.player_base_island, true
-	else
-		for _, island in pairs(g_savedata.islands) do
-			if island.flag_vehicle.id == vehicle_id then
-				return island, true
-			end
-		end
-	end
-
-	return nil, false
-end
-
---# returns the island data from the provided island index (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param island_index integer the island index you want to get
----@return ISLAND island the island data from the index
----@return boolean island_found returns true if the island was found
-function Island.getDataFromIndex(island_index)
-	if not island_index then -- if the island_index wasn't specified
-		d.print("(Island.getDataFromIndex) island_index was never inputted!", true, 1)
-		return nil, false
-	end
-
-	if g_savedata.islands[island_index] then
-		-- if its a normal island
-		return g_savedata.islands[island_index], true
-	elseif island_index == g_savedata.ai_base_island.index then
-		-- if its the ai's main base
-		return g_savedata.ai_base_island, true
-	elseif island_index == g_savedata.player_base_island.index then
-		-- if its the player's main base
-		return g_savedata.player_base_island, true 
-	end
-
-	d.print("(Island.getDataFromIndex) island was not found! inputted island_index: "..tostring(island_index), true, 1)
-
-	return nil, false
-end
-
---# returns the island data from the provided island name (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param island_name string the island name you want to get
----@return ISLAND island the island data from the name
----@return boolean island_found returns true if the island was found
-function Island.getDataFromName(island_name) -- function that gets the island by its name, it doesnt care about capitalisation and will replace underscores with spaces automatically
-	if island_name then
-		island_name = string.friendly(island_name)
-		if island_name == string.friendly(g_savedata.ai_base_island.name) then
-			-- if its the ai's main base
-			return g_savedata.ai_base_island, true
-		elseif island_name == string.friendly(g_savedata.player_base_island.name) then
-			-- if its the player's main base
-			return g_savedata.player_base_island, true
-		else
-			-- check all other islands
-			for _, island in pairs(g_savedata.islands) do
-				if island_name == string.friendly(island.name) then
-					return island, true
-				end
-			end
-		end
-	else
-		return nil, false
-	end
-	return nil, false
-end
 
 
 -- library name
@@ -3326,7 +3468,11 @@ local version_updates = {
 	"(0.3.0.78)",
 	"(0.3.0.79)",
 	"(0.3.0.82)",
-	"(0.3.1.2)"
+	"(0.3.1.2)",
+	"(0.3.2.2)",
+	"(0.3.2.6)",
+	"(0.3.2.8)",
+	"(0.3.2.9)"
 }
 
 --[[
@@ -3353,7 +3499,7 @@ local version_updates = {
 ]]
 
 --# creates version data for the specified version, for use in the version_history table
----@param version string? the version you want to create the data on
+---@param version string the version you want to create the data on
 ---@return table version_history_data the data of the version
 function Compatibility.createVersionHistoryData(version)
 
@@ -3383,15 +3529,35 @@ end
 --# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
 function Compatibility.getSavedataCopy()
 
-	local copied_g_savedata = table.copy.deep(g_savedata)
+	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
+
+	--[[
+		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
+
+		returns a clone/copy of g_savedata
+	]]
+	
+	local function clone(t)
+		local copy = {}
+		if type(t) == "table" then
+			for key, value in next, t, nil do
+				copy[clone(key)] = clone(value)
+			end
+		else
+			copy = t
+		end
+		return copy
+	end
+
+	local copied_g_savedata = clone(g_savedata)
 	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
 
 	return copied_g_savedata
 end
 
 --# migrates the version system to the new one implemented in 0.3.0.78
----@param overwrite_g_savedata boolean? if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
----@return table|nil migrated_g_savedata
+---@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
+---@return table migrated_g_savedata
 ---@return boolean is_success if it successfully migrated the versioning system
 function Compatibility.migrateVersionSystem(overwrite_g_savedata)
 
@@ -3440,7 +3606,7 @@ end
 
 --# returns the version id from the provided version
 ---@param version string the version you want to get the id of
----@return integer|nil version_id the id of the version
+---@return integer version_id the id of the version
 ---@return boolean is_success if it found the id of the version
 function Compatibility.getVersionID(version)
 	--[[
@@ -3491,7 +3657,7 @@ end
 
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
----@return string|nil version the version associated with the id
+---@return string version the version associated with the id
 ---@return boolean is_success if it successfully got the version from the id
 function Compatibility.getVersion(version_id)
 
@@ -3512,8 +3678,8 @@ function Compatibility.getVersion(version_id)
 end
 
 --# returns version data about the specified version, or if left blank, the current version
----@param version string? the current version, leave blank if want data on current version
----@return VERSION_DATA|nil version_data the data about the version
+---@param version string the current version, leave blank if want data on current version
+---@return VERSION_DATA version_data the data about the version
 ---@return boolean is_success if it successfully got the version data
 function Compatibility.getVersionData(version)
 
@@ -3539,7 +3705,7 @@ function Compatibility.getVersionData(version)
 	-- (1) check if the version system is not migrated
 	if not g_savedata.info.version_history then
 		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
-		if not is_success or not migrated_g_savedata then
+		if not is_success then
 			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
 			return nil, false
 		end
@@ -3622,7 +3788,7 @@ function Compatibility.saveBackup()
 
 	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
 		d.print("(comp.saveBackup) migrating version system", true, 0)
-		local _, is_success = comp.migrateVersionSystem(true) -- migrate version system
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
 		if not is_success then
 			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
 			return false
@@ -3633,8 +3799,8 @@ function Compatibility.saveBackup()
 		end
 	end
 
-	local version_data, _ = comp.getVersionData()
-	if version_data and version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
+	local version_data, is_success = comp.getVersionData()
+	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
 		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
 		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
 	end
@@ -3672,7 +3838,7 @@ function Compatibility.update()
 
 	-- ensure that we're actually outdated before proceeding
 	local version_data, is_success = comp.getVersionData()
-	if not is_success or not version_data then
+	if not is_success then
 		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
 		return
 	end
@@ -3768,6 +3934,88 @@ function Compatibility.update()
 		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.2.2)" then -- 0.3.2.2 changes
+
+		local temp_g_savedata_debug = {
+			chat = {
+				enabled = g_savedata.debug.chat,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			error = {
+				enabled = g_savedata.debug.error,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			profiler = {
+				enabled = g_savedata.debug.profiler,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			map = {
+				enabled = g_savedata.debug.map,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			graph_node = {
+				enabled = g_savedata.debug.graph_node,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			driving = {
+				enabled = g_savedata.debug.driving,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			vehicle = {
+				enabled = g_savedata.debug.vehicle,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			["function"] = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true
+			},
+			traceback = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true,
+				stack = {},
+				stack_size = 0,
+				funct_names = {},
+				funct_count = 0
+			}
+		}
+
+		g_savedata.debug = temp_g_savedata_debug
+
+		for _, player in pairs(g_savedata.player_data) do
+			player.debug["function"] = false
+			player.debug.traceback = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.6)" then -- 0.3.2.6 changes
+
+		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
+
+		g_savedata.settings.PERFORMANCE_MODE = true
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.8)" then -- 0.3.2.8 changes
+
+		g_savedata.settings.CONVOY_FREQUENCY = 38 * time.minute
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.9)" then -- 0.3.2.9 changes
+
+		g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER = time.hour
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
 
 	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
@@ -3804,7 +4052,7 @@ function Compatibility.verify()
 		-- check if we're outdated
 		local version_data, is_success = comp.getVersionData()
 
-		if not is_success or not version_data then
+		if not is_success then
 			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
 			return
 		end
@@ -4453,6 +4701,9 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 		return false
 	end
 
+	-- indexed by name, this is so we dont have to constantly call server.getTileTransform for the same tiles. 
+	local tile_locations = {}
+
 	local start_time = s.getTimeMillisec()
 	d.print("Creating Path Y...", true, 0)
 	local total_paths = 0
@@ -4464,16 +4715,25 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 				local LOCATION_DATA = s.getLocationData(addon_index, location_index)
 				if LOCATION_DATA.env_mod and LOCATION_DATA.component_count > 0 then
 					for component_index = 0, LOCATION_DATA.component_count - 1 do
-						local COMPONENT_DATA, getLocationComponentData = s.getLocationComponentData(
+						local COMPONENT_DATA = s.getLocationComponentData(
 							addon_index, location_index, component_index
 						)
 						if COMPONENT_DATA.type == "zone" then
 							local graph_node = isGraphNode(COMPONENT_DATA.tags[1])
 							if graph_node then
-								local transform_matrix, gotTileTransform = s.getTileTransform(
-									empty_matrix, LOCATION_DATA.tile, 100000
-								)
-								if gotTileTransform then
+
+								local transform_matrix = tile_locations[LOCATION_DATA.tile]
+								if not transform_matrix then
+									tile_locations[LOCATION_DATA.tile] = s.getTileTransform(
+										empty_matrix,
+										LOCATION_DATA.tile,
+										100000
+									)
+
+									transform_matrix = tile_locations[LOCATION_DATA.tile]
+								end
+
+								if transform_matrix then
 									local real_transform = matrix.multiplyXZ(COMPONENT_DATA.transform, transform_matrix)
 									local x = (path_res):format(real_transform[13])
 									local last_tag = COMPONENT_DATA.tags[#COMPONENT_DATA.tags]
@@ -7713,6 +7973,11 @@ function setupRules()
 				min = nil,
 				max = nil,
 				input_multiplier = time.minute
+			},
+			CARGO_VEHICLE_DESPAWN_TIMER = {
+				min = nil,
+				max = nil,
+				input_multiplier = time.minute
 			}
 		}
 	}
@@ -7791,13 +8056,14 @@ function onCreate(is_world_create)
 			MAX_LAND_AMOUNT = property.slider("Max amount of AI Land Vehicles", 0, 40, 1, 10),
 			MAX_PLANE_AMOUNT = property.slider("Max amount of AI Planes", 0, 40, 1, 10),
 			MAX_HELI_AMOUNT = property.slider("Max amount of AI Helicopters", 0, 40, 1, 10),
-			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per Island)", 0, 7, 1, 3),
+			MAX_TURRET_AMOUNT = property.slider("Max amount of AI Turrets (Per island)", 0, 7, 1, 3),
 			AI_INITIAL_SPAWN_COUNT = property.slider("AI Initial Spawn Count", 0, 30, 1, 5),
 			AI_INITIAL_ISLAND_AMOUNT = property.slider("Percent of Islands which are AI", 0, 100, 1, 20) * 0.01,
 			ISLAND_COUNT = property.slider("Percent of Islands that are available", 0, 100, 1,100) * 0.01,
 			CARGO_GENERATION_MULTIPLIER = property.slider("Cargo Generation Multiplier (multiplies cargo generated by this)", 0.1, 5, 0.1, 1),
 			CARGO_CAPACITY_MULTIPLIER = property.slider("Cargo Capacity Multiplier (multiplier for capacity of each island)", 0.1, 5, 0.1, 1),
 			CONVOY_FREQUENCY = property.slider("Cargo Convoy Cooldown (Mins)", 5, 60, 1, 30) * 60 * 60,
+			CARGO_VEHICLE_DESPAWN_TIMER = property.slider("Cargo Vehicle Despawn Timer (Mins)", 0, 120, 1, 60) * time.minute,
 			PAUSE_WHEN_NONE_ONLINE = PAUSE_WHEN_NONE_ONLINE,
 		}
 
@@ -7850,8 +8116,6 @@ function setupMain(is_world_create)
 	warningChecks(-1)
 
 	if is_dlc_weapons then
-
-		s.announce("Loading Script: " .. s.getAddonData((s.getAddonIndex())).name, "Complete, Version: "..ADDON_VERSION, 0)
 
 		setupRules()
 		
@@ -8151,8 +8415,6 @@ function setupMain(is_world_create)
 
 	g_savedata.info.setup = true
 
-	d.print(("%s%.3f%s"):format("World setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
-
 	for debug_type, debug_setting in pairs(g_savedata.debug) do
 		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
 			local debug_id = d.debugIDFromType(debug_type)
@@ -8164,6 +8426,8 @@ function setupMain(is_world_create)
 			d.setDebug(debug_id, -1, true)
 		end
 	end
+
+	d.print(("%s%.3f%s"):format("ICM setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
 end
 
 player_commands = {
@@ -8351,10 +8615,10 @@ player_commands = {
 			example ="?icm getmemusage"
 		},
 		causeerror = {
-			short_desc = "",
-			desc = "",
-			args = "",
-			example = ""
+			short_desc = "causes an error when the specified function is called.",
+			desc = "causes an error when the specified function is called. Useful for debugging the traceback debug, or trying to reproduce an error.",
+			args = "<function_name>",
+			example = "?icm cause_error math.euclideanDistance"
 		},
 		printtraceback = {
 			short_desc = "",
@@ -9125,7 +9389,40 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				d.print(("Lua is using %0.0fkb of memory."):format(collectgarbage("count")), false, 0, peer_id)
 			end
 		elseif command == "causeerror" then
-			cause_error = true
+			local function_path = arg[1]
+			if not function_path then
+				d.print("You need to specify a function path!", false, 1, peer_id)
+				return
+			end
+
+			local value_at_path, got_path = table.getValueAtPath(function_path)
+
+			if not got_path then
+				d.print(("failed to get path. returned value:\n%s"):format(string.fromTable(value_at_path)), false, 1, peer_id)
+				return
+			end
+
+			if type(value_at_path) ~= "function" then
+				d.print(("value at path is not a function! returned type: %s, returned value:\n%s"):format(type(value_at_path), string.fromTable(value_at_path)), false, 1, peer_id)
+			end
+
+			d.print(("Warning, %s set function %s to cause an error when its called."):format(s.getPlayerName(peer_id), function_path), false, 0, -1)
+
+			local value_at_path = table.copy.deep(value_at_path)
+
+			local value_was_set = table.setValueAtPath(function_path, function(...)
+				return (function(...)
+					local x = nil + nil
+					return ...
+				end)(value_at_path(...))
+			end)
+
+			if not value_was_set then
+				d.print("Failed to set the function!", false, 1, peer_id)
+				return
+			end
+
+			d.print(("successfully set the function %s to cause an error when its called."):format(function_path), false, 0, peer_id)
 		elseif command == "printtraceback" then
 			-- swap to normal env to avoid a self reference loop
 			local __ENV = _ENV_NORMAL
@@ -9550,12 +9847,23 @@ function onVehicleSpawn(vehicle_id, peer_id, x, y, z, cost)
 
 	if pl.isPlayer(peer_id) then
 		d.print("Player Spawned Vehicle "..vehicle_id, true, 0)
+
+		-- get the mass of it
+		local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+
+		local mass = nil
+
+		if is_success then
+			mass = vehicle_data.mass
+		end
+
 		-- player spawned vehicle
 		g_savedata.player_vehicles[vehicle_id] = {
 			current_damage = 0, 
 			damage_threshold = 100, 
 			death_pos = nil, 
-			ui_id = s.getMapID()
+			ui_id = s.getMapID(),
+			mass = mass
 		}
 
 		return
@@ -9566,6 +9874,19 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	if is_dlc_weapons then
 		if g_savedata.player_vehicles[vehicle_id] ~= nil then
 			g_savedata.player_vehicles[vehicle_id] = nil
+
+			-- make sure to clear this vehicle from all AI
+			for _, squad in pairs(g_savedata.ai_army.squadrons) do
+				if squad.target_vehicles and squad.target_vehicles[vehicle_id] then
+					squad.target_vehicles[vehicle_id] = nil
+
+					for _, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.target_vehicle_id then
+							vehicle_object.target_vehicle_id = nil
+						end
+					end
+				end
+			end
 		end
 	end
 
@@ -9675,10 +9996,18 @@ function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 
-		local vehicle_data, is_success = s.getVehicleData(vehicle_object.target_vehicle_id)
+		local target_vehicle_id = vehicle_object.target_vehicle_id
 
-		if is_success then -- target vehicle's mass
-			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", vehicle_data.mass)
+		if g_savedata.player_vehicles[target_vehicle_id] and not g_savedata.player_vehicles[target_vehicle_id].mass then
+			local vehicle_data, is_success = s.getVehicleData(target_vehicle_id)
+
+			if is_success then
+				g_savedata.player_vehicles[target_vehicle_id].mass = vehicle_data.mass
+			end
+		end
+
+		if g_savedata.player_vehicles[target_vehicle_id].mass then -- target vehicle's mass
+			s.setVehicleKeypad(vehicle_id, "AI_TARGET_MASS", g_savedata.player_vehicles[target_vehicle_id].mass)
 		end
 
 	elseif pl.isPlayer(vehicle_object.target_player_id) and squad_vision.visible_players_map[vehicle_object.target_player_id] then
@@ -10662,7 +10991,7 @@ function tickSquadrons()
 					vehicle_object.death_timer = vehicle_object.death_timer + 1
 
 					if vehicle_object.role == SQUAD.COMMAND.CARGO then
-						if vehicle_object.death_timer >= time.hour/squadron_tick_rate then
+						if vehicle_object.death_timer >= g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER/squadron_tick_rate then
 							v.kill(vehicle_id, true)
 						end
 					elseif vehicle_object.role == SQUAD.COMMAND.SCOUT then
@@ -13327,4 +13656,5 @@ end
 function millisecondsSince(start_ms)
 	return s.getTimeMillisec() - start_ms
 end
+
 

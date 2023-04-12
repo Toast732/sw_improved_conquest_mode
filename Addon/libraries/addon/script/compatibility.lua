@@ -8,8 +8,8 @@
 
 -- required libraries
 require("libraries.addon.script.debugging")
-require("libraries.addon.script.setup")
 require("libraries.icm.island")
+require("libraries.addon.script.setup")
 
 -- library name
 Compatibility = {}
@@ -30,7 +30,11 @@ local version_updates = {
 	"(0.3.0.78)",
 	"(0.3.0.79)",
 	"(0.3.0.82)",
-	"(0.3.1.2)"
+	"(0.3.1.2)",
+	"(0.3.2.2)",
+	"(0.3.2.6)",
+	"(0.3.2.8)",
+	"(0.3.2.9)"
 }
 
 --[[
@@ -57,7 +61,7 @@ local version_updates = {
 ]]
 
 --# creates version data for the specified version, for use in the version_history table
----@param version string? the version you want to create the data on
+---@param version string the version you want to create the data on
 ---@return table version_history_data the data of the version
 function Compatibility.createVersionHistoryData(version)
 
@@ -87,15 +91,35 @@ end
 --# returns g_savedata, a copy of g_savedata which when edited, doesnt actually apply changes to the actual g_savedata, useful for backing up.
 function Compatibility.getSavedataCopy()
 
-	local copied_g_savedata = table.copy.deep(g_savedata)
+	--d.print("(comp.getSavedataCopy) getting a g_savedata copy...", true, 0)
+
+	--[[
+		credit to Woe (https://canary.discord.com/channels/357480372084408322/905791966904729611/1024355759468839074)
+
+		returns a clone/copy of g_savedata
+	]]
+	
+	local function clone(t)
+		local copy = {}
+		if type(t) == "table" then
+			for key, value in next, t, nil do
+				copy[clone(key)] = clone(value)
+			end
+		else
+			copy = t
+		end
+		return copy
+	end
+
+	local copied_g_savedata = clone(g_savedata)
 	--d.print("(comp.getSavedataCopy) created a g_savedata copy!", true, 0)
 
 	return copied_g_savedata
 end
 
 --# migrates the version system to the new one implemented in 0.3.0.78
----@param overwrite_g_savedata boolean? if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
----@return table|nil migrated_g_savedata
+---@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
+---@return table migrated_g_savedata
 ---@return boolean is_success if it successfully migrated the versioning system
 function Compatibility.migrateVersionSystem(overwrite_g_savedata)
 
@@ -144,7 +168,7 @@ end
 
 --# returns the version id from the provided version
 ---@param version string the version you want to get the id of
----@return integer|nil version_id the id of the version
+---@return integer version_id the id of the version
 ---@return boolean is_success if it found the id of the version
 function Compatibility.getVersionID(version)
 	--[[
@@ -195,7 +219,7 @@ end
 
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
----@return string|nil version the version associated with the id
+---@return string version the version associated with the id
 ---@return boolean is_success if it successfully got the version from the id
 function Compatibility.getVersion(version_id)
 
@@ -216,8 +240,8 @@ function Compatibility.getVersion(version_id)
 end
 
 --# returns version data about the specified version, or if left blank, the current version
----@param version string? the current version, leave blank if want data on current version
----@return VERSION_DATA|nil version_data the data about the version
+---@param version string the current version, leave blank if want data on current version
+---@return VERSION_DATA version_data the data about the version
 ---@return boolean is_success if it successfully got the version data
 function Compatibility.getVersionData(version)
 
@@ -243,7 +267,7 @@ function Compatibility.getVersionData(version)
 	-- (1) check if the version system is not migrated
 	if not g_savedata.info.version_history then
 		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
-		if not is_success or not migrated_g_savedata then
+		if not is_success then
 			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
 			return nil, false
 		end
@@ -326,7 +350,7 @@ function Compatibility.saveBackup()
 
 	if not g_savedata.info.version_history then -- if its not created (pre 0.3.0.78)
 		d.print("(comp.saveBackup) migrating version system", true, 0)
-		local _, is_success = comp.migrateVersionSystem(true) -- migrate version system
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem(true) -- migrate version system
 		if not is_success then
 			d.print("(comp.saveBackup) failed to migrate version system. This is probably not good!", false, 1)
 			return false
@@ -337,8 +361,8 @@ function Compatibility.saveBackup()
 		end
 	end
 
-	local version_data, _ = comp.getVersionData()
-	if version_data and version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
+	local version_data, is_success = comp.getVersionData()
+	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
 		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
 		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
 	end
@@ -376,7 +400,7 @@ function Compatibility.update()
 
 	-- ensure that we're actually outdated before proceeding
 	local version_data, is_success = comp.getVersionData()
-	if not is_success or not version_data then
+	if not is_success then
 		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
 		return
 	end
@@ -472,6 +496,88 @@ function Compatibility.update()
 		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.3.2.2)" then -- 0.3.2.2 changes
+
+		local temp_g_savedata_debug = {
+			chat = {
+				enabled = g_savedata.debug.chat,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			error = {
+				enabled = g_savedata.debug.error,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			profiler = {
+				enabled = g_savedata.debug.profiler,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			map = {
+				enabled = g_savedata.debug.map,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			graph_node = {
+				enabled = g_savedata.debug.graph_node,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			driving = {
+				enabled = g_savedata.debug.driving,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			vehicle = {
+				enabled = g_savedata.debug.vehicle,
+				default = false,
+				needs_setup_on_reload = false
+			},
+			["function"] = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true
+			},
+			traceback = {
+				enabled = false,
+				default = false,
+				needs_setup_on_reload = true,
+				stack = {},
+				stack_size = 0,
+				funct_names = {},
+				funct_count = 0
+			}
+		}
+
+		g_savedata.debug = temp_g_savedata_debug
+
+		for _, player in pairs(g_savedata.player_data) do
+			player.debug["function"] = false
+			player.debug.traceback = false
+		end
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.6)" then -- 0.3.2.6 changes
+
+		g_savedata.settings.PAUSE_WHEN_NONE_ONLINE = true
+
+		g_savedata.settings.PERFORMANCE_MODE = true
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.8)" then -- 0.3.2.8 changes
+
+		g_savedata.settings.CONVOY_FREQUENCY = 38 * time.minute
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	elseif version_data.newer_versions[1] == "(0.3.2.9)" then -- 0.3.2.9 changes
+
+		g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER = time.hour
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end
 
 	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
@@ -508,7 +614,7 @@ function Compatibility.verify()
 		-- check if we're outdated
 		local version_data, is_success = comp.getVersionData()
 
-		if not is_success or not version_data then
+		if not is_success then
 			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
 			return
 		end

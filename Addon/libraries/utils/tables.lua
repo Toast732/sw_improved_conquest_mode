@@ -130,6 +130,90 @@ function table.fromString(S)
 	return table.pack(stringToTable(S, 1))[1]
 end
 
+--- Returns the value at the path in _ENV
+---@param path string the path we want to get the value at
+---@return any value the value at the path, if it reached a nil value in the given path, it will return the value up to that point, and is_success will be false.
+---@return boolean is_success if it successfully got the value at the path
+function table.getValueAtPath(path)
+	if type(path) ~= "string" then
+		d.print(("path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return nil, false
+	end
+
+	local cur_path
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end
+
+	local cur_path_string = "_ENV"
+
+	for index in string.gmatch(path, "([^%.]+)") do
+		if not cur_path[index] then
+			d.print(("%s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return cur_path, false
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	return cur_path, true
+end
+
+--- Sets the value at the path in _ENV
+---@param path string the path we want to set the value at
+---@param set_value any the value we want to set the value of what the path is
+---@return boolean is_success if it successfully got the value at the path
+function table.setValueAtPath(path, set_value)
+	if type(path) ~= "string" then
+		d.print(("(table.setValueAtPath) path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
+		return false
+	end
+
+	local cur_path = _ENV
+	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
+	--[[if _ENV_NORMAL then
+		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
+	else
+		cur_path = table.copy.deep(_ENV)
+	end]]
+
+	local cur_path_string = "_ENV"
+
+	local index_count = 0
+
+	local last_index, got_count = string.countCharInstances(path, "%.")
+
+	last_index = last_index + 1
+
+	if not got_count then
+		d.print(("(table.setValueAtPath) failed to get count! path: %s"):format(path))
+		return false
+	end
+
+	for index in string.gmatch(path, "([^%.]+)") do
+		index_count = index_count + 1
+
+		if not cur_path[index] then
+			d.print(("(table.setValueAtPath) %s does not contain a value indexed by %s, given path: %s"):format(cur_path_string, index, path), false, 1)
+			return false
+		end
+
+		if index_count == last_index then
+			cur_path[index] = set_value
+
+			return true
+		end
+
+		cur_path = cur_path[index]
+	end
+
+	d.print("(table.setValueAtPath) never reached end of path?", true, 1)
+	return false
+end
+
 -- a table containing a bunch of functions for making a copy of tables, to best fit each scenario performance wise.
 table.copy = {
 
