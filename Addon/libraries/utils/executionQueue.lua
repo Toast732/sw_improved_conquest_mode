@@ -25,7 +25,7 @@ eq = ExecutionQueue
 
 s = s or server
 
-local queued_executions = {}
+queued_executions = {}
 
 --[[
 
@@ -64,8 +64,14 @@ function ExecutionQueue.tick()
 		local queued_execution = queued_executions[i]
 		queued_execution:tick()
 
-		if queued_execution == "expired" then
-			table.insert(queued_executions_to_remove, i)
+		if queued_execution.expired then
+			--[[
+				insert at start to ensure that it removes the ones with the greatest indecies first
+				otherwise would cause issues where for example, it has to remove index 1 and 2, so it
+				removes index 1, but now index 2 is index 1, so when it would go to remove index 2
+				it would actually then remove index 3, leaving index 2 to still be there.
+			]]
+			table.insert(queued_executions_to_remove, 1, i)
 		end
 	end
 
@@ -110,7 +116,8 @@ function ExecutionQueue.queue(execute_condition, function_to_execute, variable_t
 		execute_condition = execute_condition,
 		function_to_execute = function_to_execute,
 		execute_count = execute_count or 1,
-		expire_timer = expire_timer or -1
+		expire_timer = expire_timer or -1,
+		expired = false
 	}
 
 	function queued_execution:getVar(variable_index)
@@ -133,7 +140,7 @@ function ExecutionQueue.queue(execute_condition, function_to_execute, variable_t
 		-- if we're expired/fully used
 		if self.execute_count == 0 or self.expire_timer == 0 then
 			-- expire self, to be deleted.
-			self = "expired"
+			self.expired = true
 		end
 	end
 

@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.9)"
+ADDON_VERSION = "(0.4.0.10)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -200,6 +200,8 @@ SQUAD = {
 		CARGO = "cargo" -- cargo vehicle
 	}
 }
+
+addon_setup = false
 
 g_savedata = {
 	ai_base_island = nil,
@@ -892,6 +894,7 @@ function setupMain(is_world_create)
 					z = island.transform[15]
 				})
 			end
+
 			-- sort the islands from least to most by their x coordinate
 			table.sort(g_savedata.sweep_and_prune.flags.x, function(a, b) return a.x < b.x end)
 			-- sort the islands from least to most by their z coordinate
@@ -946,6 +949,8 @@ function setupMain(is_world_create)
 	end
 
 	g_savedata.info.setup = true
+	-- this one will reset every reload/load of the world, this ensures that tracebacks wont be enabled before setupMain is finished.
+	addon_setup = true
 
 	for debug_type, debug_setting in pairs(g_savedata.debug) do
 		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
@@ -1969,48 +1974,65 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			local location_string = arg[1]
 			local value = arg[2]
 
-			local _, index_count = location_string:gsub("%.", ".")
+			--local _, index_count = location_string:gsub("%.", ".")
 
-			-- this is not a function call
-			if not location_string:match("%(") then
-				local selected_variable = _ENV
-				local index_depth = 0
-				for index, _ in location_string:gmatch("[%w_]+") do
-					if type(selected_variable) == "table" then
-						if index_depth == index_count and arg.n == 2 then
-							if value == "true" then
-								value = true
-							elseif value == "false" then
-								value = false
-							elseif arg.n == 2 and not value then
-								value = nil
-							elseif tonumber(value) then
-								value = tonumber(value)
-							else
-								value = value:gsub("\"", "")
-							end
-							selected_variable[index] = value
-							break
-						end
-
-						selected_variable = selected_variable[index]
-					end
-
-					index_depth = index_depth + 1
-				end
-
-				if arg.n == 2 then
-					d.print(("set %s to %s"):format(location_string, value), false, 0, peer_id)
-				else
-					d.print(("value of %s: %s"):format(location_string, selected_variable), false, 0, peer_id)
-				end
-			else
+			-- make sure its not a function call
+			--if location_string:match("%(") then
 				--[[if location_string:match("onCustomCommand") then
 					d.print("Hey, I see what you're trying to do there...", false, 1, peer_id)
 					goto onCustomCommand_execute_fail
 				end]]
-				d.print("sorry, but the execute command does not yet support calling functions.", false, 1, peer_id)
+				--d.print("sorry, but the execute command does not yet support calling functions.", false, 1, peer_id)
+				--goto onCustomCommand_execute_fail
+			--end
+
+			--[[local selected_variable = _ENV
+			local built_path = ""
+			local index_depth = 0
+			for index, _ in location_string:gmatch("[%w_]+") do
+				if type(selected_variable) == "table" then
+					if index_depth == index_count and arg.n == 2 then
+						if value == "true" then
+							value = true
+						elseif value == "false" then
+							value = false
+						elseif arg.n == 2 and not value then
+							value = nil
+						elseif tonumber(value) then
+							value = tonumber(value)
+						else
+							value = value:gsub("\"", "")
+						end
+						selected_variable[index] = value
+						break
+					end
+
+					selected_variable = selected_variable[index]
+				end
+
+				index_depth = index_depth + 1
+			end]]
+
+			local value_at_path, is_success = table.getValueAtPath(location_string)
+
+			if not is_success then
+				d.print(("failed to get value at path %s"):format(location_string), false, 1, peer_id)
 				goto onCustomCommand_execute_fail
+			end
+
+
+			if arg.n == 2 then
+
+				local is_success = table.setValueAtPath(location_string, value)
+
+				if not is_success then
+					d.print(("failed to set the value at path %s to %s"):format(location_string, value), false, 1, peer_id)
+					goto onCustomCommand_execute_fail
+				end
+
+				d.print(("set %s to %s"):format(location_string, value), false, 0, peer_id)
+			else
+				d.print(("value of %s: %s"):format(location_string, string.fromTable(value_at_path)), false, 0, peer_id)
 			end
 
 			::onCustomCommand_execute_fail::
@@ -2230,20 +2252,22 @@ end
 
 function onPlayerJoin(steam_id, name, peer_id)
 
-	Players.onJoin(tostring(steam_id), peer_id)
-
-	warningChecks(peer_id)
-
 	if not g_savedata.info.setup then
 		d.print("Setting up ICM for the first time, this may take a few seconds.", false, 0, peer_id)
 	end
 
 	eq.queue(
 		function()
-			return is_dlc_weapons and g_savedata.info.setup
+			return is_dlc_weapons and addon_setup
 		end,
 		function(self)
+
 			local peer_id = self:getVar("peer_id")
+			local steam_id = self:getVar("steam_id")
+
+			Players.onJoin(steam_id, peer_id)
+
+			warningChecks(peer_id)
 
 			for _, island in pairs(g_savedata.islands) do
 				updatePeerIslandMapData(peer_id, island)
@@ -2254,23 +2278,24 @@ function onPlayerJoin(steam_id, name, peer_id)
 	
 			s.removeMapObject(peer_id, g_savedata.player_base_island.ui_id)
 			s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
+		
+			local player = Players.dataBySID(steam_id)
+
+			if player then
+				for debug_type, debug_data in pairs(g_savedata.debug) do
+					if debug_data.auto_enable then
+						d.setDebug(d.debugIDFromType(debug_type), peer_id, true)
+					end
+				end
+			end
 		end,
 		{
-			peer_id = peer_id
+			peer_id = peer_id,
+			steam_id = tostring(steam_id)
 		},
 		1,
 		-1
 	)
-
-	local player = Players.dataBySID(tostring(steam_id))
-
-	if player then
-		for debug_type, debug_data in pairs(g_savedata.debug) do
-			if debug_data.auto_enable then
-				d.setDebug(d.debugIDFromType(debug_type), peer_id, true)
-			end
-		end
-	end
 end
 
 function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
