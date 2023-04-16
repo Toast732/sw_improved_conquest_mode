@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.10)"
+ADDON_VERSION = "(0.4.0.11)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -745,6 +745,8 @@ function setupMain(is_world_create)
 				end
 			end
 
+			d.print("Setup Player island: "..g_savedata.player_base_island.index.." \""..g_savedata.player_base_island.name.."\"", true, 0)
+
 			islands[g_savedata.player_base_island.index] = nil
 
 			d.print("creating ai's main base...", true, 0)
@@ -822,6 +824,8 @@ function setupMain(is_world_create)
 				object_type = "island"
 			}
 
+			d.print("Setup AI Base island: "..g_savedata.ai_base_island.index.." \""..g_savedata.ai_base_island.name.."\"", true, 0)
+
 			g_savedata.ai_base_island.zones = tile_zones[island_tile.name]
 
 			islands[ai_base_index] = nil
@@ -873,10 +877,10 @@ function setupMain(is_world_create)
 				new_island.zones = tile_zones[island_tile.name]
 
 				g_savedata.islands[new_island.index] = new_island
-				d.print("Setup island: "..new_island.index.." \""..island.name.."\"", true, 0)
+				d.print("Setup neutral island: "..new_island.index.." \""..island.name.."\"", true, 0)
 
 				-- stop creating new islands if we've reached the island limit
-				if(#g_savedata.islands >= islands_count) then
+				if(table.length(g_savedata.islands) >= islands_count) then
 					break
 				end
 			end
@@ -1521,7 +1525,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			end
 
 			--* make the debug type arg friendly
-			local selected_debug = string.friendly(arg[1], true)
+			local selected_debug = string.friendly(arg[1])
 
 			-- turn the specified debug type into its integer index
 			local selected_debug_id = d.debugIDFromType(selected_debug)
@@ -3057,8 +3061,10 @@ function updatePeerIslandMapData(peer_id, island, is_reset)
 			else
 				if island.transform ~= g_savedata.player_base_island.transform and island.transform ~= g_savedata.ai_base_island.transform then -- makes sure its not trying to update the main islands
 					local turret_amount = 0
-					for turret_zone_index, turret_zone in pairs(island.zones.turrets) do
-						if turret_zone.is_spawned then turret_amount = turret_amount + 1 end
+					if island.zones.turrets then
+						for _, turret_zone in pairs(island.zones.turrets) do
+							if turret_zone.is_spawned then turret_amount = turret_amount + 1 end
+						end
 					end
 					
 					local debug_data = ""
