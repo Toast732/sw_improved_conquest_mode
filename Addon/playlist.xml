@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <playlist folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.4.0.dev)">
-	<locations location_id_counter="368" component_id_counter="8794">
+	<locations location_id_counter="392" component_id_counter="9146">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -58331,6 +58331,30 @@
 						</spawn_bounds>
 						<graph_links/>
 					</c>
+					<c component_type="10" id="9144" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.002918" 02="0.999996" 20="-0.999996" 22="0.002918" 30="288.886627" 31="5.000002" 32="-115.964134"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="9145" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.928616" 02="-0.371043" 20="0.371043" 22="0.928616" 30="-369.708099" 31="5" 32="-169.350739"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="10" id="9146" cargo_zone_import_cargo_type="boat_spawn" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 00="0.035377" 02="0.999374" 20="-0.999374" 22="0.035377" 30="18.976118" 31="5" 32="-192.863266"/>
+						<spawn_bounds>
+							<min x="-5" y="-5" z="-5"/>
+							<max x="5" y="5" z="5"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
 				</components>
 			</l>
 			<l id="279" tile="data/tiles/arid_island_9_6.xml" name="ARID_ISLAND_9_6" is_env_mod="true" env_mod_spawn_num="1">
@@ -81845,6 +81869,3374 @@
 							<max x="5" y="5" z="5"/>
 						</spawn_bounds>
 						<graph_links/>
+					</c>
+				</components>
+			</l>
+			<l id="370" tile="data/tiles/arid_island_18_4.xml" name="ARID_ISLAND_18_4" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8795" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.572205" 31="75.794624" 32="471.29126"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8796" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-479.623444" 31="73.059158" 32="482.327026"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8795"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8797" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-446.723541" 31="69.560226" 32="496.386383"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8796"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8798" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-439.177032" 31="68.820557" 32="499.585876"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8797"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8799" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-193.357468" 31="62.016537" 32="499.937683"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8800" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-170.09201" 31="62.21524" 32="491.425262"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8799"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8801" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-133.974823" 31="62.598518" 32="478.259735"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8800"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8802" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-84.637589" 31="60.752537" 32="454.998291"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8801"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8803" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-34.520199" 31="55.426537" 32="428.802765"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8802"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8804" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="16.337276" 31="48.920952" 32="402.929535"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8803"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8805" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="69.324097" 31="41.463188" 32="380.737335"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8804"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8806" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="120.508514" 31="37.075546" 32="362.347076"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8805"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8807" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="170.697266" 31="35.288589" 32="354.048309"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8806"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8808" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="219.881851" 31="33.862213" 32="352.672821"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8807"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8809" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="272.604706" 31="30.117851" 32="355.838013"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8810" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="243.943466" 31="32.407463" 32="354.231323"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8808"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8811" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="259.862152" 31="31.220589" 32="355.425385"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8809"/>
+							<l value="8810"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8812" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="334.724213" 31="24.183033" 32="366.280701"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8809"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8813" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="375.37088" 31="20.02611" 32="377.93454"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8812"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8814" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="399.413361" 31="17.023829" 32="385.92218"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8813"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8815" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="433.896576" 31="13.029585" 32="399.760712"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8814"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8816" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="468.84668" 31="9.92962" 32="416.778168"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8815"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8817" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.514893" 31="8.392694" 32="437.410919"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8816"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="371" tile="data/tiles/arid_island_18_5.xml" name="ARID_ISLAND_18_5" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8818" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-199.690384" 31="61.958134" 32="-499.684845"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8819" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-235.460541" 31="61.907593" 32="-489.112671"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8818"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8820" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-275.19455" 31="62.17548" 32="-475.692688"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8819"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8822" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-294.912872" 31="62.164745" 32="-467.798309"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8820"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8823" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-287.927368" 31="62.17535" 32="-473.612122"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8822"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8824" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-321.643066" 31="63.269676" 32="-475.296661"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8826" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-352.554474" 31="63.64851" 32="-476.509827"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8824"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8827" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-382.14386" 31="63.583191" 32="-481.809814"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8826"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8828" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-435.259888" 31="68.458427" 32="-499.817383"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8829" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-416.832489" 31="66.704109" 32="-491.224823"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8828"/>
+							<l value="8827"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8830" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-352.763977" 31="63.251099" 32="-449.176636"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8822"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8831" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-382.29834" 31="63.942944" 32="-437.067322"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8830"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8832" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-406.534943" 31="63.96328" 32="-425.865326"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8831"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8833" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-437.940887" 31="65.009514" 32="-411.058258"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8832"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8834" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-464.218842" 31="66.344299" 32="-391.408295"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8833"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8835" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.314301" 31="68.98201" 32="-360.550385"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8834"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8836" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-298.881317" 31="62.293594" 32="-477.143036"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8823"/>
+							<l value="8820"/>
+							<l value="8824"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8837" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.785858" 31="26.815598" 32="152.360123"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8838" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-448.918701" 31="24.81731" 32="155.564972"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8837"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8839" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-390.156921" 31="22.795507" 32="165.379471"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8838"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8841" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-361.95163" 31="21.816814" 32="169.820007"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8839"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8842" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-330.882233" 31="19.231581" 32="179.812057"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8841"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8843" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-291.81778" 31="18.145813" 32="191.133621"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8843"/>
+							<l value="8842"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8844" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-252.857742" 31="17.48781" 32="209.38382"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8843"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8845" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-231.489563" 31="17.427904" 32="219.187393"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8844"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8846" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-224.85675" 31="17.174625" 32="185.949203"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8844"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8847" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-194.997559" 31="17.084154" 32="165.785477"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8846"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8848" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-162.563782" 31="15.605371" 32="145.865128"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8847"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8849" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-128.912354" 31="15.24463" 32="127.664223"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8848"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8850" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-92.674301" 31="14.66978" 32="109.666618"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8849"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8851" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-53.376438" 31="14.003862" 32="92.430733"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8850"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8852" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-10.658167" 31="12.7279" 32="76.358574"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8851"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8853" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="34.664402" 31="11.693319" 32="59.132732"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8852"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8854" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="76.165665" 31="11.408047" 32="44.181087"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8853"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8855" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="122.305931" 31="10.07303" 32="28.918472"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8854"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8856" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="170.672989" 31="7.666648" 32="14.587643"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8855"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8857" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="225.824234" 31="5.504828" 32="2.224347"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8856"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8858" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="286.767914" 31="4.28121" 32="-8.97823"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8857"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8859" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="349.142639" 31="3.370321" 32="-17.070225"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8858"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8860" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="404.784119" 31="3.10247" 32="-20.841688"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8859"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8861" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="449.50116" 31="3.171464" 32="-23.851387"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8860"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8862" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.203613" 31="3.171812" 32="-25.035225"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8861"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8863" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-178.114624" 31="16.867865" 32="249.554977"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8845"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8864" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-130.427109" 31="16.33354" 32="278.873962"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8863"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8865" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-75.121613" 31="16.28129" 32="309.132538"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8864"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8866" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-48.518494" 31="15.57839" 32="321.844971"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8865"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8867" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-14.594506" 31="16.269402" 32="333.531921"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8866"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8868" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="53.925648" 31="16.27096" 32="351.834747"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8867"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8869" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="135.555832" 31="16.301546" 32="367.212891"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8868"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8870" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="212.852783" 31="16.36676" 32="378.475891"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8869"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8871" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="292.60849" 31="16.341639" 32="391.894165"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8870"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8873" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="333.634491" 31="16.335682" 32="400.566071"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8871"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8874" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="368.670135" 31="16.315748" 32="409.229065"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8873"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8875" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="426.055511" 31="17.079317" 32="432.879913"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8874"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8876" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="478.445831" 31="17.097099" 32="468.09256"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8875"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8877" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.108917" 31="16.459904" 32="489.490967"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8876"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="373" tile="data/tiles/arid_island_18_7.xml" name="ARID_ISLAND_18_7" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8878" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.425201" 31="16.415422" 32="101.020065"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8879" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-178.398132" 31="16.533495" 32="117.334335"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8878"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8880" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-67.725288" 31="16.901274" 32="127.58287"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8879"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8881" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="38.89146" 31="17.075195" 32="143.801025"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8880"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8882" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="143.469757" 31="16.894447" 32="165.095978"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8881"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8883" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="287.985474" 31="16.54171" 32="196.427429"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8882"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8884" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="383.401794" 31="16.440071" 32="215.34169"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8883"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8885" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="436.563629" 31="16.421606" 32="221.896194"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8884"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8886" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="491.592194" 31="16.415354" 32="226.758469"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8885"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8887" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.174133" 31="16.381701" 32="226.877258"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8886"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="376" tile="data/tiles/arid_island_18_10.xml" name="ARID_ISLAND_18_10" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8888" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="108.642197" 31="33.601311" 32="499.845428"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8889" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="140.318558" 31="29.252947" 32="426.466034"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8888"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8890" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="180.148132" 31="27.856087" 32="355.875061"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8889"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8891" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="218.379364" 31="24.428452" 32="283.97229"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8890"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8892" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="277.513794" 31="20.587158" 32="212.143326"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8891"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8893" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="319.61792" 31="18.456177" 32="169.654266"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8892"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8894" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="381.381073" 31="19.596432" 32="120.397926"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8893"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8895" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="448.246979" 31="19.708294" 32="78.125343"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8894"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8896" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.613098" 31="19.621368" 32="49.07819"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8895"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="377" tile="data/tiles/arid_island_18_11.xml" name="ARID_ISLAND_18_11" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8897" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.872833" 31="26.016924" 32="433.323486"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8898" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-430.04718" 31="29.505028" 32="399.537903"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8897"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8899" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-361.161285" 31="34.242687" 32="355.370087"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8898"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8900" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-288.811188" 31="39.440258" 32="300.07962"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8899"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8901" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-219.103119" 31="46.496582" 32="231.229721"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8900"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8902" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-189.041092" 31="49.517399" 32="195.435196"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8901"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8903" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-151.027603" 31="53.530968" 32="146.597137"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8902"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8904" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-85.887215" 31="57.052998" 32="34.131077"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8903"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8905" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-30.975916" 31="56.174751" 32="-102.398689"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8904"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8906" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="32.820858" 31="48.57082" 32="-292.068909"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8907" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="64.366562" 31="41.891998" 32="-383.613678"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8906"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8908" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="94.833511" 31="35.642044" 32="-461.357849"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8907"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8909" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="108.8283" 31="33.646515" 32="-498.724854"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8908"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8910" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="6.418154" 31="52.636879" 32="-214.166931"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8906"/>
+							<l value="8905"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8911" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-162.788879" 31="49.834747" 32="213.320358"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8902"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8912" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-145.104034" 31="49.816853" 32="226.731583"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8911"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8913" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-103.103096" 31="49.853554" 32="260.332825"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8912"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8914" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-59.437119" 31="49.787685" 32="297.307007"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8913"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8915" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-16.82044" 31="45.922615" 32="332.875031"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8914"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8917" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="36.897472" 31="42.199188" 32="380.0354"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8915"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8918" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="88.341042" 31="38.177738" 32="426.694946"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8917"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8919" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="139.465637" 31="35.188065" 32="473.099091"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8918"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8920" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="165.619705" 31="31.839926" 32="499.753479"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8919"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="378" tile="data/tiles/arid_island_18_12.xml" name="ARID_ISLAND_18_12" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8922" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.743835" 31="20.561811" 32="450.176514"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8923" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="440.329529" 31="20.062267" 32="499.594421"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8922"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8924" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.660431" 31="19.754175" 32="-172.028366"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8925" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="419.375" 31="19.471121" 32="-251.377396"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8924"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8926" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="364.101471" 31="19.439589" 32="-305.279724"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8925"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8927" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="257.059784" 31="24.150255" 32="-410.748962"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8926"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8930" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="205.579422" 31="28.842499" 32="-462.426758"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8927"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8932" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="167.100388" 31="31.798452" 32="-499.986572"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8930"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="379" tile="data/tiles/arid_island_18_13.xml" name="ARID_ISLAND_18_13" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8933" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.781799" 31="16.634441" 32="-289.562714"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8934" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-388.560394" 31="16.569605" 32="-292.188477"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8933"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8935" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-295.752655" 31="16.478487" 32="-292.120422"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8934"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8936" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-213.518234" 31="16.441841" 32="-287.604767"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8935"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8937" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-130.611954" 31="16.437626" 32="-276.727722"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8936"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8938" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-48.762966" 31="16.46759" 32="-260.990082"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8937"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8939" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="30.914078" 31="16.523418" 32="-244.582794"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8938"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8940" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="109.569786" 31="16.545776" 32="-224.488785"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8939"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8941" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="160.361588" 31="16.52914" 32="-206.926254"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8940"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8942" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="203.100754" 31="16.512396" 32="-187.196152"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8941"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8943" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="247.624222" 31="16.493162" 32="-167.602173"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8942"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8944" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="279.966156" 31="16.466171" 32="-148.197189"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8943"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8945" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="308.190308" 31="16.461683" 32="-124.836975"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8944"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8946" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="327.795074" 31="16.464041" 32="-105.197166"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8945"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8947" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="356.019714" 31="16.435453" 32="-72.387077"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8946"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8948" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="376.2323" 31="16.432606" 32="-34.422749"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8947"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8949" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="389.382629" 31="16.439495" 32="-2.068802"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8948"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8950" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="405.846344" 31="16.480448" 32="86.799248"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8949"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8951" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="414.538879" 31="16.605537" 32="186.189606"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8950"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8952" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="419.036163" 31="16.778852" 32="296.477112"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8951"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8953" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="422.276886" 31="16.839275" 32="346.077545"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8952"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8954" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="425.477386" 31="16.837952" 32="389.086914"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8953"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8955" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="440.854523" 31="16.882124" 32="480.452362"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8954"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8956" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="447.078033" 31="16.934423" 32="499.759613"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8955"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8957" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="205.684265" 31="16.50083" 32="-192.089478"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8942"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8958" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="213.989029" 31="18.884245" 32="-216.185242"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8957"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8959" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="227.460617" 31="19.118059" 32="-245.985764"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8958"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8960" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="241.933609" 31="19.281284" 32="-274.873016"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8959"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8961" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="261.617767" 31="19.38504" 32="-307.375275"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8960"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8962" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="281.180969" 31="19.544031" 32="-337.860596"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8961"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8963" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="304.084686" 31="19.718668" 32="-367.500641"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8962"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8964" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="330.300415" 31="19.582684" 32="-399.072388"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8963"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8965" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="359.314667" 31="19.499054" 32="-430.474365"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8964"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8966" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="393.216278" 31="19.554817" 32="-460.552612"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8965"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8967" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="437.28363" 31="20.02879" 32="-499.470459"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8966"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="380" tile="data/tiles/arid_island_18_14.xml" name="ARID_ISLAND_18_14" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8968" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="447.583771" 31="16.935169" 32="-499.810791"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8969" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="455.842529" 31="17.002586" 32="-474.904694"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8968"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8970" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="472.369537" 31="17.249269" 32="-442.333893"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8969"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8971" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.826691" 31="17.349371" 32="-405.059387"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8970"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="381" tile="data/tiles/arid_island_19_4.xml" name="ARID_ISLAND_19_4" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8972" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.747528" 31="8.366071" 32="437.0755"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8973" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-493.916473" 31="8.048791" 32="442.062988"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8972"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8974" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-464.285431" 31="6.570327" 32="470.491089"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8973"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8975" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-441.358612" 31="5.720514" 32="499.64566"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8974"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="382" tile="data/tiles/arid_island_19_5.xml" name="ARID_ISLAND_19_5" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8976" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-439.838501" 31="5.691256" 32="-499.723999"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8977" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-437.357452" 31="5.593204" 32="-496.725342"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8976"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8978" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-417.519531" 31="4.661942" 32="-461.914917"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8977"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8979" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-400.251648" 31="3.542957" 32="-418.172272"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8978"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8980" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-389.260681" 31="4.107642" 32="-375.203247"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8979"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8981" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-381.923553" 31="3.776189" 32="-330.533081"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8980"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8982" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-377.972931" 31="3.015435" 32="-273.627502"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8981"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8983" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-378.183167" 31="3.118409" 32="-54.282787"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8982"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8984" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-378.486542" 31="3.17174" 32="-27.358912"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8983"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8985" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.822998" 31="3.17181" 32="-25.227167"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8984"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8986" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-290.202332" 31="3.172778" 32="-26.496353"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8984"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8987" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-183.115173" 31="3.624304" 32="-25.5825"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8986"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8988" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.536163" 31="3.65594" 32="-27.606462"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8989" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="397.811676" 31="3.629026" 32="-27.884443"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8988"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8990" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="349.191833" 31="3.594506" 32="-27.517746"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8989"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8991" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="280.400269" 31="3.628348" 32="-27.284788"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8990"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8992" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="209.05835" 31="3.628169" 32="-26.320282"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8991"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8993" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="142.338028" 31="3.628197" 32="-26.499533"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8992"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8994" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="65.408279" 31="3.62815" 32="-25.154158"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8993"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8995" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-34.749035" 31="3.628145" 32="-24.63641"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8994"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8996" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-81.912918" 31="3.628606" 32="-24.517406"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8987"/>
+							<l value="8995"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="383" tile="data/tiles/arid_island_19_6.xml" name="ARID_ISLAND_19_6" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="8997" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-79.148964" 31="16.056124" 32="499.880341"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="8998" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-77.564156" 31="16.444794" 32="468.667755"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8997"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="8999" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="2.834659" 31="16.417194" 32="472.374634"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8998"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9000" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="57.133881" 31="16.340843" 32="472.091522"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8999"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9001" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="136.852234" 31="16.338713" 32="465.442627"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9000"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9002" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="194.882141" 31="16.338713" 32="453.723236"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9001"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9003" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="253.25647" 31="16.338715" 32="436.344025"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9002"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9004" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="306.023926" 31="16.338715" 32="413.251831"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9003"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9005" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="355.805573" 31="16.338717" 32="384.054108"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9004"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9006" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="400.558044" 31="16.338718" 32="347.024353"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9005"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9007" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="438.334534" 31="16.33872" 32="305.609344"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9006"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9008" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="478.186096" 31="16.338722" 32="250.713638"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9007"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9009" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.010712" 31="16.33872" 32="216.147064"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9008"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9010" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-72.757004" 31="16.338718" 32="347.648529"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="8998"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9011" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-80.301407" 31="16.33872" 32="297.136475"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9010"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9012" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-96.664169" 31="16.338722" 32="248.213501"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9011"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9013" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-126.627846" 31="16.338724" 32="200.324112"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9012"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9014" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-159.464661" 31="16.338726" 32="164.466461"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9013"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9015" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-191.895859" 31="16.338728" 32="134.46167"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9014"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9016" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-245.553329" 31="16.33873" 32="86.962685"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9015"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9017" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-291.69278" 31="16.338732" 32="45.090305"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9016"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9018" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-333.240997" 31="16.338734" 32="-0.612931"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9017"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9019" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-367.353821" 31="16.338614" 32="-51.527756"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9018"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9020" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-392.52594" 31="16.345114" 32="-114.759636"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9019"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9021" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-402.65033" 31="16.353048" 32="-157.355835"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9020"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9022" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-408.409149" 31="16.365049" 32="-186.250961"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9021"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9023" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-432.921234" 31="16.380899" 32="-337.84082"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9022"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9024" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-449.381348" 31="16.426802" 32="-409.074402"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9023"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9025" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-460.459778" 31="16.392523" 32="-442.29715"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9024"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9026" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-474.500671" 31="16.355505" 32="-474.852325"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9025"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9027" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-492.506165" 31="16.355114" 32="-499.408386"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9026"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="384" tile="data/tiles/arid_island_19_7.xml" name="ARID_ISLAND_19_7" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="9028" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="109.156494" 31="17.244942" 32="499.541901"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9029" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="80.56218" 31="17.207527" 32="456.038849"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9028"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9030" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="73.59407" 31="17.207527" 32="464.381989"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9028"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9032" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="44.994446" 31="17.207531" 32="400.311127"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9029"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9033" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="2.803583" 31="17.207535" 32="311.930511"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9032"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9034" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-20.201048" 31="17.195658" 32="256.560486"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9033"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9035" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-41.871159" 31="15.875113" 32="191.238113"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9034"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9036" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-60.878136" 31="15.876227" 32="129.009521"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9035"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9038" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-76.101501" 31="15.874008" 32="51.480358"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9036"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9039" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-85.054298" 31="15.988727" 32="-58.894176"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9040" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-85.024277" 31="15.921581" 32="-35.44733"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9039"/>
+							<l value="9038"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9041" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-92.859123" 31="15.924937" 32="-41.17226"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9039"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9042" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-82.503792" 31="16.713034" 32="-102.485413"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9039"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9043" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-80.330048" 31="15.8053" 32="-142.510574"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9042"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9044" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-80.301567" 31="16.168934" 32="-145.837509"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9043"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9045" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-79.98307" 31="16.168934" 32="-439.368805"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9044"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9046" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-79.987465" 31="15.726356" 32="-442.921295"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9045"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9047" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-79.173782" 31="15.955024" 32="-492.410919"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9046"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9048" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-78.808289" 31="16.04842" 32="-499.478424"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9047"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9049" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-119.820122" 31="15.872656" 32="13.685145"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9041"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9051" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-138.263702" 31="15.874246" 32="43.834091"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9049"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9052" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-161.232925" 31="15.875095" 32="74.241669"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9051"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9053" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-188.794922" 31="15.875094" 32="104.667877"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9052"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9054" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-211.838364" 31="15.875093" 32="125.590401"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9053"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9056" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-238.756592" 31="16.362652" 32="145.903885"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9054"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9057" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-270.580475" 31="16.415394" 32="166.704727"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9056"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9058" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-300.684753" 31="16.415394" 32="184.637863"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9057"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9059" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-331.06958" 31="16.415392" 32="200.305359"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9058"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9060" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-366.800964" 31="16.415426" 32="212.3759"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9059"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9061" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-407.643646" 31="16.415482" 32="220.121414"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9060"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9062" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-465.908508" 31="16.343529" 32="227.233597"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9061"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9063" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.536896" 31="16.376249" 32="225.944504"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9062"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9064" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-424.018585" 31="16.38867" 32="232.2258"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9062"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9065" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-398.848511" 31="16.415442" 32="235.245468"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9064"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9066" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-346.721039" 31="16.415392" 32="243.720215"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9065"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9068" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-297.079041" 31="16.41539" 32="253.672348"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9066"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9069" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-247.634323" 31="16.415388" 32="267.650085"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9068"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9070" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-200.061646" 31="17.183455" 32="282.304291"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9069"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9071" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-155.842422" 31="17.207535" 32="300.042297"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9070"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9072" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-111.460358" 31="17.100616" 32="322.245514"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9071"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9073" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-73.066147" 31="17.195793" 32="342.95929"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9072"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9074" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-35.96468" 31="17.207531" 32="368.742035"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9073"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9075" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="3.59436" 31="17.207531" 32="397.321716"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9074"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9076" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="27.906481" 31="17.207529" 32="419.104645"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9030"/>
+							<l value="9075"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="385" tile="data/tiles/arid_island_19_8.xml" name="ARID_ISLAND_19_8" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="9077" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="109.834846" 31="17.250124" 32="-499.76413"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9078" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="155.986649" 31="18.004089" 32="-443.303864"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9077"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9079" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="180.066711" 31="19.501955" 32="-411.259338"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9078"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9080" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="220.466995" 31="21.150162" 32="-366.491119"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9079"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9081" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="270.887909" 31="21.962952" 32="-310.914215"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9080"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9082" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="321.550446" 31="20.502098" 32="-256.311005"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9081"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9083" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="360.597473" 31="19.369776" 32="-214.873581"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9082"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9084" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="410.939484" 31="17.565042" 32="-158.423615"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9083"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9085" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="462.786682" 31="17.308619" 32="-99.360886"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9084"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9086" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.881256" 31="17.178154" 32="-52.510651"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9085"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9087" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="289.001007" 31="17.680367" 32="499.899994"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9088" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="227.703842" 31="17.773726" 32="481.541779"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9087"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9089" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="127.86924" 31="17.465628" 32="453.924194"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9088"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9090" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="80.297035" 31="17.305746" 32="446.503265"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9089"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9091" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="36.842056" 31="17.151888" 32="448.402954"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9090"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9092" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-4.163569" 31="17.101648" 32="457.084869"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9091"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9093" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-44.401863" 31="17.076368" 32="472.854431"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9092"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9094" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-92.519485" 31="20.283283" 32="499.363342"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9093"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="386" tile="data/tiles/arid_island_19_9.xml" name="ARID_ISLAND_19_9" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="9095" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-221.861298" 31="29.059187" 32="-254.216934"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9096" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-226.486725" 31="28.926968" 32="-264.658295"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9095"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9097" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-225.123886" 31="26.17005" 32="-322.46698"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9098" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-225.772934" 31="28.766691" 32="-282.1409"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9096"/>
+							<l value="9097"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9099" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-217.440384" 31="23.177711" 32="-364.303619"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9097"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9100" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-203.624603" 31="21.998659" 32="-397.933502"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9099"/>
+							<l value="9100"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9101" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-191.389755" 31="21.369591" 32="-416.38382"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9100"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9102" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-155.017487" 31="20.816448" 32="-455.8591"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9103" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-177.299164" 31="21.064014" 32="-433.956787"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9101"/>
+							<l value="9102"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9104" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-121.450592" 31="20.539211" 32="-483.7117"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9102"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9105" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-97.867455" 31="20.593885" 32="-497.525818"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9104"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9106" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-93.841515" 31="20.382425" 32="-499.524536"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9105"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9107" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.69693" 31="17.979515" 32="-485.034821"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9108" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="472.2034" 31="17.853071" 32="-482.832977"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9107"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9109" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="413.950897" 31="17.523552" 32="-484.487671"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9108"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9110" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="360.800354" 31="17.589169" 32="-487.825623"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9109"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9111" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="310.841217" 31="17.654951" 32="-496.226624"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9110"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9112" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="298.865631" 31="17.668579" 32="-499.825562"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9111"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="388" tile="data/tiles/arid_island_19_10.xml" name="ARID_ISLAND_19_10" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="9113" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.960632" 31="17.07737" 32="-208.944901"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9114" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="421.735657" 31="16.617929" 32="-209.671463"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9113"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9115" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="320.536652" 31="16.087578" 32="-195.42598"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9114"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9116" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="222.657837" 31="15.828934" 32="-181.037308"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9115"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9117" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="123.064514" 31="16.112328" 32="-163.454346"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9116"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9118" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="21.284641" 31="16.051195" 32="-141.04892"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9117"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9119" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-78.162956" 31="16.340601" 32="-116.869514"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9118"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9120" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-180.453796" 31="16.332586" 32="-83.946205"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9119"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9121" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-275.802124" 31="16.415421" 32="-50.280174"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9120"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9122" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-404.974884" 31="19.602348" 32="0.979844"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9121"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9123" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.911987" 31="19.621609" 32="49.976906"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9122"/>
+						</graph_links>
+					</c>
+				</components>
+			</l>
+			<l id="391" tile="data/tiles/arid_island_19_14.xml" name="ARID_ISLAND_19_14" is_env_mod="true" env_mod_spawn_num="1">
+				<components>
+					<c component_type="11" id="9124" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-499.620819" 31="17.357933" 32="-402.347107"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links/>
+					</c>
+					<c component_type="11" id="9125" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-482.712616" 31="17.359169" 32="-382.908325"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9124"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9126" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-442.750519" 31="17.301645" 32="-347.942596"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9125"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9127" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-406.839752" 31="17.372837" 32="-319.945221"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9126"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9128" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-356.811798" 31="17.598289" 32="-290.046997"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9127"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9129" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-290.444702" 31="17.853523" 32="-253.311707"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9128"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9130" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-218.286591" 31="17.87575" 32="-216.649582"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9129"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9131" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-147.591751" 31="17.658541" 32="-177.208694"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9130"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9132" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-75.029129" 31="17.419796" 32="-126.613411"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9131"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9133" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="-35.387783" 31="17.481384" 32="-90.992645"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9132"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9134" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="16.856234" 31="17.66843" 32="-34.731102"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9133"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9135" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="54.542942" 31="17.914549" 32="8.49345"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9134"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9136" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="100.675499" 31="18.10507" 32="59.074657"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9135"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9137" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="153.376297" 31="17.793404" 32="109.510277"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9136"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9138" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="195.449173" 31="17.566423" 32="140.824493"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9137"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9139" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="228.036438" 31="17.418617" 32="161.430557"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9138"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9140" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="258.699066" 31="17.260338" 32="176.064545"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9139"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9141" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="316.403229" 31="17.064138" 32="189.40596"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9140"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9142" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="404.240723" 31="17.127943" 32="196.105804"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9141"/>
+						</graph_links>
+					</c>
+					<c component_type="11" id="9143" name="land_path,precision=0" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
+						<spawn_transform 30="499.390289" 31="17.602425" 32="195.25267"/>
+						<spawn_bounds>
+							<min x="-10" y="-10" z="-10"/>
+							<max x="10" y="10" z="10"/>
+						</spawn_bounds>
+						<graph_links>
+							<l value="9142"/>
+						</graph_links>
 					</c>
 				</components>
 			</l>

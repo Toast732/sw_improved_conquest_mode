@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.13)"
+ADDON_VERSION = "(0.4.0.14)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -2982,8 +2982,10 @@ function tickGamemode()
 			local t, a = Objective.getIslandToAttack()
 
 			local ai_base_island_turret_count = 0
-			for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
-				if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+			if g_savedata.ai_base_island.zones.turrets then
+				for _, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
+					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+				end
 			end
 
 			local debug_data = ""

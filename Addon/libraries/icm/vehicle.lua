@@ -582,14 +582,14 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		if not island then
 			return false, "unable to find island to spawn sea vehicle at!"
 		end
-		if #island.zones.sea == 0 then
+		if not island.zones.sea or #island.zones.sea == 0 then
 			d.print("(Vehicle.spawn) island has no sea spawn zones but says it can spawn sea vehicles! island_name: "..tostring(island.name), true, 1)
 			return false, "island has no sea spawn zones"
 		end
 
 		spawn_transform = island.zones.sea[math.random(1, #island.zones.sea)].transform
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_land") then
-		if #island.zones.land == 0 then
+		if not island.zones.land or #island.zones.land == 0 then
 			d.print("(Vehicle.spawn) island has no land spawn zones but says it can spawn land vehicles! island_name: "..tostring(island.name), true, 1)
 			return false, "island has no land spawn zones"
 		end
@@ -599,7 +599,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local turret_count = 0
 		local unoccupied_zones = {}
 
-		if #island.zones.turrets == 0 then
+		if not island.zones.turrets or #island.zones.turrets == 0 then
 			d.print(("(v.spawn) Unable to spawn turret, Island %s has no turret spawn zones!"):format(island.name), true, 1)
 			return false, ("Island %s has no turret spawn zones!"):format(island.name)
 		end

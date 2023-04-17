@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.13)"
+ADDON_VERSION = "(0.4.0.14)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -5765,14 +5765,14 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		if not island then
 			return false, "unable to find island to spawn sea vehicle at!"
 		end
-		if #island.zones.sea == 0 then
+		if not island.zones.sea or #island.zones.sea == 0 then
 			d.print("(Vehicle.spawn) island has no sea spawn zones but says it can spawn sea vehicles! island_name: "..tostring(island.name), true, 1)
 			return false, "island has no sea spawn zones"
 		end
 
 		spawn_transform = island.zones.sea[math.random(1, #island.zones.sea)].transform
 	elseif Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_land") then
-		if #island.zones.land == 0 then
+		if not island.zones.land or #island.zones.land == 0 then
 			d.print("(Vehicle.spawn) island has no land spawn zones but says it can spawn land vehicles! island_name: "..tostring(island.name), true, 1)
 			return false, "island has no land spawn zones"
 		end
@@ -5782,7 +5782,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local turret_count = 0
 		local unoccupied_zones = {}
 
-		if #island.zones.turrets == 0 then
+		if not island.zones.turrets or #island.zones.turrets == 0 then
 			d.print(("(v.spawn) Unable to spawn turret, Island %s has no turret spawn zones!"):format(island.name), true, 1)
 			return false, ("Island %s has no turret spawn zones!"):format(island.name)
 		end
@@ -10457,8 +10457,10 @@ function tickGamemode()
 			local t, a = Objective.getIslandToAttack()
 
 			local ai_base_island_turret_count = 0
-			for turret_zone_index, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
-				if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+			if g_savedata.ai_base_island.zones.turrets then
+				for _, turret_zone in pairs(g_savedata.ai_base_island.zones.turrets) do
+					if turret_zone.is_spawned then ai_base_island_turret_count = ai_base_island_turret_count + 1 end
+				end
 			end
 
 			local debug_data = ""
