@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.15)"
+ADDON_VERSION = "(0.4.0.16)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -8820,7 +8820,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 			local vehicle_id = sm.getVehicleListID(string.gsub(arg[1], "_", " "))
 
-			if not vehicle_id and arg[1] ~= "scout" and arg[1] ~= "cargo" and not valid_types[string.lower(arg[1])] then
+			if not vehicle_id and arg[1] ~= "scout" and arg[1] ~= "cargo" and not valid_types[string.lower(arg[1])] and not arg[1]:match("--count:") then
 				d.print("Was unable to find a vehicle with the name \""..arg[1].."\", use '?impwep vl' to see all valid vehicle names", false, 1, peer_id)
 				return
 			end
@@ -8856,101 +8856,138 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 
 			else
 
-				local vehicle_data = nil
-				local successfully_spawned = false
+				--[[
+					look for "--count:" arg, if its there, take the number after :, and remove --count from arguments table
+					if there is none, default to 1
+				]]
 
-				if not valid_types[string.lower(arg[1])] then
-					-- they did not specify a type of vehicle to spawn
-					successfully_spawned, vehicle_data = v.spawn(vehicle_id, nil, true)
-				else
-					-- they specified a type of vehicle to spawn
-					successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
+				local spawn_count = 1
+				local _, count_end = full_message:find("--count:")
+				if count_end then
+					local _, value_end = full_message:find("[^%d]", count_end + 1)
+
+					-- this could happen if --count: is specified at the end of the string, so we want to deafult it to the length
+					if not value_end then
+						value_end = full_message:len() + 1
+					end
+
+					local value = full_message:sub(count_end + 1, value_end - 1)
+					if not tonumber(value) then
+						d.print(("count value has to be a number! given value: %s"):format(value), false, 1, peer_id)
+						goto onCustomCommand_spawnVehicle_countInvalid
+					end
+
+					spawn_count = tonumber(value)
+
+					for arg_i = 1, arg.n do
+						if arg[arg_i]:match("--count:"..value) then
+							table.remove(arg, arg_i)
+							arg.n = arg.n - 1
+							break
+						end
+					end
 				end
-				if successfully_spawned then
-					-- if the player didn't specify where to spawn it
-					if arg[2] == nil then
-						return
-					end
 
-					if arg[2] == "near" then -- the player selected to spawn it in a range
-						arg[3] = tonumber(arg[3]) or 150
-						arg[4] = tonumber(arg[4]) or 1900
-						if arg[3] >= 150 then -- makes sure the min range is equal or greater than 150
-							if arg[4] >= arg[3] then -- makes sure the max range is greater or equal to the min range
-								if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
-									local player_pos = s.getPlayerPos(peer_id)
-									local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
-									if found_new_location then
-										-- teleport vehicle to new position
-										v.teleport(vehicle_data.id, new_location)
-										d.print("Spawned "..vehicle_data.name.." at x:"..new_location[13].." y:"..new_location[14].." z:"..new_location[15], false, 0, peer_id)
-									else
-										-- delete vehicle as it was unable to find a valid position
-										v.kill(vehicle_data.id, true, true)
-										d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, peer_id)
-									end
-								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
-									--[[
-									local possible_islands = {}
-									for island_index, island in pairs(g_savedata.islands) do
-										if island.faction ~= ISLAND.FACTION.PLAYER then
-											if Tags.has(island.tags, "can_spawn=land") then
-												for in pairs(island.zones.land)
-											for g_savedata.islands[island_index]
-											table.insert(possible_islands.)
+				::onCustomCommand_spawnVehicle_countInvalid::
+
+				for _ = 1, spawn_count do
+					local vehicle_data = nil
+					local successfully_spawned = false
+
+					if not arg[1] or not valid_types[string.lower(arg[1])] then
+						-- they did not specify a type of vehicle to spawn
+							successfully_spawned, vehicle_data = v.spawn(vehicle_id, nil, true)
+					else
+						-- they specified a type of vehicle to spawn
+							successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
+					end
+					if successfully_spawned then
+						-- if the player didn't specify where to spawn it
+						if arg[2] == nil then
+							goto onCustomCommand_spawnVehicle_spawnNext
+						end
+
+						if arg[2] == "near" then -- the player selected to spawn it in a range
+							arg[3] = tonumber(arg[3]) or 150
+							arg[4] = tonumber(arg[4]) or 1900
+							if arg[3] >= 150 then -- makes sure the min range is equal or greater than 150
+								if arg[4] >= arg[3] then -- makes sure the max range is greater or equal to the min range
+									if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
+										local player_pos = s.getPlayerPos(peer_id)
+										local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
+										if found_new_location then
+											-- teleport vehicle to new position
+											v.teleport(vehicle_data.id, new_location)
+											d.print("Spawned "..vehicle_data.name.." at x:"..new_location[13].." y:"..new_location[14].." z:"..new_location[15], false, 0, peer_id)
+										else
+											-- delete vehicle as it was unable to find a valid position
+											v.kill(vehicle_data.id, true, true)
+											d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, peer_id)
 										end
+									elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
+										--[[
+										local possible_islands = {}
+										for island_index, island in pairs(g_savedata.islands) do
+											if island.faction ~= ISLAND.FACTION.PLAYER then
+												if Tags.has(island.tags, "can_spawn=land") then
+													for in pairs(island.zones.land)
+												for g_savedata.islands[island_index]
+												table.insert(possible_islands.)
+											end
+										end
+										--]]
+										d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon!", false, 1, peer_id)
+										v.kill(vehicle_data.id, true, true)
+									else
+										local player_pos = s.getPlayerPos(peer_id)
+										vehicle_data.transform[13] = player_pos[13] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- x
+										vehicle_data.transform[14] = vehicle_data.transform[14] * 1.5 -- y
+										vehicle_data.transform[15] = player_pos[15] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- z
+										v.teleport(vehicle_data.id, vehicle_data.transform)
+										d.print("Spawned "..vehicle_data.name.." at x:"..vehicle_data.transform[13].." y:"..vehicle_data.transform[14].." z:"..vehicle_data.transform[15], false, 0, peer_id)
 									end
-									--]]
-									d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon!", false, 1, peer_id)
-									v.kill(vehicle_data.id, true, true)
 								else
-									local player_pos = s.getPlayerPos(peer_id)
-									vehicle_data.transform[13] = player_pos[13] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- x
-									vehicle_data.transform[14] = vehicle_data.transform[14] * 1.5 -- y
-									vehicle_data.transform[15] = player_pos[15] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- z
-									v.teleport(vehicle_data.id, vehicle_data.transform)
-									d.print("Spawned "..vehicle_data.name.." at x:"..vehicle_data.transform[13].." y:"..vehicle_data.transform[14].." z:"..vehicle_data.transform[15], false, 0, peer_id)
-								end
-							else
-								d.print("your maximum range must be greater or equal to the minimum range!", false, 1, peer_id)
-								v.kill(vehicle_data.id, true, true)
-							end
-						else
-							d.print("the minimum range must be at least 150!", false, 1, peer_id)
-							v.kill(vehicle_data.id, true, true)
-						end
-					else
-						if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
-							if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
-								if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
-									local new_pos = m.translation(arg[2], 0, arg[3])
-									v.teleport(vehicle_data.id, new_pos)
-									vehicle_data.transform = new_pos
-									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
-								elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
-									d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle!", false, 1, peer_id)
+									d.print("your maximum range must be greater or equal to the minimum range!", false, 1, peer_id)
 									v.kill(vehicle_data.id, true, true)
-								else -- air vehicle
-									local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
-									v.teleport(vehicle_data.id, new_pos)
-									vehicle_data.transform = new_pos
-									d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
 								end
 							else
-								d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, peer_id)
+								d.print("the minimum range must be at least 150!", false, 1, peer_id)
 								v.kill(vehicle_data.id, true, true)
 							end
 						else
-							d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, peer_id)
-							v.kill(vehicle_data.id, true, true)
+							if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
+								if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
+									if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
+										local new_pos = m.translation(arg[2], 0, arg[3])
+										v.teleport(vehicle_data.id, new_pos)
+										vehicle_data.transform = new_pos
+										d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
+									elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
+										d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle!", false, 1, peer_id)
+										v.kill(vehicle_data.id, true, true)
+									else -- air vehicle
+										local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
+										v.teleport(vehicle_data.id, new_pos)
+										vehicle_data.transform = new_pos
+										d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
+									end
+								else
+									d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, peer_id)
+									v.kill(vehicle_data.id, true, true)
+								end
+							else
+								d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, peer_id)
+								v.kill(vehicle_data.id, true, true)
+							end
+						end
+					else
+						if type(vehicle_data) == "string" then
+							d.print("Failed to spawn vehicle! Error:\n"..vehicle_data, false, 1, peer_id)
+						else
+							d.print("Failed to spawn vehicle!\n(no error code recieved)", false, 1, peer_id)
 						end
 					end
-				else
-					if type(vehicle_data) == "string" then
-						d.print("Failed to spawn vehicle! Error:\n"..vehicle_data, false, 1, peer_id)
-					else
-						d.print("Failed to spawn vehicle!\n(no error code recieved)", false, 1, peer_id)
-					end
+					::onCustomCommand_spawnVehicle_spawnNext::
 				end
 			end
 
