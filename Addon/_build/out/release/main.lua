@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.16)"
+ADDON_VERSION = "(0.4.0.17)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1835,6 +1835,11 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 			server.announce(prefix, message, peer_id or -1)
 		end
 	end
+
+	-- print a traceback if this is a debug error message, and if tracebacks are enabled
+	if debug_type == 1 and d.getDebug(8) then
+		d.trace.print(_ENV, requires_debug, peer_id)
+	end
 end
 
 function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
@@ -2275,7 +2280,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						__ENV._ENV_MODIFIED = _ENV
 						_ENV = __ENV
 
-						d.trace.print()
+						d.trace.print(_ENV_MODIFIED)
 
 						_ENV = _ENV_MODIFIED
 
@@ -2570,6 +2575,12 @@ function Debugging.buildArgs(args)
 			--[[if type(arg) == "table" then
 				arg = string.gsub(string.fromTable(arg), "\n", " ")
 			end]]
+
+			-- wrap in "" if arg is a string
+			if type(arg) == "string" then
+				arg = ("\"%s\""):format(arg)
+			end
+
 			s = ("%s%s%s"):format(s, arg, i ~= arg_len and ", " or "")
 		end
 	end
@@ -2582,8 +2593,8 @@ end
 
 Debugging.trace = {
 
-	print = function()
-		local g_tb = _ENV_MODIFIED.g_savedata.debug.traceback
+	print = function(ENV, requires_debug, peer_id)
+		local g_tb = ENV.g_savedata.debug.traceback
 
 		local str = ""
 
@@ -2595,7 +2606,7 @@ Debugging.trace = {
 			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.stack[trace][1]], d.buildArgs(g_tb.stack[trace][2]))
 		end
 
-		d.print(str, false, 8)
+		d.print(str, requires_debug or false, 8, peer_id or -1)
 	end
 }
 
@@ -5544,7 +5555,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local island = specified_island
 
 		-- make sure theres turret spawns on this island
-		if (#island.zones.turrets < 1) then
+		if (not island.zones.turrets or #island.zones.turrets < 1) then
 			return false, "theres no turret zones on this island!\nisland: "..island.name 
 		end
 
@@ -8151,7 +8162,7 @@ function setupMain(is_world_create)
 			local spawn_zones = sup.spawnZones()
 
 			-- add them to a list indexed by which island the zone belongs to
-			local tile_zones = sup.sortSpawnZones(spawn_zones)
+			-- local tile_zones = sup.sortSpawnZones(spawn_zones)
 
 			d.print("populating constructable vehicles with spawning modifiers...", true, 0)
 
@@ -8193,6 +8204,11 @@ function setupMain(is_world_create)
 							capture_timer = g_savedata.settings.CAPTURE_TIME, 
 							ui_id = s.getMapID(),
 							assigned_squad_index = -1,
+							zones = {
+								turrets = {},
+								land = {},
+								sea = {}
+							},
 							ai_capturing = 0,
 							players_capturing = 0,
 							defenders = 0,
@@ -8301,7 +8317,7 @@ function setupMain(is_world_create)
 
 			d.print("Setup AI Base island: "..g_savedata.ai_base_island.index.." \""..g_savedata.ai_base_island.name.."\"", true, 0)
 
-			g_savedata.ai_base_island.zones = tile_zones[island_tile.name]
+			--g_savedata.ai_base_island.zones = tile_zones[island_tile.name]
 
 			islands[ai_base_index] = nil
 
@@ -8349,7 +8365,7 @@ function setupMain(is_world_create)
 					object_type = "island"
 				}
 
-				new_island.zones = tile_zones[island_tile.name]
+				--new_island.zones = tile_zones[island_tile.name]
 
 				g_savedata.islands[new_island.index] = new_island
 				d.print("Setup neutral island: "..new_island.index.." \""..island.name.."\"", true, 0)
@@ -8360,6 +8376,72 @@ function setupMain(is_world_create)
 				end
 			end
 
+			-- link the zones to the island which is closest to the zone
+
+			for zone_type, zones in pairs(spawn_zones) do
+
+				for _, zone in ipairs(zones) do
+
+					-- first, check if this zone has a tag indicating which island it belongs to
+					if Tags.has(zone.tags, "owner", true) then
+						local owner_name = Tags.getValue(zone.tags, "owner", true)
+
+						if not owner_name then
+							d.print("zone says it has a owner, but failed to get the name of the owner!", true, 1)
+							goto setupMain_setupIslands_setupZones_continue_zone
+						end
+
+						-- find the capture point which shares the name of the zone's owner override
+						
+						-- check ai base island
+						if g_savedata.ai_base_island.name == owner_name then
+							table.insert(g_savedata.ai_base_island.zones[zone_type], zone)
+							goto setupMain_setupIslands_setupZones_continue_zone
+						end
+
+						-- check player base island
+						if g_savedata.player_base_island.name == owner_name then
+							table.insert(g_savedata.player_base_island.zones[zone_type], zone)
+							goto setupMain_setupIslands_setupZones_continue_zone
+						end
+
+						-- check other islands
+						for _, island in pairs(g_savedata.islands) do
+							if island.name == owner_name then
+								table.insert(island.zones[zone_type], zone)
+								goto setupMain_setupIslands_setupZones_continue_zone
+							end
+						end
+					end
+				
+					-- get start with distance from ai island
+					local closest_island = g_savedata.ai_base_island
+					local closest_distance = matrix.xzDistance(zone.transform, g_savedata.ai_base_island.transform)
+
+					-- check if player base is closer
+					local player_island_distance = matrix.xzDistance(zone.transform, g_savedata.player_base_island.transform)
+					if closest_distance > player_island_distance then
+						closest_distance = player_island_distance
+						closest_island = g_savedata.player_base_island
+					end
+
+					-- check all of the other islands
+					for _, island in pairs(g_savedata.islands) do
+						local island_distance = matrix.xzDistance(zone.transform, island.transform)
+						if closest_distance > island_distance then
+							closest_distance = island_distance
+							closest_island = island
+						end 
+					end
+
+					-- add to the island which was closest, if its within 2000m
+					if closest_distance <= 2000 then
+						table.insert(closest_island.zones[zone_type], zone)
+					end
+
+					::setupMain_setupIslands_setupZones_continue_zone::
+				end
+			end
 			d.print("setting up additional data...")
 
 			-- sets up their positions for sweep and prune
@@ -11069,7 +11151,8 @@ function tickSquadrons()
 
 					if vehicle_object.role == SQUAD.COMMAND.CARGO then
 						if vehicle_object.death_timer >= g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER/squadron_tick_rate then
-							v.kill(vehicle_id, true)
+							d.print(("Cargo Vehicle %s has been killed for more than %s minutes, despawning"):format(vehicle_object.name, g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER/time.minute), true, 0)
+							v.kill(vehicle_id, true, true)
 						end
 					elseif vehicle_object.role == SQUAD.COMMAND.SCOUT then
 						if vehicle_object.death_timer >= (time.minute/4)/squadron_tick_rate then
@@ -12158,6 +12241,7 @@ function tickVehicles()
 							if total_vel_change >= 50 or total_pos_change < 0.012 then
 								d.print(("Vehicle %s (%i) Crashed! (total_vel_change: %s total_pos_change: %s)"):format(vehicle_object.name, vehicle_id, total_vel_change, total_pos_change), true, 0)
 								v.kill(vehicle_id, true)
+								goto continue_vehicle
 							end
 						end
 					end

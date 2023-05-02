@@ -361,7 +361,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		local island = specified_island
 
 		-- make sure theres turret spawns on this island
-		if (#island.zones.turrets < 1) then
+		if (not island.zones.turrets or #island.zones.turrets < 1) then
 			return false, "theres no turret zones on this island!\nisland: "..island.name 
 		end
 

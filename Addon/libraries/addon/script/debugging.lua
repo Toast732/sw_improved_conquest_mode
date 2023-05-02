@@ -72,6 +72,11 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 			server.announce(prefix, message, peer_id or -1)
 		end
 	end
+
+	-- print a traceback if this is a debug error message, and if tracebacks are enabled
+	if debug_type == 1 and d.getDebug(8) then
+		d.trace.print(_ENV, requires_debug, peer_id)
+	end
 end
 
 function Debugging.debugTypeFromID(debug_id) -- debug id to debug type
@@ -512,7 +517,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						__ENV._ENV_MODIFIED = _ENV
 						_ENV = __ENV
 
-						d.trace.print()
+						d.trace.print(_ENV_MODIFIED)
 
 						_ENV = _ENV_MODIFIED
 
@@ -807,6 +812,12 @@ function Debugging.buildArgs(args)
 			--[[if type(arg) == "table" then
 				arg = string.gsub(string.fromTable(arg), "\n", " ")
 			end]]
+
+			-- wrap in "" if arg is a string
+			if type(arg) == "string" then
+				arg = ("\"%s\""):format(arg)
+			end
+
 			s = ("%s%s%s"):format(s, arg, i ~= arg_len and ", " or "")
 		end
 	end
@@ -819,8 +830,8 @@ end
 
 Debugging.trace = {
 
-	print = function()
-		local g_tb = _ENV_MODIFIED.g_savedata.debug.traceback
+	print = function(ENV, requires_debug, peer_id)
+		local g_tb = ENV.g_savedata.debug.traceback
 
 		local str = ""
 
@@ -832,6 +843,6 @@ Debugging.trace = {
 			str = ("%s\n    Called By: %s(%s)"):format(str, g_tb.funct_names[g_tb.stack[trace][1]], d.buildArgs(g_tb.stack[trace][2]))
 		end
 
-		d.print(str, false, 8)
+		d.print(str, requires_debug or false, 8, peer_id or -1)
 	end
 }
