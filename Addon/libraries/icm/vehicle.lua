@@ -348,7 +348,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		vehicle_type = "heli"
 	end
 	
-	local selected_prefab = nil
+	local selected_prefabs = nil
 
 	local spawnbox_index = nil -- turrets
 
@@ -399,23 +399,33 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			return false, "players are too close to the turret spawn point!"
 		end
 
-		selected_prefab = sm.spawn(true, Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
+		selected_prefabs = sm.spawn(true, Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
 
-		if not selected_prefab then
+		if not selected_prefabs then
 			return false, "was unable to get a turret prefab! turret_type of turret spawn zone: "..tostring(Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true))
 		end
 
 	elseif requested_prefab then
 		-- *spawning specified vehicle
-		selected_prefab = sm.spawn(true, requested_prefab, vehicle_type) 
+		d.print(("(Vehicle.spawn is_specified: true, requested_prefab: %s, vehicle_type: %s)"):format(tostring(requested_prefab), tostring(vehicle_type)))
+		selected_prefabs = sm.spawn(true, requested_prefab, vehicle_type)
 	else
 		-- *spawn random vehicle
-		selected_prefab = sm.spawn(false, requested_prefab, vehicle_type)
+		selected_prefabs = sm.spawn(false, requested_prefab, vehicle_type)
 	end
 
-	if not selected_prefab then
+	if not selected_prefabs then
 		d.print("(Vehicle.spawn) Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
+	end
+
+	local selected_prefab = selected_prefabs.variations.normal[1]
+
+	if not selected_prefab then
+		for _, prefab_data in pairs(selected_prefabs.variations) do
+			selected_prefab = prefab_data[1]
+			break
+		end
 	end
 
 	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location_data.name, true, 0)
@@ -576,6 +586,24 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	d.print("(Vehicle.spawn) island: "..island.name, true, 0)
+
+	-- find the variation of the vehicle we want.
+
+	selected_prefab = selected_prefabs.variations.normal
+
+	for variation_pattern, prefab_data in pairs(selected_prefabs.variations) do
+		if variation_pattern ~= "normal" and server.getTile(island.transform).name:match(variation_pattern) then
+			selected_prefab = prefab_data
+			break
+		end
+	end
+
+	if not selected_prefab then
+		d.print(("Failed to get a variation of the %s to spawn at the island of %s"):format(selected_prefabs.name, island.name))
+		return false, ("Failed to get a variation of the %s to spawn at the island of %s"):format(selected_prefabs.name, island.name)
+	end
+
+	selected_prefab = selected_prefab[math.random(1, #selected_prefab)]
 
 	local spawn_transform = selected_spawn_transform
 	if Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then

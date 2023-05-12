@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.17)"
+ADDON_VERSION = "(0.4.0.18)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1952,11 +1952,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			else
 				d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.best) do
-					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 				d.print("Bottom 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.worst) do
-					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 			end
 		
@@ -4382,11 +4382,14 @@ function tickSquadrons()
 					-- update waypoint and target data
 
 					-- if its targeting a player or a vehicle
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+
+					local player_data = pl.dataBySID(vehicle_object.target_player_id or "0")
+
+					if player_data or vehicle_object.target_vehicle_id then
 						local target_pos = nil
 						local target_id = nil
 						local target_type = ""
-						if pl.isPlayer(vehicle_object.target_player_id) then -- if its targeting a player
+						if player_data then -- if its targeting a player
 							target_pos = squad_vision.visible_players_map[vehicle_object.target_player_id].obj.last_known_pos
 							target_id = pl.objectIDFromSteamID(vehicle_object.target_player_id)
 							target_type = "character"

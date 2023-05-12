@@ -7,54 +7,54 @@
 --      By Nameous Changey
 -- Minimized Size: 1042 (1356 with comment) chars
 
-q=true
-d=false
-x=property
+t=true
+e=false
+u=property
 c=math
-A=input
-y=output.setBool
-b=A.getNumber
-z=c.atan
-a=x.getNumber
-C=x.getBool
-k=0
-u=0
-Q=0
-J=0
-s=C("Requires Is Occupied?")D=C("Radar Rotation")G=a("Time Between Missiles (s)")e=a("Min Mass")i=a("Max Mass")U=a("Min Y")V=a("Max Y")F=a("Min Distance")L=a("Max Distance")m=a("Radar FOV X")*.75
-g=a("Radar FOV Y")*.75
-if D then
-local H=g
-g=m
-m=H
+r=input
+q=output.setBool
+a=r.getNumber
+y=c.atan
+b=u.getNumber
+w=u.getBool
+n=0
+A=0
+D=0
+L=0
+v=w("Requires Is Occupied?")N=w("Radar Rotation")G=b("Time Between Missiles (s)")d=b("Min Mass")i=b("Max Mass")S=b("Min Y")U=b("Max Y")E=b("Min Distance")Q=b("Max Distance")m=b("Radar FOV X")*.75
+f=b("Radar FOV Y")*.75
+if N then
+local P=f
+f=m
+m=P
 end
-w=c.pi*2
-function O(j,f,o,l)return z(j-o,f-l)/w
+s=c.pi*2
+function K(h,g,l,o)return y(h-l,g-o)/s
 end
-function M(o,l,j,f)return c.sqrt((j-o)^2+(f-l)^2)end
-function onTick()local v=d
-k=k+1
-Q=0
-J=0
-T=d
-X=d
-E=A.getBool(1)if not s or s and E then
-h=b(8)if i==0 and e==0 or i==0 and e>=0 and h>=e or h>=e and h<=i then
-r=b(5)p=b(7)B=b(1)t=b(3)n=M(r,p,B,t)if n>=F and n<=L then
-N=-b(4)K=O(B,t,r,p)if c.abs(K-N)<=m then
-I=b(6)P=b(2)if z((P-I)/n)/w-b(9)<=g then
-if u==0 or k-u>=G*60 then
-y(1,q)v=q
-end
-end
+function H(l,o,h,g)return c.sqrt((h-l)^2+(g-o)^2)end
+function onTick()local B=e
+n=n+1
+D=0
+L=0
+V=e
+X=e
+J=r.getBool(1)if not v or v and J then
+k=a(8)if i==0 and d==0 or i==0 and d>=0 and k>=d or k>=d and k<=i then
+z=a(5)x=a(7)p=a(1)C=a(3)j=H(z,x,p,C)if j>=E and j<=Q then
+O=-a(4)M=K(p,C,z,x)if c.abs(M-O)<=m then
+F=a(6)I=a(2)if y((I-F)/j)/s-a(9)<=f then
+if A==0 or n-A>=G*60 then
+q(1,t)B=t
 end
 end
 end
 end
-if not v then
-y(1,d)end
 end
-function c.S(_,min,max)return max<_ and max or min>_ and min or _
+end
+if not B then
+q(1,e)end
+end
+function c.T(_,min,max)return max<_ and max or min>_ and min or _
 end
 function R(_)return _~=_ and 0 or _
 end

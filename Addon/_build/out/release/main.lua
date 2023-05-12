@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.17)"
+ADDON_VERSION = "(0.4.0.18)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -3277,14 +3277,15 @@ function Setup.createVehiclePrefabs()
 	g_savedata.vehicle_list = {}
 
 	-- remove all existing vehicle data in constructable_vehicles
-	for role, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
+	for _, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
 		if type(vehicles_with_role) == "table" then
-			for vehicle_type, vehicles_with_type in pairs(vehicles_with_role) do
+			for _, vehicles_with_type in pairs(vehicles_with_role) do
 				if type(vehicles_with_type) == "table" then
-					for strategy, vehicles_with_strategy in pairs(vehicles_with_type) do
+					for _, vehicles_with_strategy in pairs(vehicles_with_type) do
 						if type(vehicles_with_strategy) == "table" then
-							for i = 1, #vehicles_with_type do
-								vehicles_with_type[i].prefab_data = nil
+							for i = 1, #vehicles_with_strategy do
+								vehicles_with_strategy[i].variations = {}
+								d.print("cleared prefab_data for vehicle "..vehicles_with_strategy[i].name)
 							end
 						end
 					end
@@ -3410,6 +3411,8 @@ function Setup.createVehiclePrefabs()
 				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true) --[[@as string]], "wep_", "") or "unknown"
 				-- get the strategy of the vehicle
 				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
+				-- the variation of this vehicle
+				local variation = Tags.getValue(component_data.tags, "variation", true) or "normal"
 
 				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
 				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
@@ -3433,25 +3436,36 @@ function Setup.createVehiclePrefabs()
 					if constructable_vehicle_data and constructable_vehicle_data.name == location_data.name then
 						-- this vehicle already exists
 
-						-- update prefab data
-						constructable_vehicle_data.prefab_data = prefab_data
-
 						-- update id
-						constructable_vehicle_data.id = #g_savedata.vehicle_list
+						if table.length(constructable_vehicle_data.variations) == 0 then
+							constructable_vehicle_data.id = #g_savedata.vehicle_list
+						else
+							d.print("removing vehicle from vehicle_list with id: "..#g_savedata.vehicle_list, false, 0)
+							g_savedata.vehicle_list[#g_savedata.vehicle_list] = nil
+						end
+
+						constructable_vehicle_data.variations[variation] = constructable_vehicle_data.variations[variation] or {}
+
+						-- update prefab data
+						table.insert(constructable_vehicle_data.variations[variation], prefab_data)
 
 						-- break, as we found a match.
 						break
 					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
 						-- this vehicle does not exist
 						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
-							prefab_data = prefab_data,
+							variations = {
+								[variation] = {
+									prefab_data
+								}
+							},
 							name = location_data.name,
 							mod = 1,
 							id = #g_savedata.vehicle_list
 						})
 					end
 				end
-				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
+				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i | variation: %s"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index, variation), true, 0)
 				::createVehiclePrefabs_continue_component::
 			end
 			::createVehiclePrefabs_continue_location::
@@ -4201,7 +4215,7 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 							for vehicle_id, v in pairs(strat_data) do
 								if type(v) == "table" then
 									g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].prefab_data.location_data.name.." for adaptive AI", true, 0)
+									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].name.." for adaptive AI", true, 0)
 								end
 							end
 						end
@@ -4302,7 +4316,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		return
 	end
-	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle].prefab_data
+	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
 end
 
 ---@param role string the role of the vehicle, such as attack, general or defend
@@ -4427,7 +4441,7 @@ function SpawnModifiers.getStats()
 								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
-										prefab_data = vehicle_data.prefab_data
+										name = vehicle_data.name
 									})
 								end
 							end
@@ -5542,7 +5556,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		vehicle_type = "heli"
 	end
 	
-	local selected_prefab = nil
+	local selected_prefabs = nil
 
 	local spawnbox_index = nil -- turrets
 
@@ -5593,23 +5607,33 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			return false, "players are too close to the turret spawn point!"
 		end
 
-		selected_prefab = sm.spawn(true, Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
+		selected_prefabs = sm.spawn(true, Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true), "turret")
 
-		if not selected_prefab then
+		if not selected_prefabs then
 			return false, "was unable to get a turret prefab! turret_type of turret spawn zone: "..tostring(Tags.getValue(island.zones.turrets[spawnbox_index].tags, "turret_type", true))
 		end
 
 	elseif requested_prefab then
 		-- *spawning specified vehicle
-		selected_prefab = sm.spawn(true, requested_prefab, vehicle_type) 
+		d.print(("(Vehicle.spawn is_specified: true, requested_prefab: %s, vehicle_type: %s)"):format(tostring(requested_prefab), tostring(vehicle_type)))
+		selected_prefabs = sm.spawn(true, requested_prefab, vehicle_type)
 	else
 		-- *spawn random vehicle
-		selected_prefab = sm.spawn(false, requested_prefab, vehicle_type)
+		selected_prefabs = sm.spawn(false, requested_prefab, vehicle_type)
 	end
 
-	if not selected_prefab then
+	if not selected_prefabs then
 		d.print("(Vehicle.spawn) Unable to spawn AI vehicle! (prefab not recieved)", true, 1)
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
+	end
+
+	local selected_prefab = selected_prefabs.variations.normal[1]
+
+	if not selected_prefab then
+		for _, prefab_data in pairs(selected_prefabs.variations) do
+			selected_prefab = prefab_data[1]
+			break
+		end
 	end
 
 	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location_data.name, true, 0)
@@ -5770,6 +5794,24 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	end
 
 	d.print("(Vehicle.spawn) island: "..island.name, true, 0)
+
+	-- find the variation of the vehicle we want.
+
+	selected_prefab = selected_prefabs.variations.normal
+
+	for variation_pattern, prefab_data in pairs(selected_prefabs.variations) do
+		if variation_pattern ~= "normal" and server.getTile(island.transform).name:match(variation_pattern) then
+			selected_prefab = prefab_data
+			break
+		end
+	end
+
+	if not selected_prefab then
+		d.print(("Failed to get a variation of the %s to spawn at the island of %s"):format(selected_prefabs.name, island.name))
+		return false, ("Failed to get a variation of the %s to spawn at the island of %s"):format(selected_prefabs.name, island.name)
+	end
+
+	selected_prefab = selected_prefab[math.random(1, #selected_prefab)]
 
 	local spawn_transform = selected_spawn_transform
 	if Tags.has(selected_prefab.vehicle.tags, "vehicle_type=wep_boat") then
@@ -7546,14 +7588,24 @@ end
 ---@param vehicle_type string the type of vehicle, such as air, boat or land
 ---@return PREFAB_DATA|nil vehicle_prefab the vehicle to spawn
 function Cargo.getTransportVehicle(vehicle_type)
-	local prefab_data = sm.spawn(true, "cargo", vehicle_type)
-	if not prefab_data then
-		d.print("(Cargo.getTransportVehicle) prefab_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
+	local prefabs_data = sm.spawn(true, "cargo", vehicle_type)
+	if not prefabs_data then
+		d.print("(Cargo.getTransportVehicle) prefabs_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
 		return
 	else
-		prefab_data.name = prefab_data.location_data.name
+		local prefab_data = prefabs_data.variations.normal
+		if not prefab_data then
+			for _, variation_prefab_data in pairs(prefabs_data) do
+				prefab_data = variation_prefab_data
+				break
+			end
+		end
+
+		prefab_data[1].name = prefab_data[1].location_data.name
+
+		return prefab_data[1]
 	end
-	return prefab_data
+	return prefabs_data
 end
 
 ---@param island1 ISLAND|AI_ISLAND|PLAYER_ISLAND the first island you want to get the distance from
@@ -9438,11 +9490,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			else
 				d.print("Top 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.best) do
-					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 				d.print("Bottom 3 vehicles the ai thinks is effective against you:", false, 0, peer_id)
 				for _, vehicle_data in ipairs(vehicles.worst) do
-					d.print(_..": "..vehicle_data.prefab_data.location_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
+					d.print(_..": "..vehicle_data.name.." ("..vehicle_data.mod..")", false, 0, peer_id)
 				end
 			end
 		
@@ -11868,11 +11920,14 @@ function tickSquadrons()
 					-- update waypoint and target data
 
 					-- if its targeting a player or a vehicle
-					if pl.isPlayer(vehicle_object.target_player_id) or vehicle_object.target_vehicle_id then
+
+					local player_data = pl.dataBySID(vehicle_object.target_player_id or "0")
+
+					if player_data or vehicle_object.target_vehicle_id then
 						local target_pos = nil
 						local target_id = nil
 						local target_type = ""
-						if pl.isPlayer(vehicle_object.target_player_id) then -- if its targeting a player
+						if player_data then -- if its targeting a player
 							target_pos = squad_vision.visible_players_map[vehicle_object.target_player_id].obj.last_known_pos
 							target_id = pl.objectIDFromSteamID(vehicle_object.target_player_id)
 							target_type = "character"

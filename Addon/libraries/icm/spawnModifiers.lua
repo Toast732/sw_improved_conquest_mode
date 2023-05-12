@@ -28,7 +28,7 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 							for vehicle_id, v in pairs(strat_data) do
 								if type(v) == "table" then
 									g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].mod = 1
-									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].prefab_data.location_data.name.." for adaptive AI", true, 0)
+									d.print("setup "..g_savedata.constructable_vehicles[role][veh_type][strat][vehicle_id].name.." for adaptive AI", true, 0)
 								end
 							end
 						end
@@ -129,7 +129,7 @@ function SpawnModifiers.spawn(is_specified, vehicle_list_id, vehicle_type)
 		end
 		return
 	end
-	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle].prefab_data
+	return g_savedata.constructable_vehicles[sel_role][sel_veh_type][sel_strat][sel_vehicle]
 end
 
 ---@param role string the role of the vehicle, such as attack, general or defend
@@ -254,7 +254,7 @@ function SpawnModifiers.getStats()
 								if type(vehicle_data) == "table" and vehicle_data.mod then
 									table.insert(all_vehicles, {
 										mod = vehicle_data.mod,
-										prefab_data = vehicle_data.prefab_data
+										name = vehicle_data.name
 									})
 								end
 							end

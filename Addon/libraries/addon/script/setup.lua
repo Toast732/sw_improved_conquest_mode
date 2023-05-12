@@ -129,14 +129,15 @@ function Setup.createVehiclePrefabs()
 	g_savedata.vehicle_list = {}
 
 	-- remove all existing vehicle data in constructable_vehicles
-	for role, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
+	for _, vehicles_with_role in pairs(g_savedata.constructable_vehicles) do
 		if type(vehicles_with_role) == "table" then
-			for vehicle_type, vehicles_with_type in pairs(vehicles_with_role) do
+			for _, vehicles_with_type in pairs(vehicles_with_role) do
 				if type(vehicles_with_type) == "table" then
-					for strategy, vehicles_with_strategy in pairs(vehicles_with_type) do
+					for _, vehicles_with_strategy in pairs(vehicles_with_type) do
 						if type(vehicles_with_strategy) == "table" then
-							for i = 1, #vehicles_with_type do
-								vehicles_with_type[i].prefab_data = nil
+							for i = 1, #vehicles_with_strategy do
+								vehicles_with_strategy[i].variations = {}
+								d.print("cleared prefab_data for vehicle "..vehicles_with_strategy[i].name)
 							end
 						end
 					end
@@ -262,6 +263,8 @@ function Setup.createVehiclePrefabs()
 				local vehicle_type = string.gsub(Tags.getValue(component_data.tags, "vehicle_type", true) --[[@as string]], "wep_", "") or "unknown"
 				-- get the strategy of the vehicle
 				local strategy = Tags.getValue(component_data.tags, "strategy", true) or "general"
+				-- the variation of this vehicle
+				local variation = Tags.getValue(component_data.tags, "variation", true) or "normal"
 
 				-- fill out the constructable_vehicles table with the vehicle's role, vehicle type and strategy
 				table.tabulate(g_savedata.constructable_vehicles, role, vehicle_type, strategy)
@@ -285,25 +288,36 @@ function Setup.createVehiclePrefabs()
 					if constructable_vehicle_data and constructable_vehicle_data.name == location_data.name then
 						-- this vehicle already exists
 
-						-- update prefab data
-						constructable_vehicle_data.prefab_data = prefab_data
-
 						-- update id
-						constructable_vehicle_data.id = #g_savedata.vehicle_list
+						if table.length(constructable_vehicle_data.variations) == 0 then
+							constructable_vehicle_data.id = #g_savedata.vehicle_list
+						else
+							d.print("removing vehicle from vehicle_list with id: "..#g_savedata.vehicle_list, false, 0)
+							g_savedata.vehicle_list[#g_savedata.vehicle_list] = nil
+						end
+
+						constructable_vehicle_data.variations[variation] = constructable_vehicle_data.variations[variation] or {}
+
+						-- update prefab data
+						table.insert(constructable_vehicle_data.variations[variation], prefab_data)
 
 						-- break, as we found a match.
 						break
 					elseif i == #g_savedata.constructable_vehicles[role][vehicle_type][strategy] then
 						-- this vehicle does not exist
 						table.insert(g_savedata.constructable_vehicles[role][vehicle_type][strategy], {
-							prefab_data = prefab_data,
+							variations = {
+								[variation] = {
+									prefab_data
+								}
+							},
 							name = location_data.name,
 							mod = 1,
 							id = #g_savedata.vehicle_list
 						})
 					end
 				end
-				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index), true, 0)
+				d.print(("set id: %i | # of vehicles w same role, type and strategy: %s | name: %s | from addon with index: %i | variation: %s"):format(#g_savedata.vehicle_list, #g_savedata.constructable_vehicles[role][vehicle_type][strategy], location_data.name, addon_index, variation), true, 0)
 				::createVehiclePrefabs_continue_component::
 			end
 			::createVehiclePrefabs_continue_location::

@@ -1367,14 +1367,24 @@ end
 ---@param vehicle_type string the type of vehicle, such as air, boat or land
 ---@return PREFAB_DATA|nil vehicle_prefab the vehicle to spawn
 function Cargo.getTransportVehicle(vehicle_type)
-	local prefab_data = sm.spawn(true, "cargo", vehicle_type)
-	if not prefab_data then
-		d.print("(Cargo.getTransportVehicle) prefab_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
+	local prefabs_data = sm.spawn(true, "cargo", vehicle_type)
+	if not prefabs_data then
+		d.print("(Cargo.getTransportVehicle) prefabs_data is nil! vehicle_type: "..tostring(vehicle_type), true, 1)
 		return
 	else
-		prefab_data.name = prefab_data.location_data.name
+		local prefab_data = prefabs_data.variations.normal
+		if not prefab_data then
+			for _, variation_prefab_data in pairs(prefabs_data) do
+				prefab_data = variation_prefab_data
+				break
+			end
+		end
+
+		prefab_data[1].name = prefab_data[1].location_data.name
+
+		return prefab_data[1]
 	end
-	return prefab_data
+	return prefabs_data
 end
 
 ---@param island1 ISLAND|AI_ISLAND|PLAYER_ISLAND the first island you want to get the distance from

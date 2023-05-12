@@ -5,84 +5,84 @@
 -- Developed & Minimized using LifeBoatAPI - Stormworks Lua plugin for VSCode
 -- https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --      By Nameous Changey
--- Minimized Size: 2645 (2959 with comment) chars
+-- Minimized Size: 2664 (2978 with comment) chars
 au="%.3f"
-at="\npitch from tar: "
-as="\nyaw from tar: "
+at="\nyaw from tar: "
+as="\npitch from tar: "
 
-M=true
-U=property
-T=input
+U=true
+O=property
+N=input
 n=math
-W=output
+Z=output
 o=screen.drawText
-Q=W.setNumber
+M=Z.setNumber
 a=n.abs
-e=T.getNumber
-N=n.atan
-_=U.getNumber
-r=U.getBool
-S=false
-w=0
-E=0
+e=N.getNumber
+Q=n.atan
+_=O.getNumber
+r=O.getBool
+T=false
+t=0
+z=0
 s=0
 b=0
 c=0
-ak=r("Enable Debug")ab=r("Invert Horizontal Rotation")ah=r("Invert Vertical Rotation")ar=r("Aim Mode")O=r("Requires Is Occupied?")ae=r("Require Can Fire Input?")f=_("Horizontal Pivot Type")g=_("Vertical Pivot Type")z=_("Angle Units")D=_("Horizontal Max Angle")G=_("Horizontal Min Angle")x=_("Vertical Max Angle")I=_("Vertical Min Angle")ap=_("Missile Count")ai=_("Time Between Missiles (s)")v=_("Min Mass")H=_("Max Mass")an=_("Min Y")aq=_("Max Y")m=_("Yaw Threshold")l=_("Pitch Threshold")al=_("Min Distance")Y=_("Max Distance")K=n.pi*2
-h=4
-j=4
-F=1
-u=1
-function am(B,L,C,J)return N(B-C,L-J)/K
+ae=r("Enable Debug")ad=r("Invert Horizontal Rotation")ak=r("Invert Vertical Rotation")ar=r("Aim Mode")V=r("Requires Is Occupied?")ap=r("Require Can Fire Input?")f=_("Horizontal Pivot Type")g=_("Vertical Pivot Type")y=_("Angle Units")H=_("Horizontal Max Angle")J=_("Horizontal Min Angle")F=_("Vertical Max Angle")L=_("Vertical Min Angle")ac=_("Missile Count")af=_("Time Between Missiles (s)")u=_("Min Mass")A=_("Max Mass")ai=_("Min Y")an=_("Max Y")l=_("Yaw Threshold")m=_("Pitch Threshold")aa=_("Min Distance")P=_("Max Distance")G=n.pi*2
+k=4
+i=4
+K=1
+v=1
+function aj(I,C,B,D)return Q(I-B,C-D)/G
 end
-function ac(C,J,B,L)return n.sqrt((B-C)^2+(L-J)^2)end
-function ad()i=1
-if z==1 then
-i=K
-elseif z==2 then
-i=400
-elseif z==3 then
-i=360
+function al(B,D,I,C)return n.sqrt((I-B)^2+(C-D)^2)end
+function aq()h=1
+if y==1 then
+h=G
+elseif y==2 then
+h=400
+elseif y==3 then
+h=360
 end
 if f>=2 then
-h=1
+k=1
 end
 if g>=2 then
-j=1
+i=1
 end
-F=h
-if ab then
-F=-h
+K=k
+if ad then
+K=-k
 end
-u=j
-if ah then
-u=-j
+v=i
+if ak then
+v=-i
 end
-D=d(D/i/h)G=d(G/i/h)x=d(x/i/j)I=d(I/i/j)m=d(m/i)l=d(l/i)end
-function onTick()if not S then
-ad()S=M
+H=d(H/h/k)J=d(J/h/k)F=d(F/h/i)L=d(L/h/i)l=d(l/h)m=d(m/h)end
+function onTick()if not T then
+aq()T=U
 end
-w=w+1
+t=t+1
 b=0
 c=0
-if s<ap then
-ag=e(11)==1
-if not O or O and ag then
-A=e(10)if H==0 and v==0 or H==0 and v>=0 and A>=v or A>=v and A<=H then
-y=e(2)if y>=an and y<=aq then
-Z=e(7)P=e(9)R=e(1)V=e(3)t=ac(Z,P,R,V)if t>=al and t<=Y+300 then
-aa=e(8)af=-e(4)q=e(5)p=e(6)aj=af-am(R,V,Z,P)b=d(n.X(aj,G,D)*F)if f<=1 then
-b=d(ao(b,-1,1))end
+debug.log("SW | 0")if s<ac then
+ao=e(11)==1
+if not V or V and ao then
+E=e(10)if A==0 and u==0 or A==0 and u>=0 and E>=u or E>=u and E<=A then
+x=e(2)if x>=ai and x<=an then
+Y=e(7)X=e(9)S=e(1)R=e(3)w=al(Y,X,S,R)if w>=aa and w<=P+300 then
+am=e(8)ah=-e(4)q=e(5)p=e(6)ag=ah-aj(S,R,Y,X)b=d(n.W(ag,J,H)*K)if f<=1 then
+b=d(ab(b,-1,1))end
 if f>=2 then
 b=d(((b-q)%1+1.5)%1-.5)end
-c=d(n.X(N((y-aa)/t)/K,I,x)*u)if g>=2 then
-c=d(((c-p*j)%1+1.5)%1-.5)end
-if f<=1 and a(q*h-b)<=m or f>=2 and a(b)<=m then
-if g<=1 and a(p*u-c)<=l or g>=2 and a(c)<=l then
-if E==0 or w-E>=ai*60 then
-if t<Y and(not ae or T.getBool(s+1))then
+c=d(n.W(Q((x-am)/w)/G,L,F)*v)if g>=2 then
+c=d(((c-p*i)%1+1.5)%1-.5)end
+if f<=1 and a(q*k-b)<=l or f>=2 and a(b)<=l then
+if g<=1 and a(p*v-c)<=m or g>=2 and a(c)<=m then
+if z==0 or t-z>=af*60 then
+if w<P and(not ap or N.getBool(s+1))then
 s=s+1
-W.setBool(s,M)E=w
+Z.setBool(s,U)z=t
 end
 end
 end
@@ -92,25 +92,25 @@ end
 end
 end
 end
-Q(1,b)Q(2,c)end
-function onDraw()if ak then
+M(1,b)M(2,c)end
+function onDraw()if ae then
 if q then
-if f<=1 and a(q*h-b)<=m or f>=2 and a(b)<=m then
-o(0,0,"VALID yaw thrsh: "..(au):format(m)..as..(au):format(f<=1 and a(q*h-b)or f>=2 and a(b)))else
-o(0,0,"INVALID yaw thrsh: "..(au):format(m)..as..(au):format(f<=1 and a(q*h-b)or f>=2 and a(b)))end
+if f<=1 and a(q*k-b)<=l or f>=2 and a(b)<=l then
+o(0,0,"VALID yaw thrsh: "..(au):format(l)..at..(au):format(f<=1 and a(q*k-b)or f>=2 and a(b)))else
+o(0,0,"INVALID yaw thrsh: "..(au):format(l)..at..(au):format(f<=1 and a(q*k-b)or f>=2 and a(b)))end
 else
 o(0,0,"horizontal_rot doesnt exist")end
 if p then
-if g<=1 and a(p*j-c)<=l or g>=2 and a(c)<=l then
-o(0,20,"VALID pitch thrsh: "..(au):format(l)..at..(au):format(g<=1 and a(p*j-c)or g>=2 and a(c)))else
-o(0,20,"INVALID pitch thrsh: "..(au):format(l)..at..(au):format(g<=1 and a(p*j-c)or g>=2 and a(c)))end
+if g<=1 and a(p*i-c)<=m or g>=2 and a(c)<=m then
+o(0,20,"VALID pitch thrsh: "..(au):format(m)..as..(au):format(g<=1 and a(p*i-c)or g>=2 and a(c)))else
+o(0,20,"INVALID pitch thrsh: "..(au):format(m)..as..(au):format(g<=1 and a(p*i-c)or g>=2 and a(c)))end
 else
 o(0,20,"vertical_rot doesnt exist")end
 end
 end
-function n.X(k,min,max)return max<k and max or min>k and min or k
+function n.W(j,min,max)return max<j and max or min>j and min or j
 end
-function d(k)return k~=k and 0 or k
+function d(j)return j~=j and 0 or j
 end
-function ao(k,min,max)return(k-min)/(max-min)%1*(max-min)+min
+function ab(j,min,max)return(j-min)/(max-min)%1*(max-min)+min
 end
