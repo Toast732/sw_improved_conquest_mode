@@ -23,7 +23,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.18)"
+ADDON_VERSION = "(0.4.0.19)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -643,18 +643,44 @@ function math.euclideanDistance(...)
 	local rx = c[1] - c[2]
 	local rz = c[3] - c[4]
 
-	if cause_error then
-		rx = rx * nil
-		--d.trace.print()
-	end
-	if #c == 4 then
+	if c.n == 4 then
 		-- 2D distance
 		return math.sqrt(rx*rx+rz*rz)
-	else
-		-- 3D distance
-		local ry = c[5] - c[6]
-		return math.sqrt(rx*rx+ry*ry+rz*rz)
 	end
+
+	-- 3D distance
+	local ry = c[5] - c[6]
+	return math.sqrt(rx*rx+ry*ry+rz*rz)
+end
+
+---@param x1 number x coordinate of position 1
+---@param x2 number x coordinate of position 2
+---@param z1 number z coordinate of position 1
+---@param z2 number z coordinate of position 2
+---@param y1 number? y coordinate of position 1 (exclude to just get yaw, include to get yaw and pitch)
+---@param y2 number? y coordinate of position 2 (exclude to just get yaw, include to get yaw and pitch)
+---@return number yaw the yaw needed to face position 2 from position 1
+---@return number pitch the pitch needed to face position 2 from position 1, will return 0 if y not specified.
+function math.angleToFace(...)
+	local c = table.pack(...)
+
+	-- relative x coordinate
+	local rx = c[1] - c[2]
+	-- relative z coordinate
+	local rz = c[3] - c[4]
+
+	local yaw = math.atan(rz, rx) - math.half_pi
+
+	if c.n == 4 then
+		return yaw, 0
+	end
+
+	-- relative y
+	local ry = c[5] - c[6]
+
+	local pitch = -math.atan(ry, math.sqrt(rx * rx + rz * rz))
+
+	return yaw, pitch
 end
 
 
@@ -2939,13 +2965,13 @@ function Cache.reset(location) -- resets the cache
 	else
 		if g_savedata.cache[location] then
 			g_savedata.cache[location] = nil
-		else
+		--[[else
 			if not g_savedata.cache_stats.failed_resets then
 				g_savedata.cache_stats.failed_resets = 0
 			end
 			g_savedata.cache_stats.failed_resets = g_savedata.cache_stats.failed_resets + 1
 			d.print("Failed to reset cache data at "..tostring(location)..", this should not be happening!", true, 1)
-			return false
+			return false]]
 		end
 	end
 	g_savedata.cache_stats.resets = g_savedata.cache_stats.resets + 1
@@ -4553,7 +4579,8 @@ end
 
 ---@param vehicle_object vehicle_object the vehicle you want to add the path for
 ---@param target_dest SWMatrix the destination for the path
-function Pathfinding.addPath(vehicle_object, target_dest)
+---@param translate_forward_distance number? the increment of the distance, used to slowly try moving the vehicle's matrix forwards, if its at a tile's boundery, and its unable to move, used by the function itself, leave undefined.
+function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
 
 	-- path tags to exclude
 	local exclude = ""
@@ -4589,7 +4616,7 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 		-- calculates route
 		local path_list = s.pathfind(path_start_pos, m.translation(target_dest[13], 0, target_dest[15]), "ocean_path", exclude)
 
-		for path_index, path in pairs(path_list) do
+		for _, path in pairs(path_list) do
 			if not path.y then
 				path.y = 0
 			end
@@ -4604,15 +4631,44 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 			})
 		end
 	elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-		local dest_x, dest_y, dest_z = m.position(target_dest)
+		--local dest_x, dest_y, dest_z = m.position(target_dest)
 
 		local path_start_pos = nil
 
 		if #vehicle_object.path > 0 then
 			local waypoint_end = vehicle_object.path[#vehicle_object.path]
-			path_start_pos = m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z)
+
+			if translate_forward_distance then
+				local second_last_path_pos
+				if #vehicle_object.path < 2 then
+					second_last_path_pos = vehicle_object.transform
+				else
+					local second_last_path = vehicle_object.path[#vehicle_object.path - 1]
+					second_last_path_pos = matrix.translation(second_last_path.x, second_last_path.y, second_last_path.z)
+				end
+
+				local yaw, _ = math.angleToFace(second_last_path_pos[13], waypoint_end.x, second_last_path_pos[15], waypoint_end.z)
+
+				path_start_pos = m.translation(waypoint_end.x + translate_forward_distance * math.sin(yaw), waypoint_end.y, waypoint_end.z + translate_forward_distance * math.cos(yaw))
+			
+				--[[server.addMapLine(-1, vehicle_object.ui_id, m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z), path_start_pos, 1, 255, 255, 255, 255)
+			
+				d.print("path_start_pos (existing paths)", false, 0)
+				d.print(path_start_pos)]]
+			else
+				path_start_pos = m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z)
+			end
 		else
 			path_start_pos = vehicle_object.transform
+
+			if translate_forward_distance then
+				path_start_pos = matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, translate_forward_distance))
+				--[[server.addMapLine(-1, vehicle_object.ui_id, vehicle_object.transform, path_start_pos, 1, 150, 150, 150, 255)
+				d.print("path_start_pos (no existing paths)", false, 0)
+				d.print(path_start_pos)]]
+			else
+				path_start_pos = vehicle_object.transform
+			end
 		end
 
 		start_x, start_y, start_z = m.position(vehicle_object.transform)
@@ -4667,6 +4723,44 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 			if m.xzDistance(vehicle_object.transform, next_path_matrix) < m.xzDistance(m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), next_path_matrix) then
 				p.nextPath(vehicle_object)
 			end
+		end
+
+		--[[
+			checks if the vehicle is basically stuck, and if its at a tile border, if it is, 
+			try moving matrix forwards slightly, and keep trying till we've got a path, 
+			or until we reach a set max distance, to avoid infinite recursion.
+		]]
+
+		local max_attempt_distance = 30
+		local max_attempt_increment = 5
+
+		translate_forward_distance = translate_forward_distance or 0
+
+		if translate_forward_distance < max_attempt_distance then
+			local last_path = vehicle_object.path[#vehicle_object.path]
+
+			-- if theres no last path, just set it as the vehicle's positon.
+			if not last_path then
+				last_path = {
+					x = vehicle_object.transform[13],
+					z = vehicle_object.transform[15]
+				}
+			end
+
+			-- checks if we're within the max_attempt_distance of any tile border
+			local tile_x_border_distance = math.abs((last_path.x-250)%1000-250)
+			local tile_z_border_distance = math.abs((last_path.z-250)%1000-250)
+
+			if tile_x_border_distance <= max_attempt_distance or tile_z_border_distance <= max_attempt_distance then
+				-- increments the translate_forward_distance
+				translate_forward_distance = translate_forward_distance + max_attempt_increment
+
+				d.print(("(Pathfinding.addPath) moving the pathfinding start pos forwards by %sm"):format(translate_forward_distance), true, 0)
+
+				Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
+			end
+		else
+			d.print(("(Pathfinding.addPath) despite moving the pathfinding start pos forward by %sm, pathfinding still failed for vehicle with id %s, aborting to avoid infinite recursion"):format(translate_forward_distance, vehicle_object.id), true, 0)
 		end
 	else
 		table.insert(vehicle_object.path, { 
@@ -5267,8 +5361,17 @@ function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressive
 
 		if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 			-- land vehicle
-			local terrain_type = v.getTerrainType(vehicle_object.transform)
-			local aggressive = aggressiveness_override or not ignore_aggressiveness and vehicle_object.is_aggressive or false
+			local terrain_type
+
+			if ignore_terrain_type then
+				terrain_type = terrain_type_override or "ROAD"
+			else
+				terrain_type = v.getTerrainType(vehicle_object.transform)
+			end
+
+			local _, squad = Squad.getSquad(vehicle_object.id)
+			
+			local aggressive = aggressiveness_override or not ignore_aggressiveness and squad.command == SQUAD.COMMAND.ENGAGE
 			if aggressive then
 				speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.AGGRESSIVE
 			else
@@ -5951,16 +6054,16 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				purchase_type = purchase_type
 			},
 			vision = { 
-				radius = Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
-				base_radius = Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
-				is_radar = Tags.has(selected_prefab.vehicle.tags, "radar"),
+				radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
+				base_radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
+				is_radar = Tags.has(selected_prefab.vehicle.tags, "radar") and stats_multiplier >= 0.8,
 				is_sonar = Tags.has(selected_prefab.vehicle.tags, "sonar")
 			},
 			spawning_transform = {
 				distance = Tags.getValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0 * stats_multiplier,
+				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0,
 				convoy_modifier = 0
 			},
 			driving = { -- used for driving the vehicle itself, holds special data depending on the vehicle type
@@ -7330,11 +7433,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 				if first_path_island.distance.land then
 					if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-						--
-						total_travel_time[first_path_island_index].land = 
-						(total_travel_time[first_path_island_index].land or 0) + 
-						(first_path_island.distance.land/transport_vehicle.land.movement_speed)
-						--
+						if Tags.has(origin_island.island.tags, "can_spawn=land") then
+							--
+							total_travel_time[first_path_island_index].land = 
+							(total_travel_time[first_path_island_index].land or 0) + 
+							(first_path_island.distance.land/transport_vehicle.land.movement_speed)
+							--
+						end
 					end
 				end
 				if first_path_island.distance.sea then
@@ -7387,11 +7492,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 							end
 							if second_path_island.distance.land then
 								if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-									--
-									total_travel_time[first_path_island_index][second_path_island_index].land = 
-									(total_travel_time[first_path_island_index].land or 0) + 
-									(second_path_island.distance.land/transport_vehicle.land.movement_speed)
-									--
+									if Tags.has(first_path_island.island.tags, "can_spawn=land") then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index].land = 
+										(total_travel_time[first_path_island_index].land or 0) + 
+										(second_path_island.distance.land/transport_vehicle.land.movement_speed)
+										--
+									end
 								end
 							end
 							if second_path_island.distance.sea then
@@ -7442,11 +7549,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 										end
 										if third_path_island.distance.land then
 											if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-												--
-												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
-												(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
-												(third_path_island.distance.land/transport_vehicle.land.movement_speed)
-												--
+												if Tags.has(second_path_island.island.tags, "can_spawn=land") then
+													--
+													total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
+													(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
+													(third_path_island.distance.land/transport_vehicle.land.movement_speed)
+													--
+												end
 											end
 										end
 										if third_path_island.distance.sea then
@@ -12123,7 +12232,7 @@ function tickVision()
 							if squad.target_vehicles[player_vehicle_id] == nil then
 								squad.target_vehicles[player_vehicle_id] = {
 									state = TARGET_VISIBILITY_VISIBLE,
-									last_known_pos = player_vehicle_transform,
+									last_known_pos = player_vehicle_transform
 								}
 							else
 								local target_vehicle = squad.target_vehicles[player_vehicle_id]
@@ -12338,16 +12447,20 @@ function tickVehicles()
 				local tile, got_tile = s.getTile(vehicle_object.transform)
 				-- if its not on the ocean tile, make its explosion depth 3x lower, if its a boat
 				if got_tile and tile.name ~= "" and vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-					modifier = 3
+					modifier = 6
 				end
 
 				-- check if the vehicle has sunk or is under water
 				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.vehicle_type]/modifier then
 					if vehicle_object.role ~= SQUAD.COMMAND.CARGO then
-						v.kill(vehicle_id, true)
 						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
+							vehicle_object.sinking_counter = (vehicle_object.sinking_counter or 0) + 1
+							if vehicle_object.sinking_counter > 8 then
+								v.kill(vehicle_id, true)
+								d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
+							end
 						else
+							v.kill(vehicle_id, true)
 							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					else
@@ -12363,6 +12476,8 @@ function tickVehicles()
 						end
 					end
 					goto continue_vehicle
+				else
+					vehicle_object.sinking_counter = 0
 				end
 
 				local ai_target = nil
@@ -12423,6 +12538,50 @@ function tickVehicles()
 									-- if we have reached last waypoint start holding there
 									--d.print("set boat "..vehicle_id.." to holding", true, 0)
 									AI.setState(vehicle_object, VEHICLE.STATE.HOLDING)
+								end
+							end
+
+							-- if the target has moved far enough, then we want to add to our path.
+
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND and squad.command == SQUAD.COMMAND.ENGAGE then
+
+								local squad_vision = squadGetVisionData(squad)
+
+								if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+								elseif pl.isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+								end
+
+								if target and (not target.last_pathfind_pos or m.distance(target.last_known_pos, target.last_pathfind_pos) > 20) then
+									target.last_pathfind_pos = target.last_known_pos
+									ai_target = target.last_pathfind_pos
+
+									p.resetPath(vehicle_object)
+
+									local distance = m.distance(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfind(vehicle_object.transform, ai_target, "land_path", "")
+									local is_better_pos = false
+									for path_index, path in pairs(possiblePaths) do
+										if m.distance(m.translation(path.x, path.y, path.z), ai_target) < distance then
+											is_better_pos = true
+										end
+									end
+									if is_better_pos then
+										p.addPath(vehicle_object, ai_target)
+										--? if its target is at least 5 metres above sea level and its target is within 35 metres of its final waypoint.
+										if ai_target[14] > 5 and m.xzDistance(ai_target, m.translation(vehicle_object.path[#vehicle_object.path].x, 0, vehicle_object.path[#vehicle_object.path].z)) < 35 then
+											--* replace its last path be where the target is.
+											vehicle_object.path[#vehicle_object.path] = {
+												x = ai_target[13],
+												y = ai_target[14],
+												z = ai_target[15],
+												ui_id = vehicle_object.path[#vehicle_object.path].ui_id
+											}
+										end
+									else
+										ai_state = 0
+									end
 								end
 							end
 						end
@@ -13296,6 +13455,7 @@ function tickControls()
 					if d.getDebug(5) then
 						if vehicle_object.driving.ui_id then
 							s.removeMapLine(-1, vehicle_object.driving.ui_id)
+							s.removeMapLabel(-1, vehicle_object.driving.ui_id)
 						end
 					end
 
@@ -13305,7 +13465,7 @@ function tickControls()
 
 
 			--? we have at least 1 path
-			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[1].x and vehicle_object.path[0].y == vehicle_object.path[1].y and vehicle_object.path[0].z == vehicle_object.path[1].z) then
+			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[#vehicle_object.path].x and vehicle_object.path[0].y == vehicle_object.path[#vehicle_object.path].y and vehicle_object.path[0].z == vehicle_object.path[#vehicle_object.path].z) then
 
 				if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 					-- resets seat
@@ -13316,6 +13476,7 @@ function tickControls()
 				if d.getDebug(5) then
 					if vehicle_object.driving.ui_id then
 						s.removeMapLine(-1, vehicle_object.driving.ui_id)
+						s.removeMapLabel(-1, vehicle_object.driving.ui_id)
 					end
 				end
 
@@ -13385,7 +13546,7 @@ function tickControls()
 
 				local target_angle = math.atan(target_pos.x - vehicle_object.transform[13], target_pos.z - vehicle_object.transform[15])
 
-				local speed = v.getSpeed(vehicle_object)
+				local speed = v.getSpeed(vehicle_object, true)
 
 				local x_axis, y_axis, z_axis = m.getMatrixRotation(vehicle_object.transform)
 				--d.print("y_axis: "..y_axis, true, 0)
@@ -13397,9 +13558,9 @@ function tickControls()
 				local previous_yaw = math.atan(vehicle_object.path[1].x - vehicle_object.transform[13], vehicle_object.path[1].z - vehicle_object.transform[15])
 				local total_dist = m.distance(vehicle_object.transform, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)) -- the total distance checked so far, used for weight
 
-				local max_dist = 300
+				local max_dist = 200
 
-				local min_speed = 6.5
+				local min_speed = 8
 
 				local speed_before = speed
 
@@ -13479,7 +13640,9 @@ function tickControls()
 				local ad = math.wrap(-(ad)/3, -math.pi, math.pi)
 				--d.print("a/d: "..ad, true, 0)
 
-				AI.setSeat(vehicle_id, "Driver", (speed/vehicle_object.speed.speed)/math.max(1, math.abs(ad)+0.6), ad, 0, 0, true, false, false, false, false, false, false)
+				local ws = (speed/vehicle_object.speed.speed)/math.clamp(math.abs(ad)+0.6, 1, 2)
+
+				AI.setSeat(vehicle_id, "Driver", ws, ad, 0, 0, true, false, false, false, false, false, false)
 
 				if d.getDebug(5) then
 					-- calculate info for debug
@@ -13491,12 +13654,23 @@ function tickControls()
 					
 					local player_list = s.getPlayers()
 					s.removeMapLine(-1, vehicle_object.driving.ui_id)
-					for peer_index, peer in pairs(player_list) do
+					s.removeMapLabel(-1, vehicle_object.driving.ui_id)
+					for _, peer in pairs(player_list) do
 						if d.getDebug(5, peer.id) then
 							if #next_paths_debug > 0 then
 								for i=1, #next_paths_debug do
 									-- line that shows the next paths, colour depending on how much the vehicle is slowing down for it, red = very slow, green = none
 									s.addMapLine(peer.id, vehicle_object.driving.ui_id, m.translation(next_paths_debug[i].origin_x, 0, next_paths_debug[i].origin_z), m.translation(next_paths_debug[i].target_x, 0, next_paths_debug[i].target_z), 1, math.floor(math.clamp(255*(1-next_paths_debug[i].speed_mult), 0, 255)), math.floor(math.clamp(255*next_paths_debug[i].speed_mult, 0, 255)), 0, 200)
+									
+									local line_distance = math.euclideanDistance(next_paths_debug[i].origin_x, next_paths_debug[i].target_x, next_paths_debug[i].origin_z, next_paths_debug[i].target_z)
+
+									local to_next_yaw, _ = math.angleToFace(next_paths_debug[i].origin_x, next_paths_debug[i].target_x, next_paths_debug[i].origin_z, next_paths_debug[i].target_z)
+
+									to_next_yaw = to_next_yaw - math.half_pi
+									local label_x = next_paths_debug[i].origin_x + (line_distance * 0.65) * math.cos(to_next_yaw)
+									local label_z = next_paths_debug[i].origin_z + (line_distance * 0.65) * math.sin(to_next_yaw)
+									
+									s.addMapLabel(peer.id, vehicle_object.driving.ui_id, 4, "Speed Multiplier: "..next_paths_debug[i].speed_mult, label_x, label_z)
 									--d.print("speed_mult: "..next_paths_debug[i].speed_mult, true, 0)
 								end
 							end
@@ -13508,6 +13682,9 @@ function tickControls()
 
 							-- yellow line at target angle (where its wanting to go)
 							s.addMapLine(peer.id, vehicle_object.driving.ui_id, vehicle_object.transform, m.translation(target_angle_x, 0, target_angle_z), 0.5, 255, 255, 0, 200)
+						
+							-- Label at where the vehicle is, displaying the current throttle
+							s.addMapLabel(peer.id, vehicle_object.driving.ui_id, 4, "Throttle: "..ws.."\nSteering: "..ad, vehicle_object.transform[13], vehicle_object.transform[15])
 						end
 					end
 					

@@ -59,8 +59,17 @@ function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressive
 
 		if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 			-- land vehicle
-			local terrain_type = v.getTerrainType(vehicle_object.transform)
-			local aggressive = aggressiveness_override or not ignore_aggressiveness and vehicle_object.is_aggressive or false
+			local terrain_type
+
+			if ignore_terrain_type then
+				terrain_type = terrain_type_override or "ROAD"
+			else
+				terrain_type = v.getTerrainType(vehicle_object.transform)
+			end
+
+			local _, squad = Squad.getSquad(vehicle_object.id)
+			
+			local aggressive = aggressiveness_override or not ignore_aggressiveness and squad.command == SQUAD.COMMAND.ENGAGE
 			if aggressive then
 				speed = speed * VEHICLE.SPEED.MULTIPLIERS.LAND.AGGRESSIVE
 			else
@@ -743,16 +752,16 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				purchase_type = purchase_type
 			},
 			vision = { 
-				radius = Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
-				base_radius = Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE,
-				is_radar = Tags.has(selected_prefab.vehicle.tags, "radar"),
+				radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
+				base_radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
+				is_radar = Tags.has(selected_prefab.vehicle.tags, "radar") and stats_multiplier >= 0.8,
 				is_sonar = Tags.has(selected_prefab.vehicle.tags, "sonar")
 			},
 			spawning_transform = {
 				distance = Tags.getValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
-				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0 * stats_multiplier,
+				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0,
 				convoy_modifier = 0
 			},
 			driving = { -- used for driving the vehicle itself, holds special data depending on the vehicle type

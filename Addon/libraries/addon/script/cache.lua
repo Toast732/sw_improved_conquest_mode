@@ -13,13 +13,13 @@ function Cache.reset(location) -- resets the cache
 	else
 		if g_savedata.cache[location] then
 			g_savedata.cache[location] = nil
-		else
+		--[[else
 			if not g_savedata.cache_stats.failed_resets then
 				g_savedata.cache_stats.failed_resets = 0
 			end
 			g_savedata.cache_stats.failed_resets = g_savedata.cache_stats.failed_resets + 1
 			d.print("Failed to reset cache data at "..tostring(location)..", this should not be happening!", true, 1)
-			return false
+			return false]]
 		end
 	end
 	g_savedata.cache_stats.resets = g_savedata.cache_stats.resets + 1

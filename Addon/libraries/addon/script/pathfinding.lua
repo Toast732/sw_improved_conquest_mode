@@ -96,7 +96,8 @@ end
 
 ---@param vehicle_object vehicle_object the vehicle you want to add the path for
 ---@param target_dest SWMatrix the destination for the path
-function Pathfinding.addPath(vehicle_object, target_dest)
+---@param translate_forward_distance number? the increment of the distance, used to slowly try moving the vehicle's matrix forwards, if its at a tile's boundery, and its unable to move, used by the function itself, leave undefined.
+function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
 
 	-- path tags to exclude
 	local exclude = ""
@@ -132,7 +133,7 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 		-- calculates route
 		local path_list = s.pathfind(path_start_pos, m.translation(target_dest[13], 0, target_dest[15]), "ocean_path", exclude)
 
-		for path_index, path in pairs(path_list) do
+		for _, path in pairs(path_list) do
 			if not path.y then
 				path.y = 0
 			end
@@ -147,15 +148,44 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 			})
 		end
 	elseif vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
-		local dest_x, dest_y, dest_z = m.position(target_dest)
+		--local dest_x, dest_y, dest_z = m.position(target_dest)
 
 		local path_start_pos = nil
 
 		if #vehicle_object.path > 0 then
 			local waypoint_end = vehicle_object.path[#vehicle_object.path]
-			path_start_pos = m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z)
+
+			if translate_forward_distance then
+				local second_last_path_pos
+				if #vehicle_object.path < 2 then
+					second_last_path_pos = vehicle_object.transform
+				else
+					local second_last_path = vehicle_object.path[#vehicle_object.path - 1]
+					second_last_path_pos = matrix.translation(second_last_path.x, second_last_path.y, second_last_path.z)
+				end
+
+				local yaw, _ = math.angleToFace(second_last_path_pos[13], waypoint_end.x, second_last_path_pos[15], waypoint_end.z)
+
+				path_start_pos = m.translation(waypoint_end.x + translate_forward_distance * math.sin(yaw), waypoint_end.y, waypoint_end.z + translate_forward_distance * math.cos(yaw))
+			
+				--[[server.addMapLine(-1, vehicle_object.ui_id, m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z), path_start_pos, 1, 255, 255, 255, 255)
+			
+				d.print("path_start_pos (existing paths)", false, 0)
+				d.print(path_start_pos)]]
+			else
+				path_start_pos = m.translation(waypoint_end.x, waypoint_end.y, waypoint_end.z)
+			end
 		else
 			path_start_pos = vehicle_object.transform
+
+			if translate_forward_distance then
+				path_start_pos = matrix.multiply(vehicle_object.transform, matrix.translation(0, 0, translate_forward_distance))
+				--[[server.addMapLine(-1, vehicle_object.ui_id, vehicle_object.transform, path_start_pos, 1, 150, 150, 150, 255)
+				d.print("path_start_pos (no existing paths)", false, 0)
+				d.print(path_start_pos)]]
+			else
+				path_start_pos = vehicle_object.transform
+			end
 		end
 
 		start_x, start_y, start_z = m.position(vehicle_object.transform)
@@ -210,6 +240,44 @@ function Pathfinding.addPath(vehicle_object, target_dest)
 			if m.xzDistance(vehicle_object.transform, next_path_matrix) < m.xzDistance(m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z), next_path_matrix) then
 				p.nextPath(vehicle_object)
 			end
+		end
+
+		--[[
+			checks if the vehicle is basically stuck, and if its at a tile border, if it is, 
+			try moving matrix forwards slightly, and keep trying till we've got a path, 
+			or until we reach a set max distance, to avoid infinite recursion.
+		]]
+
+		local max_attempt_distance = 30
+		local max_attempt_increment = 5
+
+		translate_forward_distance = translate_forward_distance or 0
+
+		if translate_forward_distance < max_attempt_distance then
+			local last_path = vehicle_object.path[#vehicle_object.path]
+
+			-- if theres no last path, just set it as the vehicle's positon.
+			if not last_path then
+				last_path = {
+					x = vehicle_object.transform[13],
+					z = vehicle_object.transform[15]
+				}
+			end
+
+			-- checks if we're within the max_attempt_distance of any tile border
+			local tile_x_border_distance = math.abs((last_path.x-250)%1000-250)
+			local tile_z_border_distance = math.abs((last_path.z-250)%1000-250)
+
+			if tile_x_border_distance <= max_attempt_distance or tile_z_border_distance <= max_attempt_distance then
+				-- increments the translate_forward_distance
+				translate_forward_distance = translate_forward_distance + max_attempt_increment
+
+				d.print(("(Pathfinding.addPath) moving the pathfinding start pos forwards by %sm"):format(translate_forward_distance), true, 0)
+
+				Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
+			end
+		else
+			d.print(("(Pathfinding.addPath) despite moving the pathfinding start pos forward by %sm, pathfinding still failed for vehicle with id %s, aborting to avoid infinite recursion"):format(translate_forward_distance, vehicle_object.id), true, 0)
 		end
 	else
 		table.insert(vehicle_object.path, { 

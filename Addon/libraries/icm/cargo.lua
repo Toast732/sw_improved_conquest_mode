@@ -1109,11 +1109,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 				if first_path_island.distance.land then
 					if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-						--
-						total_travel_time[first_path_island_index].land = 
-						(total_travel_time[first_path_island_index].land or 0) + 
-						(first_path_island.distance.land/transport_vehicle.land.movement_speed)
-						--
+						if Tags.has(origin_island.island.tags, "can_spawn=land") then
+							--
+							total_travel_time[first_path_island_index].land = 
+							(total_travel_time[first_path_island_index].land or 0) + 
+							(first_path_island.distance.land/transport_vehicle.land.movement_speed)
+							--
+						end
 					end
 				end
 				if first_path_island.distance.sea then
@@ -1166,11 +1168,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 							end
 							if second_path_island.distance.land then
 								if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-									--
-									total_travel_time[first_path_island_index][second_path_island_index].land = 
-									(total_travel_time[first_path_island_index].land or 0) + 
-									(second_path_island.distance.land/transport_vehicle.land.movement_speed)
-									--
+									if Tags.has(first_path_island.island.tags, "can_spawn=land") then
+										--
+										total_travel_time[first_path_island_index][second_path_island_index].land = 
+										(total_travel_time[first_path_island_index].land or 0) + 
+										(second_path_island.distance.land/transport_vehicle.land.movement_speed)
+										--
+									end
 								end
 							end
 							if second_path_island.distance.sea then
@@ -1221,11 +1225,13 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 										end
 										if third_path_island.distance.land then
 											if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-												--
-												total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
-												(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
-												(third_path_island.distance.land/transport_vehicle.land.movement_speed)
-												--
+												if Tags.has(second_path_island.island.tags, "can_spawn=land") then
+													--
+													total_travel_time[first_path_island_index][second_path_island_index][third_path_island_index].land = 
+													(total_travel_time[first_path_island_index][second_path_island_index].land or 0) + 
+													(third_path_island.distance.land/transport_vehicle.land.movement_speed)
+													--
+												end
 											end
 										end
 										if third_path_island.distance.sea then

@@ -22,7 +22,7 @@
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.18)"
+ADDON_VERSION = "(0.4.0.19)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -4585,7 +4585,7 @@ function tickVision()
 							if squad.target_vehicles[player_vehicle_id] == nil then
 								squad.target_vehicles[player_vehicle_id] = {
 									state = TARGET_VISIBILITY_VISIBLE,
-									last_known_pos = player_vehicle_transform,
+									last_known_pos = player_vehicle_transform
 								}
 							else
 								local target_vehicle = squad.target_vehicles[player_vehicle_id]
@@ -4800,16 +4800,20 @@ function tickVehicles()
 				local tile, got_tile = s.getTile(vehicle_object.transform)
 				-- if its not on the ocean tile, make its explosion depth 3x lower, if its a boat
 				if got_tile and tile.name ~= "" and vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-					modifier = 3
+					modifier = 6
 				end
 
 				-- check if the vehicle has sunk or is under water
 				if vehicle_object.transform[14] <= explosion_depths[vehicle_object.vehicle_type]/modifier then
 					if vehicle_object.role ~= SQUAD.COMMAND.CARGO then
-						v.kill(vehicle_id, true)
 						if vehicle_object.vehicle_type == VEHICLE.TYPE.BOAT then
-							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
+							vehicle_object.sinking_counter = (vehicle_object.sinking_counter or 0) + 1
+							if vehicle_object.sinking_counter > 8 then
+								v.kill(vehicle_id, true)
+								d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it sank!", true, 0)
+							end
 						else
+							v.kill(vehicle_id, true)
 							d.print("Killed "..string.upperFirst(vehicle_object.vehicle_type).." as it went into the water! (y = "..vehicle_object.transform[14]..")", true, 0)
 						end
 					else
@@ -4825,6 +4829,8 @@ function tickVehicles()
 						end
 					end
 					goto continue_vehicle
+				else
+					vehicle_object.sinking_counter = 0
 				end
 
 				local ai_target = nil
@@ -4885,6 +4891,50 @@ function tickVehicles()
 									-- if we have reached last waypoint start holding there
 									--d.print("set boat "..vehicle_id.." to holding", true, 0)
 									AI.setState(vehicle_object, VEHICLE.STATE.HOLDING)
+								end
+							end
+
+							-- if the target has moved far enough, then we want to add to our path.
+
+							if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND and squad.command == SQUAD.COMMAND.ENGAGE then
+
+								local squad_vision = squadGetVisionData(squad)
+
+								if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
+									target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
+								elseif pl.isPlayer(vehicle_object.target_player_id) and vehicle_object.target_player_id and squad_vision.visible_players_map[vehicle_object.target_player_id] then
+									target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+								end
+
+								if target and (not target.last_pathfind_pos or m.distance(target.last_known_pos, target.last_pathfind_pos) > 20) then
+									target.last_pathfind_pos = target.last_known_pos
+									ai_target = target.last_pathfind_pos
+
+									p.resetPath(vehicle_object)
+
+									local distance = m.distance(vehicle_object.transform, ai_target)
+									local possiblePaths = s.pathfind(vehicle_object.transform, ai_target, "land_path", "")
+									local is_better_pos = false
+									for path_index, path in pairs(possiblePaths) do
+										if m.distance(m.translation(path.x, path.y, path.z), ai_target) < distance then
+											is_better_pos = true
+										end
+									end
+									if is_better_pos then
+										p.addPath(vehicle_object, ai_target)
+										--? if its target is at least 5 metres above sea level and its target is within 35 metres of its final waypoint.
+										if ai_target[14] > 5 and m.xzDistance(ai_target, m.translation(vehicle_object.path[#vehicle_object.path].x, 0, vehicle_object.path[#vehicle_object.path].z)) < 35 then
+											--* replace its last path be where the target is.
+											vehicle_object.path[#vehicle_object.path] = {
+												x = ai_target[13],
+												y = ai_target[14],
+												z = ai_target[15],
+												ui_id = vehicle_object.path[#vehicle_object.path].ui_id
+											}
+										end
+									else
+										ai_state = 0
+									end
 								end
 							end
 						end
@@ -5758,6 +5808,7 @@ function tickControls()
 					if d.getDebug(5) then
 						if vehicle_object.driving.ui_id then
 							s.removeMapLine(-1, vehicle_object.driving.ui_id)
+							s.removeMapLabel(-1, vehicle_object.driving.ui_id)
 						end
 					end
 
@@ -5767,7 +5818,7 @@ function tickControls()
 
 
 			--? we have at least 1 path
-			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[1].x and vehicle_object.path[0].y == vehicle_object.path[1].y and vehicle_object.path[0].z == vehicle_object.path[1].z) then
+			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[#vehicle_object.path].x and vehicle_object.path[0].y == vehicle_object.path[#vehicle_object.path].y and vehicle_object.path[0].z == vehicle_object.path[#vehicle_object.path].z) then
 
 				if vehicle_object.vehicle_type == VEHICLE.TYPE.LAND then
 					-- resets seat
@@ -5778,6 +5829,7 @@ function tickControls()
 				if d.getDebug(5) then
 					if vehicle_object.driving.ui_id then
 						s.removeMapLine(-1, vehicle_object.driving.ui_id)
+						s.removeMapLabel(-1, vehicle_object.driving.ui_id)
 					end
 				end
 
@@ -5847,7 +5899,7 @@ function tickControls()
 
 				local target_angle = math.atan(target_pos.x - vehicle_object.transform[13], target_pos.z - vehicle_object.transform[15])
 
-				local speed = v.getSpeed(vehicle_object)
+				local speed = v.getSpeed(vehicle_object, true)
 
 				local x_axis, y_axis, z_axis = m.getMatrixRotation(vehicle_object.transform)
 				--d.print("y_axis: "..y_axis, true, 0)
@@ -5859,9 +5911,9 @@ function tickControls()
 				local previous_yaw = math.atan(vehicle_object.path[1].x - vehicle_object.transform[13], vehicle_object.path[1].z - vehicle_object.transform[15])
 				local total_dist = m.distance(vehicle_object.transform, m.translation(vehicle_object.path[1].x, vehicle_object.path[1].y, vehicle_object.path[1].z)) -- the total distance checked so far, used for weight
 
-				local max_dist = 300
+				local max_dist = 200
 
-				local min_speed = 6.5
+				local min_speed = 8
 
 				local speed_before = speed
 
@@ -5941,7 +5993,9 @@ function tickControls()
 				local ad = math.wrap(-(ad)/3, -math.pi, math.pi)
 				--d.print("a/d: "..ad, true, 0)
 
-				AI.setSeat(vehicle_id, "Driver", (speed/vehicle_object.speed.speed)/math.max(1, math.abs(ad)+0.6), ad, 0, 0, true, false, false, false, false, false, false)
+				local ws = (speed/vehicle_object.speed.speed)/math.clamp(math.abs(ad)+0.6, 1, 2)
+
+				AI.setSeat(vehicle_id, "Driver", ws, ad, 0, 0, true, false, false, false, false, false, false)
 
 				if d.getDebug(5) then
 					-- calculate info for debug
@@ -5953,12 +6007,23 @@ function tickControls()
 					
 					local player_list = s.getPlayers()
 					s.removeMapLine(-1, vehicle_object.driving.ui_id)
-					for peer_index, peer in pairs(player_list) do
+					s.removeMapLabel(-1, vehicle_object.driving.ui_id)
+					for _, peer in pairs(player_list) do
 						if d.getDebug(5, peer.id) then
 							if #next_paths_debug > 0 then
 								for i=1, #next_paths_debug do
 									-- line that shows the next paths, colour depending on how much the vehicle is slowing down for it, red = very slow, green = none
 									s.addMapLine(peer.id, vehicle_object.driving.ui_id, m.translation(next_paths_debug[i].origin_x, 0, next_paths_debug[i].origin_z), m.translation(next_paths_debug[i].target_x, 0, next_paths_debug[i].target_z), 1, math.floor(math.clamp(255*(1-next_paths_debug[i].speed_mult), 0, 255)), math.floor(math.clamp(255*next_paths_debug[i].speed_mult, 0, 255)), 0, 200)
+									
+									local line_distance = math.euclideanDistance(next_paths_debug[i].origin_x, next_paths_debug[i].target_x, next_paths_debug[i].origin_z, next_paths_debug[i].target_z)
+
+									local to_next_yaw, _ = math.angleToFace(next_paths_debug[i].origin_x, next_paths_debug[i].target_x, next_paths_debug[i].origin_z, next_paths_debug[i].target_z)
+
+									to_next_yaw = to_next_yaw - math.half_pi
+									local label_x = next_paths_debug[i].origin_x + (line_distance * 0.65) * math.cos(to_next_yaw)
+									local label_z = next_paths_debug[i].origin_z + (line_distance * 0.65) * math.sin(to_next_yaw)
+									
+									s.addMapLabel(peer.id, vehicle_object.driving.ui_id, 4, "Speed Multiplier: "..next_paths_debug[i].speed_mult, label_x, label_z)
 									--d.print("speed_mult: "..next_paths_debug[i].speed_mult, true, 0)
 								end
 							end
@@ -5970,6 +6035,9 @@ function tickControls()
 
 							-- yellow line at target angle (where its wanting to go)
 							s.addMapLine(peer.id, vehicle_object.driving.ui_id, vehicle_object.transform, m.translation(target_angle_x, 0, target_angle_z), 0.5, 255, 255, 0, 200)
+						
+							-- Label at where the vehicle is, displaying the current throttle
+							s.addMapLabel(peer.id, vehicle_object.driving.ui_id, 4, "Throttle: "..ws.."\nSteering: "..ad, vehicle_object.transform[13], vehicle_object.transform[15])
 						end
 					end
 					
