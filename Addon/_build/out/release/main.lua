@@ -44,7 +44,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.19)"
+ADDON_VERSION = "(0.4.0.20)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -7454,7 +7454,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 				if first_path_island.distance.land then
 					if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-						if Tags.has(origin_island.island.tags, "can_spawn=land") then
+						if Tags.has(origin_island.tags, "can_spawn=land") then
 							--
 							total_travel_time[first_path_island_index].land = 
 							(total_travel_time[first_path_island_index].land or 0) + 

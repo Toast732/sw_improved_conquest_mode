@@ -1109,7 +1109,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 				if first_path_island.distance.land then
 					if transport_vehicle.land.name ~= "none" and transport_vehicle.land.name ~= "unknown" then
-						if Tags.has(origin_island.island.tags, "can_spawn=land") then
+						if Tags.has(origin_island.tags, "can_spawn=land") then
 							--
 							total_travel_time[first_path_island_index].land = 
 							(total_travel_time[first_path_island_index].land or 0) + 
