@@ -250,7 +250,7 @@ function Vehicle.purchaseVehicle(vehicle_name, island_name, fallback_type, just_
 		end
 	end
 
-	return total_spent, cost_existed, cost == 0, stat_multiplier
+	return total_spent, cost_existed, cost == 0 or fallback_type == 2 or fallback_type == 3, stat_multiplier
 end
 
 ---@param vehicle_name string the vehicle's name you want to get the cost of
@@ -428,13 +428,13 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		return false, "returned vehicle was nil, prefab "..(requested_prefab and "was" or "was not").." selected"
 	end
 
-	local selected_prefab = selected_prefabs.variations.normal[1]
+	--local selected_prefab = selected_prefabs.variations.normal[1]
 
-	if not selected_prefab then
-		for _, prefab_data in pairs(selected_prefabs.variations) do
-			selected_prefab = prefab_data[1]
-			break
-		end
+	-- find a temporary vehicle as we dont know what variation to spawn yet
+	local selected_prefab
+	for _, prefab_data in pairs(selected_prefabs.variations) do
+		selected_prefab = prefab_data[1]
+		break
 	end
 
 	d.print("(Vehicle.spawn) selected vehicle: "..selected_prefab.location_data.name, true, 0)
@@ -741,6 +741,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			previous_squad = nil,
 			ui_id = s.getMapID(),
 			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
+			variation = Tags.getValue(selected_prefab.vehicle.tags, "variation", true) or "normal",
 			role = Tags.getValue(selected_prefab.vehicle.tags, "role", true) or "general",
 			size = spawned_objects.spawned_vehicle.size or "small",
 			main_body = Tags.getValue(selected_prefab.vehicle.tags, "main_body") or 0,

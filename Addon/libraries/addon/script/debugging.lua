@@ -704,7 +704,7 @@ function Debugging.stopProfiler(unique_name, requires_debug, profiler_group)
 			if g_savedata.profiler.working[unique_name] then
 				table.tabulate(g_savedata.profiler.total, profiler_group, unique_name, "timer")
 				g_savedata.profiler.total[profiler_group][unique_name]["timer"][g_savedata.tick_counter] = s.getTimeMillisec()-g_savedata.profiler.working[unique_name]
-				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-60)] = nil
+				g_savedata.profiler.total[profiler_group][unique_name]["timer"][(g_savedata.tick_counter-g_savedata.flags.profiler_tick_smoothing)] = nil
 				g_savedata.profiler.working[unique_name] = nil
 			else
 				d.print("A profiler named "..unique_name.." doesn't exist", true, 1)
@@ -749,15 +749,15 @@ function Debugging.generateProfilerDisplayData(t, old_node_name)
 			if type(node_data) == "table" then
 				d.generateProfilerDisplayData(node_data, node_name)
 			elseif type(node_data) == "number" then
-				-- average the data over the past 60 ticks and save the result
+				-- average the data over the past <profiler_tick_smoothing> ticks and save the result
 				local data_total = 0
 				local valid_ticks = 0
-				for i = 0, 60 do
+				for i = 0, g_savedata.flags.profiler_tick_smoothing do
 					valid_ticks = valid_ticks + 1
 					data_total = data_total + g_savedata.profiler.total[node_name][(g_savedata.tick_counter-i)]
 				end
-				g_savedata.profiler.display.average[node_name] = data_total/valid_ticks -- average usage over the past 60 ticks
-				g_savedata.profiler.display.max[node_name] = max_node -- max usage over the past 60 ticks
+				g_savedata.profiler.display.average[node_name] = data_total/valid_ticks -- average usage over the past <profiler_tick_smoothing> ticks
+				g_savedata.profiler.display.max[node_name] = max_node -- max usage over the past <profiler_tick_smoothing> ticks
 				g_savedata.profiler.display.current[node_name] = g_savedata.profiler.total[node_name][(g_savedata.tick_counter)] -- usage in the current tick
 			end
 		end
@@ -766,11 +766,11 @@ function Debugging.generateProfilerDisplayData(t, old_node_name)
 			if type(node_data) == "table" and node_name ~= "timer" then
 				d.generateProfilerDisplayData(node_data, node_name)
 			elseif node_name == "timer" then
-				-- average the data over the past 60 ticks and save the result
+				-- average the data over the past <profiler_tick_smoothing> ticks and save the result
 				local data_total = 0
 				local valid_ticks = 0
 				local max_node = 0
-				for i = 0, 60 do
+				for i = 0, g_savedata.flags.profiler_tick_smoothing do
 					if t[node_name] and t[node_name][(g_savedata.tick_counter-i)] then
 						valid_ticks = valid_ticks + 1
 						-- set max tick time
@@ -781,8 +781,8 @@ function Debugging.generateProfilerDisplayData(t, old_node_name)
 						data_total = data_total + t[node_name][(g_savedata.tick_counter-i)]
 					end
 				end
-				g_savedata.profiler.display.average[old_node_name] = data_total/valid_ticks -- average usage over the past 60 ticks
-				g_savedata.profiler.display.max[old_node_name] = max_node -- max usage over the past 60 ticks
+				g_savedata.profiler.display.average[old_node_name] = data_total/valid_ticks -- average usage over the past <profiler_tick_smoothing> ticks
+				g_savedata.profiler.display.max[old_node_name] = max_node -- max usage over the past <profiler_tick_smoothing> ticks
 				g_savedata.profiler.display.current[old_node_name] = t[node_name][(g_savedata.tick_counter)] -- usage in the current tick
 			end
 		end

@@ -34,7 +34,8 @@ local version_updates = {
 	"(0.3.2.2)",
 	"(0.3.2.6)",
 	"(0.3.2.8)",
-	"(0.3.2.9)"
+	"(0.3.2.9)",
+	"(0.4.0.21)"
 }
 
 --[[
@@ -576,6 +577,31 @@ function Compatibility.update()
 	elseif version_data.newer_versions[1] == "(0.3.2.9)" then -- 0.3.2.9 changes
 
 		g_savedata.settings.CARGO_VEHICLE_DESPAWN_TIMER = time.hour
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+	elseif version_data.newer_versions[1] == "(0.4.0.21)" then -- 0.4.0.21 changes
+
+		-- add flags to g_savedata
+		g_savedata.flags = {}
+
+		-- add g_savedata.game_tick_counter
+		g_savedata.game_tick_counter = g_savedata.tick_counter
+
+		-- add the capture point payments
+		g_savedata.settings.CAPTURE_POINT_PAYMENTS = true
+		g_savedata.libraries = {
+			capture_point_payments = {
+				sleep_tracker = {
+					normal = 0,
+					total = 0
+				},
+				last_payout = 0.2916666667
+			}
+		}
+		g_savedata.player_base_island.payroll_multiplier = 1
+		for _, capture_point in pairs(g_savedata.islands) do
+			capture_point.payroll_multiplier = 1
+		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
 	end

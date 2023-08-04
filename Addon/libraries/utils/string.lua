@@ -135,3 +135,78 @@ function string.countCharInstances(str, char)
 
 	return count, true
 end
+
+--- Turns a string into a boolean, returns nil if not possible.
+---@param val any the value we want to turn into a boolean
+---@return boolean|nil bool the string turned into a boolean, is nil if string is not able to be turned into a boolean
+function string.toboolean(val)
+
+	local val_type = type(val)
+	
+	if val_type == "boolean" then
+		-- early out for booleans
+		return val
+	elseif val_type ~= "string" then
+		-- non strings cannot be "true" or "false", so will never return a boolean, so just early out.
+		return nil
+	end
+
+	local str = string.lower(val)
+
+	-- not convertable, return nil
+	if str ~= "true" and str ~= "false" then
+		return nil
+	end
+
+	-- convert
+	return str == "true"
+end
+
+--- Turns a value from a string into its proper value, eg: "true" becomes a boolean of true, and ""true"" becomes a string of "true"
+---@param val any the value to convert
+---@return any parsed_value the converted value
+function string.parseValue(val)
+	local val_type = type(val)
+
+	-- early out (no need to convert)
+	if val_type ~= "string" then
+		return val
+	end
+
+	-- value as an integer
+	local val_int = math.tointeger(val)
+	if val_int then return val_int end
+
+	-- value as a number
+	local val_num = tonumber(val)
+	if val_num then return val_num end
+
+	-- value as a boolean
+	local val_bool = string.toboolean(val)
+	if val_bool ~= nil then return val_bool end
+
+	-- value as a table
+	if val:sub(1, 1) == "{" then
+		local val_tab = table.fromString(val)
+
+		if val_tab then return val_tab end
+	end
+
+	--[[
+		assume its a string
+	]]
+
+	-- if it has a " at the start, remove it
+	if val:sub(1, 1) == "\"" then
+		val = val:sub(2, val:len())
+	end
+
+	-- if it has a " at the end, remove it
+	local val_len = val:len()
+	if val:sub(val_len, val_len) == "\"" then
+		val = val:sub(1, val_len - 1)
+	end
+
+	-- return the string
+	return val
+end
