@@ -323,7 +323,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		if g_savedata.info.version_history and #g_savedata.info.version_history ~= nil and #g_savedata.info.version_history ~= 0 then
 			d.print("Version History", false, 0, peer_id)
 			for i = 1, #g_savedata.info.version_history do
-				local has_backup = g_savedata.info.version_history[i].backup_g_savedata 
+				local has_backup = g_savedata.info.version_history[i].backup_g_savedata
 				d.print(i..": "..tostring(g_savedata.info.version_history[i].version), false, 0, peer_id)
 			end
 		end

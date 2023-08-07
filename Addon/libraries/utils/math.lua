@@ -182,3 +182,22 @@ function math.angleToFace(...)
 
 	return yaw, pitch
 end
+
+--- XOR function.
+---@param ... any
+---@return boolean
+function math.xor(...)
+	-- packed table of ..., dont have to use table.pack to respect nils, as nil will just be 0 anyways.
+	local t = {...}
+
+	-- the true count
+	local tc = 0
+
+	-- for each one that is true, add 1 to true count
+	for i = 1, #t do
+		if t[i] then tc = tc + 1 end
+	end
+
+	-- xor can be summarized down to if the number of true inputs modulo 2 is equal to 1, so do that.
+	return tc%2==1
+end

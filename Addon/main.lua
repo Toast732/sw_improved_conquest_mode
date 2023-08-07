@@ -26,7 +26,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.21)"
+ADDON_VERSION = "(0.4.0.22)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -208,7 +208,7 @@ SQUAD = {
 addon_setup = false
 
 g_savedata = {
-	ai_base_island = nil,
+	ai_base_island = nil, ---@type AI_ISLAND
 	player_base_island = nil,
 	islands = {},
 	loaded_islands = {}, -- islands which are loaded
@@ -673,7 +673,7 @@ function setupMain(is_world_create)
 	if is_dlc_weapons then
 
 		setupRules()
-		
+
 		p.updatePathfinding()
 
 		d.print("building locations and prefabs...", true, 0)
@@ -726,7 +726,7 @@ function setupMain(is_world_create)
 				local island_tile = s.getTile(island.transform)
 				if island_tile.name == start_island.name or (island_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					if not Tags.has(island, "not_main_base") then
-						local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+						local flag = s.spawnAddonComponent(m.multiply(island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 						---@class PLAYER_ISLAND
 						g_savedata.player_base_island = {
 							name = island.name,
@@ -736,7 +736,7 @@ function setupMain(is_world_create)
 							tags = island.tags,
 							faction = ISLAND.FACTION.PLAYER,
 							is_contested = false,
-							capture_timer = g_savedata.settings.CAPTURE_TIME, 
+							capture_timer = g_savedata.settings.CAPTURE_TIME,
 							ui_id = s.getMapID(),
 							assigned_squad_index = -1,
 							zones = {
@@ -814,7 +814,7 @@ function setupMain(is_world_create)
 
 			--local island_tile, is_success = s.getTile(ai_island.transform)
 
-			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 			---@class AI_ISLAND
 			g_savedata.ai_base_island = {
 				name = ai_island.name,
@@ -865,7 +865,7 @@ function setupMain(is_world_create)
 			for island_index, island in pairs(islands) do
 				local island_tile, _ = s.getTile(island.transform)
 
-				local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+				local flag = s.spawnAddonComponent(m.multiply(island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 				---@class ISLAND
 				local new_island = {
 					name = island.name,
@@ -1442,7 +1442,7 @@ function onVehicleUnload(vehicle_id)
 		return
 	end
 
-	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	local vehicle_object, squad_index, _ = Squad.getVehicle(vehicle_id)
 
 	if squad_index and vehicle_object then
 
@@ -1461,7 +1461,7 @@ end
 function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	
+
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 
@@ -1665,11 +1665,12 @@ function tickGamemode(game_ticks)
 	end
 
 	-- tick capture rates
-	local capture_tick_rate = g_savedata.settings.CAPTURE_TIME/400 -- time it takes for it to move 0.25%
+	--local capture_tick_rate = g_savedata.settings.CAPTURE_TIME/400/5 -- time it takes for it to move 0.25%
+	local capture_tick_rate = 60 -- tick every second.
 	if isTickID(0, capture_tick_rate) then -- ticks the time it should take to move 0.25%
 		-- check all ai that are within the capture radius
 		for vehicle_id, island in pairs(g_savedata.sweep_and_prune.ai_pairs) do
-			local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+			local vehicle_object, _, _ = Squad.getVehicle(vehicle_id)
 			if vehicle_object then
 
 				local capture_radius = island.faction == ISLAND.FACTION.AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
@@ -1682,10 +1683,10 @@ function tickGamemode(game_ticks)
 				end
 			else
 				d.print("(tickGamemode) vehicle_object is nil! Vehicle ID: "..tostring(vehicle_id).."\nRemoving from sweep and prune pairs to check", true, 1)
-				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				--local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
 				--d.print("vehicle existed before? "..tostring(vehicle_object ~= nil), true, 0)
 				g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
-				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				--local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
 				--d.print("vehicle existed after? "..tostring(vehicle_object ~= nil), true, 0)
 			end
 		end
@@ -1778,7 +1779,7 @@ function tickGamemode(game_ticks)
 		end
 
 		-- tick spawning for ai vehicles (to remove as will be replaced to be dependant on logistics system)
-		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + capture_tick_rate
+		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + capture_tick_rate * game_ticks
 		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
 			g_savedata.ai_base_island.production_timer = 0
 
@@ -1827,26 +1828,80 @@ function tickGamemode(game_ticks)
 			island.capture_timer = math.clamp(island.capture_timer, 0, g_savedata.settings.CAPTURE_TIME)
 			
 			-- displays tooltip on vehicle
-			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+			local cap_percent = island.capture_timer/g_savedata.settings.CAPTURE_TIME * 100
+
+			local capturing_status = "Revolting" -- should never happen, but why not
 			if island.is_contested then -- if the point is contested (both teams trying to cap)
-				s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+				--s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+				capturing_status = "Contested"
+				cp_status = "Remove the ${enemy_capturing_count} enemies to resume capturing."
 			elseif island.faction ~= ISLAND.FACTION.PLAYER then -- if the player doesn't own the point
 				if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+					capturing_status = "Capture"
+					cp_status = "Get closer to the capture point to begin capturing."
 				elseif island.ai_capturing == 0 then -- if players are capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+					capturing_status = "Capturing"
+					cp_status = "${time_until_faction_change} until under player control."
 				else -- if ai is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					capturing_status = "Losing"
+					cp_status = "${time_until_faction_change} until under enemy control."
 				end
 			else -- if the player does own the point
 				if island.ai_capturing == 0 and island.players_capturing == 0 or cap_percent == 100 then -- if nobody is capping the point or its at 100%
-					s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					capturing_status = "Captured"
+					cp_status = "Under full player control."
 				elseif island.ai_capturing == 0 then -- if players are capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+					capturing_status = "Re-Capturing"
+					cp_status = "${time_until_faction_change} until under full player control."
 				else -- if ai is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					capturing_status = "Losing"
+					cp_status = "${time_until_faction_change} until under enemy control."
 				end
 			end
+
+			-- format the tooltip
+			local capture_vehicle_tooltip = ("%s: %0.2f%%\n%s"):format(capturing_status, cap_percent, cp_status)
+
+			-- format in the field enemy_capturing_count
+			capture_vehicle_tooltip = capture_vehicle_tooltip:setField("enemy_capturing_count", island.ai_capturing)
+
+			-- format in the field time_until_faction_change
+			if capture_vehicle_tooltip:hasField("time_until_faction_change") then
+				-- calculate the time until the faction changes.
+				local time_till_faction_change = 0
+
+				local capture_rate = 0
+				
+				if island.players_capturing > 0 and g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- tick player progress if theres one or more players capping
+					capture_rate = ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)]) * capture_tick_rate * game_ticks
+					
+					time_till_faction_change = (g_savedata.settings.CAPTURE_TIME-island.capture_timer)/capture_rate*capture_tick_rate/60
+
+				elseif island.ai_capturing > 0 and 0 < island.capture_timer then -- tick AI progress if theres one or more ai capping
+					capture_rate = (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)]) * capture_tick_rate * game_ticks
+					
+					time_till_faction_change = island.capture_timer/capture_rate*capture_tick_rate/60
+				end
+
+				-- format it into time
+				local formatted_timer = string.formatTime(time_formats.yMdhms, time_till_faction_change, false)
+
+				-- set the time_until_faction_change field
+				capture_vehicle_tooltip = capture_vehicle_tooltip:setField("time_until_faction_change", formatted_timer, true)
+
+				-- add the capture timer debug if the flag show_capture_timer_debug is enabled 
+				if g_savedata.flags.show_capture_timer_debug then
+					capture_vehicle_tooltip = capture_vehicle_tooltip..(" capture_rate:%s time_till_faction_change:%s formatted_timer:%s"):format(capture_rate, time_till_faction_change, formatted_timer)
+				end
+			end
+
+			s.setVehicleTooltip(island.flag_vehicle.id, capture_vehicle_tooltip)
 
 			updatePeerIslandMapData(-1, island)
 
@@ -3198,7 +3253,7 @@ function tickSquadrons(game_ticks)
 
 					-- if its targeting a player or a vehicle
 
-					local player_data = pl.dataBySID(vehicle_object.target_player_id or "0")
+					local player_data = pl.dataBySID(vehicle_object.target_player_id)
 
 					if player_data or vehicle_object.target_vehicle_id then
 						local target_pos = nil
@@ -4070,7 +4125,7 @@ function tickVehicles(game_ticks)
 							if peer.id == 0 or vehicle_object.state.is_simulating then
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
-								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object.transform[13], vehicle_object.transform[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							end
 
 							if(#vehicle_object.path >= 1) then
@@ -4714,6 +4769,8 @@ function tickControls(game_ticks)
 				local path_projection = math.min(projected_dist, math.sqrt((vehicle_object.path[1].x-pos_on_path.x)^2+(vehicle_object.path[1].z-pos_on_path.z)^2)) -- metres
 
 				--d.print("path_projection: "..path_projection, true, 0)
+
+				-- close enough to next path, we can go to the next path.
 				if path_projection <= projected_dist/2 then
 					p.nextPath(vehicle_object)
 					goto break_control_vehicle
@@ -5287,6 +5344,21 @@ Flag.registerBooleanFlag(
 	"admin",
 	nil,
 	"Sets if the tick rate of the addon will be synced with the in game ticks, meaning that while sleeping, the addon will execute 400 ticks per tick call, to makeup for the game's speed being x400, Causes massive performance impacts while sleeping, which makes sleeping very slow. Not recommended to use."
+)
+
+-- show_capture_timer, if enabled, shows the capture timer on the tooltips for capture vehicles, for debug purposes.
+Flag.registerBooleanFlag(
+	"show_capture_timer_debug",
+	false,
+	{
+		"debug",
+		"internal",
+		"capture points"
+	},
+	"admin",
+	"admin",
+	nil,
+	"If enabled, shows the capture timer on the tooltips for capture vehicles, for debug purposes."
 )
 
 --[[

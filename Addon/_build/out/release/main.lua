@@ -44,7 +44,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.21)"
+ADDON_VERSION = "(0.4.0.22)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -226,7 +226,7 @@ SQUAD = {
 addon_setup = false
 
 g_savedata = {
-	ai_base_island = nil,
+	ai_base_island = nil, ---@type AI_ISLAND
 	player_base_island = nil,
 	islands = {},
 	loaded_islands = {}, -- islands which are loaded
@@ -733,6 +733,25 @@ function math.angleToFace(...)
 	local pitch = -math.atan(ry, math.sqrt(rx * rx + rz * rz))
 
 	return yaw, pitch
+end
+
+--- XOR function.
+---@param ... any
+---@return boolean
+function math.xor(...)
+	-- packed table of ..., dont have to use table.pack to respect nils, as nil will just be 0 anyways.
+	local t = {...}
+
+	-- the true count
+	local tc = 0
+
+	-- for each one that is true, add 1 to true count
+	for i = 1, #t do
+		if t[i] then tc = tc + 1 end
+	end
+
+	-- xor can be summarized down to if the number of true inputs modulo 2 is equal to 1, so do that.
+	return tc%2==1
 end
 
 
@@ -1663,6 +1682,271 @@ function string.parseValue(val)
 
 	-- return the string
 	return val
+end
+
+-- variables for if you want to account for leap years or not.
+local days_in_a_year = 365.25
+local days_per_month = days_in_a_year/12
+
+---@class timeFormatUnit -- how to format each unit, use ${plural} to have an s be added if the number is plural.
+---@field prefix string the string before the number
+---@field suffix string the string after the number
+
+---@alias timeFormatUnits
+---| '"millisecond"'
+---| '"second"'
+---| '"minute"'
+---| '"hour"'
+---| '"day"'
+---| '"week"'
+---| '"month"'
+---| '"year"'
+
+---@class timeFormat
+---@field show_zeros boolean if zeros should be shown, if true, units with a value of 0 will be removed.
+---@field time_zero_string string the string to show if the time specified is 0
+---@field seperator string the seperator to be put inbetween each unit.
+---@field final_seperator string the seperator to put for the space inbetween the last units in the list
+---@field largest_first boolean if it should be sorted so the string has the highest unit be put first, set false to have the lowest unit be first.
+---@field units table<timeFormatUnits, timeFormatUnit>
+
+time_formats = {
+	yMwdhmsMS = {
+		show_zeros = false,
+		time_zero_string = "less than 1 millisecond",
+		seperator = ", ",
+		final_seperator = ", and ",
+		largest_first = true,
+		units = {
+			millisecond = {
+				prefix = "",
+				suffix = " millisecond${plural}"
+			},
+			second = {
+				prefix = "",
+				suffix = " second${plural}"
+			},
+			minute = {
+				prefix = "",
+				suffix = " minute${plural}"
+			},
+			hour = {
+				prefix = "",
+				suffix = " hour${plural}"
+			},
+			day = {
+				prefix = "",
+				suffix = " day${plural}"
+			},
+			week = {
+				prefix = "",
+				suffix = " week${plural}"
+			},
+			month = {
+				prefix = "",
+				suffix = " month${plural}"
+			},
+			year = {
+				prefix = "",
+				suffix = " year${plural}"
+			}
+		}
+	},
+	yMdhms = {
+		show_zeros = false,
+		time_zero_string = "less than 1 second",
+		seperator = ", ",
+		final_seperator = ", and ",
+		largest_first = true,
+		units = {
+			second = {
+				prefix = "",
+				suffix = " second${plural}"
+			},
+			minute = {
+				prefix = "",
+				suffix = " minute${plural}"
+			},
+			hour = {
+				prefix = "",
+				suffix = " hour${plural}"
+			},
+			day = {
+				prefix = "",
+				suffix = " day${plural}"
+			},
+			month = {
+				prefix = "",
+				suffix = " month${plural}"
+			},
+			year = {
+				prefix = "",
+				suffix = " year${plural}"
+			}
+		}
+	}
+}
+
+---@type table<timeFormatUnits, number> the seconds needed to make up each unit.
+local seconds_per_unit = {
+	millisecond = 0.001,
+	second = 1,
+	minute = 60,
+	hour = 3600,
+	day = 86400,
+	week = 604800,
+	month = 86400*days_per_month,
+	year = 86400*days_in_a_year
+}
+
+-- 1 being smallest unit, going up to largest unit
+---@type table<integer, timeFormatUnits>
+local unit_heiarchy = {
+	"millisecond",
+	"second",
+	"minute",
+	"hour",
+	"day",
+	"week",
+	"month",
+	"year"
+}
+
+---[[@param formatting string the way to format it into time, wrap the following in ${}, overflow will be put into the highest unit available. t is ticks, ms is milliseconds, s is seconds, m is minutes, h is hours, d is days, w is weeks, M is months, y is years. if you want to hide the number if its 0, use : after the time type, and then optionally put the message after that you want to only show if that time unit is not 0, for example, "${s: seconds}", enter "default" to use the default formatting.]]
+
+---@param format timeFormat the format type, check the time_formats table for examples or use one from there.
+---@param time number the time in seconds, decimals can be used for milliseconds.
+---@param as_game_time boolean? if you want it as in game time, leave false or nil for irl time (yet to be supported)
+---@return string formatted_time the time formatted into a more readable string.
+function string.formatTime(format, time, as_game_time)
+	--[[if formatting == "default" then
+		formatting = "${y: years, }${M: months, }${d: days, }${h: hours, }${m: minutes, }${s: seconds, }${ms: milliseconds}"]]
+
+	-- return the time_zero_string if the given time is zero.
+	if time == 0 then
+		return format.time_zero_string
+	end
+
+	local leftover_time = time
+
+	---@class formattedUnit
+	---@field unit_string string the string to put for this unit
+	---@field unit_name timeFormatUnits the unit's type
+
+	---@type table<integer, formattedUnit>
+	local formatted_units = {}
+
+	-- go through all of the units, largest unit to smallest.
+	for unit_index = #unit_heiarchy, 1, -1 do
+		-- get it's name
+		local unit_name = unit_heiarchy[unit_index]
+
+		-- the unit's format data
+		local unit_data = format.units[unit_name]
+
+		-- unit data is nil if its not formatted, so just skip if its not in the formatting
+		if not unit_data then
+			goto next_unit
+		end
+
+		-- how many seconds can go into this unit
+		local seconds_in_unit =  seconds_per_unit[unit_name]
+
+		-- get the number of this unit from the given time.
+		local time_unit_instances = leftover_time/seconds_in_unit
+
+		-- skip this unit if we don't want to show zeros, and this is less than 1.
+		if not format.show_zeros and math.abs(time_unit_instances) < 1 then
+			goto next_unit
+		end
+
+		-- format this unit
+		local unit_string = ("%s%0.0f%s"):format(unit_data.prefix, time_unit_instances, unit_data.suffix)
+
+		-- if this unit is not 1, then add an s to where it wants the plurals to be.
+		unit_string = unit_string:setField("plural", math.floor(time_unit_instances) == 1 and "" or "s")
+
+		-- add the formatted unit to the formatted units table.
+		table.insert(formatted_units, {
+			unit_string = unit_string,
+			unit_name = unit_name
+		} --[[@as formattedUnit]])
+
+		-- subtract the amount of time this unit used up, from the leftover time.
+		leftover_time = leftover_time - math.floor(time_unit_instances)*seconds_in_unit
+
+		::next_unit::
+	end
+
+	-- theres no formatted units, just put the message for when the time is zero.
+	if #formatted_units == 0 then
+		return format.time_zero_string
+	end
+
+	-- sort the formatted_units table by the way the format wants it sorted.
+	table.sort(formatted_units,
+		function(a, b)
+			return math.xor(
+				seconds_per_unit[a.unit_name] < seconds_per_unit[b.unit_name],
+				format.largest_first
+			)
+		end
+	)
+
+	local formatted_time = formatted_units[1].unit_string
+
+	local formatted_unit_count = #formatted_units
+	for formatted_unit_index = 2, formatted_unit_count do
+		if formatted_unit_index == formatted_unit_count then
+			formatted_time = formatted_time..format.final_seperator..formatted_units[formatted_unit_index].unit_string
+		else
+			formatted_time = formatted_time..format.seperator..formatted_units[formatted_unit_index].unit_string
+		end
+	end
+
+	return formatted_time
+end
+
+---# Sets the field in a string
+--- for example: <br> 
+---> self: "Money: ${money}" <br> field: "money" <br> value: 100 <br> **returns: "Money: 100"**
+---
+--- <br> This function is almost interchangable with gsub, but first checks if the string matches, which might help with performance in certain scenarios, also doesn't require the user to type the ${}, and can be cleaner to read.
+---@param str string the string to set the fields in
+---@param field string the field to set
+---@param value any the value to set the field to
+---@param skip_check boolean|nil if it should skip the check for if the field is in the string.
+---@return string str the string with the field set.
+function string.setField(str, field, value, skip_check)
+
+	local field_str = ("${%s}"):format(field)
+	-- early return, as the field is not in the string.
+	if not skip_check and not str:match(field_str) then
+		return str
+	end
+
+	-- set the field.
+	str = str:gsub(field_str, tostring(value))
+
+	return str
+end
+
+---# if a string has a field <br>
+---
+--- Useful for if you dont need to figure out the value to write for the field if it doesn't exist, to help with performance in certain scenarios
+---@param str string the string to find the field in.
+---@param field string the field to find in the string.
+---@return boolean found_field if the field was found.
+function string.hasField(str, field)
+	return str:match(("${%s}"):format(field))
+end
+
+function string:toLiteral(literal_percent)
+	if literal_percent then
+		return self:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%%%1")
+	end
+
+	return self:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
 end
 -- required libraries
 
@@ -3523,7 +3807,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		if g_savedata.info.version_history and #g_savedata.info.version_history ~= nil and #g_savedata.info.version_history ~= 0 then
 			d.print("Version History", false, 0, peer_id)
 			for i = 1, #g_savedata.info.version_history do
-				local has_backup = g_savedata.info.version_history[i].backup_g_savedata 
+				local has_backup = g_savedata.info.version_history[i].backup_g_savedata
 				d.print(i..": "..tostring(g_savedata.info.version_history[i].version), false, 0, peer_id)
 			end
 		end
@@ -5206,7 +5490,8 @@ function Setup.createVehiclePrefabs()
 					flag_prefab = { 
 						addon_index = addon_index,
 						location_index = location_index,
-						component_index = component_index
+						component_index = component_index,
+						transform = component_data.transform
 					}
 
 					goto createVehiclePrefabs_continue_component
@@ -6933,9 +7218,9 @@ local payroll_oversleeping_messages = {
 }
 
 local payroll_payout_messages = {
-	"Great job holding the points, I've sent your payroll of $@{payout}.",
-	"Good work, your payroll of $@{payout} has been sent.",
-	"Keep up the good work, I've sent you $@{payout} for your efforts."
+	"Great job holding the points, I've sent your payroll of $${payout}.",
+	"Good work, your payroll of $${payout} has been sent.",
+	"Keep up the good work, I've sent you $${payout} for your efforts."
 }
 
 ---@param game_ticks number the game_ticks given by onTick()
@@ -6960,7 +7245,7 @@ function CapturePointPayments.tick(game_ticks)
 			return
 		end
 
-		local payroll_per_island = g_savedata.flags.capture_point_pay_amount
+		local payroll_per_island = g_savedata.flags.capture_point_payroll_amount
 
 		-- the player always holds their main base, so give them that amount.
 		local pay_amount = payroll_per_island * g_savedata.player_base_island.payroll_multiplier
@@ -6978,7 +7263,7 @@ function CapturePointPayments.tick(game_ticks)
 
 		local payout_message = payroll_payout_messages[math.random(1, #payroll_payout_messages)]
 
-		payout_message = payout_message:gsub("@{payout}", pay_amount)
+		payout_message = payout_message:gsub("${payout}", pay_amount)
 
 		server.notify(-1, "Capture Point Payroll", payout_message, 4)
 
@@ -7018,7 +7303,7 @@ function CapturePointPayments.resetSleepTracker()
 		total = 0
 	}
 
-	g_savedata.libraries.capture_point_payments.last_payout = server.getDateValue() + g_savedata.flags.capture_point_pay_time
+	g_savedata.libraries.capture_point_payments.last_payout = server.getDateValue() + g_savedata.flags.capture_point_payroll_time
 end
 
 -- Gets the sleep ratio
@@ -7067,7 +7352,7 @@ Flag.registerNumberFlag(
 	controls how much money you get per capture point you hold.
 ]]
 Flag.registerNumberFlag(
-	"capture_point_pay_amount",
+	"capture_point_payroll_amount",
 	700,
 	{
 		"balance",
@@ -7089,7 +7374,7 @@ Flag.registerNumberFlag(
 	may have strange behaviour when the payroll frequency is less than 1.
 ]]
 Flag.registerNumberFlag(
-	"capture_point_pay_time",
+	"capture_point_payroll_time",
 	0.2916666667,
 	{
 		"balance",
@@ -10365,7 +10650,7 @@ function setupMain(is_world_create)
 	if is_dlc_weapons then
 
 		setupRules()
-		
+
 		p.updatePathfinding()
 
 		d.print("building locations and prefabs...", true, 0)
@@ -10418,7 +10703,7 @@ function setupMain(is_world_create)
 				local island_tile = s.getTile(island.transform)
 				if island_tile.name == start_island.name or (island_tile.name == "data/tiles/island_43_multiplayer_base.xml" and g_savedata.player_base_island == nil) then
 					if not Tags.has(island, "not_main_base") then
-						local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+						local flag = s.spawnAddonComponent(m.multiply(island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 						---@class PLAYER_ISLAND
 						g_savedata.player_base_island = {
 							name = island.name,
@@ -10428,7 +10713,7 @@ function setupMain(is_world_create)
 							tags = island.tags,
 							faction = ISLAND.FACTION.PLAYER,
 							is_contested = false,
-							capture_timer = g_savedata.settings.CAPTURE_TIME, 
+							capture_timer = g_savedata.settings.CAPTURE_TIME,
 							ui_id = s.getMapID(),
 							assigned_squad_index = -1,
 							zones = {
@@ -10506,7 +10791,7 @@ function setupMain(is_world_create)
 
 			--local island_tile, is_success = s.getTile(ai_island.transform)
 
-			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+			local flag = s.spawnAddonComponent(m.multiply(ai_island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 			---@class AI_ISLAND
 			g_savedata.ai_base_island = {
 				name = ai_island.name,
@@ -10557,7 +10842,7 @@ function setupMain(is_world_create)
 			for island_index, island in pairs(islands) do
 				local island_tile, _ = s.getTile(island.transform)
 
-				local flag = s.spawnAddonComponent(m.multiply(island.transform, m.translation(0, 4.55, 0)), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
+				local flag = s.spawnAddonComponent(m.multiply(island.transform, flag_prefab.transform), s.getAddonIndex(), flag_prefab.location_index, flag_prefab.object_index, 0)
 				---@class ISLAND
 				local new_island = {
 					name = island.name,
@@ -11134,7 +11419,7 @@ function onVehicleUnload(vehicle_id)
 		return
 	end
 
-	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	local vehicle_object, squad_index, _ = Squad.getVehicle(vehicle_id)
 
 	if squad_index and vehicle_object then
 
@@ -11153,7 +11438,7 @@ end
 function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	local squad_vision = squadGetVisionData(squad)
 	local target = nil
-	
+
 	if vehicle_object.target_vehicle_id and squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id] then
 		target = squad_vision.visible_vehicles_map[vehicle_object.target_vehicle_id].obj
 
@@ -11357,11 +11642,12 @@ function tickGamemode(game_ticks)
 	end
 
 	-- tick capture rates
-	local capture_tick_rate = g_savedata.settings.CAPTURE_TIME/400 -- time it takes for it to move 0.25%
+	--local capture_tick_rate = g_savedata.settings.CAPTURE_TIME/400/5 -- time it takes for it to move 0.25%
+	local capture_tick_rate = 60 -- tick every second.
 	if isTickID(0, capture_tick_rate) then -- ticks the time it should take to move 0.25%
 		-- check all ai that are within the capture radius
 		for vehicle_id, island in pairs(g_savedata.sweep_and_prune.ai_pairs) do
-			local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+			local vehicle_object, _, _ = Squad.getVehicle(vehicle_id)
 			if vehicle_object then
 
 				local capture_radius = island.faction == ISLAND.FACTION.AI and CAPTURE_RADIUS or CAPTURE_RADIUS / 1.5 -- capture radius is normal if the ai owns the island, otherwise its / 1.5
@@ -11374,10 +11660,10 @@ function tickGamemode(game_ticks)
 				end
 			else
 				d.print("(tickGamemode) vehicle_object is nil! Vehicle ID: "..tostring(vehicle_id).."\nRemoving from sweep and prune pairs to check", true, 1)
-				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				--local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
 				--d.print("vehicle existed before? "..tostring(vehicle_object ~= nil), true, 0)
 				g_savedata.sweep_and_prune.ai_pairs[vehicle_id] = nil
-				local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+				--local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
 				--d.print("vehicle existed after? "..tostring(vehicle_object ~= nil), true, 0)
 			end
 		end
@@ -11470,7 +11756,7 @@ function tickGamemode(game_ticks)
 		end
 
 		-- tick spawning for ai vehicles (to remove as will be replaced to be dependant on logistics system)
-		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + capture_tick_rate
+		g_savedata.ai_base_island.production_timer = g_savedata.ai_base_island.production_timer + capture_tick_rate * game_ticks
 		if g_savedata.ai_base_island.production_timer > g_savedata.settings.AI_PRODUCTION_TIME_BASE then
 			g_savedata.ai_base_island.production_timer = 0
 
@@ -11519,26 +11805,80 @@ function tickGamemode(game_ticks)
 			island.capture_timer = math.clamp(island.capture_timer, 0, g_savedata.settings.CAPTURE_TIME)
 			
 			-- displays tooltip on vehicle
-			local cap_percent = math.floor((island.capture_timer/g_savedata.settings.CAPTURE_TIME) * 100)
+			local cap_percent = island.capture_timer/g_savedata.settings.CAPTURE_TIME * 100
+
+			local capturing_status = "Revolting" -- should never happen, but why not
 			if island.is_contested then -- if the point is contested (both teams trying to cap)
-				s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+				--s.setVehicleTooltip(island.flag_vehicle.id, "Contested: "..cap_percent.."%")
+				capturing_status = "Contested"
+				cp_status = "Remove the ${enemy_capturing_count} enemies to resume capturing."
 			elseif island.faction ~= ISLAND.FACTION.PLAYER then -- if the player doesn't own the point
 				if island.ai_capturing == 0 and island.players_capturing == 0 then -- if nobody is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Capture: "..cap_percent.."%")
+					capturing_status = "Capture"
+					cp_status = "Get closer to the capture point to begin capturing."
 				elseif island.ai_capturing == 0 then -- if players are capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Capturing: "..cap_percent.."%")
+					capturing_status = "Capturing"
+					cp_status = "${time_until_faction_change} until under player control."
 				else -- if ai is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					capturing_status = "Losing"
+					cp_status = "${time_until_faction_change} until under enemy control."
 				end
 			else -- if the player does own the point
 				if island.ai_capturing == 0 and island.players_capturing == 0 or cap_percent == 100 then -- if nobody is capping the point or its at 100%
-					s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Captured: "..cap_percent.."%")
+					capturing_status = "Captured"
+					cp_status = "Under full player control."
 				elseif island.ai_capturing == 0 then -- if players are capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Re-Capturing: "..cap_percent.."%")
+					capturing_status = "Re-Capturing"
+					cp_status = "${time_until_faction_change} until under full player control."
 				else -- if ai is capping the point
-					s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					--s.setVehicleTooltip(island.flag_vehicle.id, "Losing: "..cap_percent.."%")
+					capturing_status = "Losing"
+					cp_status = "${time_until_faction_change} until under enemy control."
 				end
 			end
+
+			-- format the tooltip
+			local capture_vehicle_tooltip = ("%s: %0.2f%%\n%s"):format(capturing_status, cap_percent, cp_status)
+
+			-- format in the field enemy_capturing_count
+			capture_vehicle_tooltip = capture_vehicle_tooltip:setField("enemy_capturing_count", island.ai_capturing)
+
+			-- format in the field time_until_faction_change
+			if capture_vehicle_tooltip:hasField("time_until_faction_change") then
+				-- calculate the time until the faction changes.
+				local time_till_faction_change = 0
+
+				local capture_rate = 0
+				
+				if island.players_capturing > 0 and g_savedata.settings.CAPTURE_TIME > island.capture_timer then -- tick player progress if theres one or more players capping
+					capture_rate = ((ISLAND_CAPTURE_AMOUNT_PER_SECOND * 5) * capture_speeds[math.min(island.players_capturing, 3)]) * capture_tick_rate * game_ticks
+					
+					time_till_faction_change = (g_savedata.settings.CAPTURE_TIME-island.capture_timer)/capture_rate*capture_tick_rate/60
+
+				elseif island.ai_capturing > 0 and 0 < island.capture_timer then -- tick AI progress if theres one or more ai capping
+					capture_rate = (ISLAND_CAPTURE_AMOUNT_PER_SECOND * capture_speeds[math.min(island.ai_capturing, 3)]) * capture_tick_rate * game_ticks
+					
+					time_till_faction_change = island.capture_timer/capture_rate*capture_tick_rate/60
+				end
+
+				-- format it into time
+				local formatted_timer = string.formatTime(time_formats.yMdhms, time_till_faction_change, false)
+
+				-- set the time_until_faction_change field
+				capture_vehicle_tooltip = capture_vehicle_tooltip:setField("time_until_faction_change", formatted_timer, true)
+
+				-- add the capture timer debug if the flag show_capture_timer_debug is enabled 
+				if g_savedata.flags.show_capture_timer_debug then
+					capture_vehicle_tooltip = capture_vehicle_tooltip..(" capture_rate:%s time_till_faction_change:%s formatted_timer:%s"):format(capture_rate, time_till_faction_change, formatted_timer)
+				end
+			end
+
+			s.setVehicleTooltip(island.flag_vehicle.id, capture_vehicle_tooltip)
 
 			updatePeerIslandMapData(-1, island)
 
@@ -12890,7 +13230,7 @@ function tickSquadrons(game_ticks)
 
 					-- if its targeting a player or a vehicle
 
-					local player_data = pl.dataBySID(vehicle_object.target_player_id or "0")
+					local player_data = pl.dataBySID(vehicle_object.target_player_id)
 
 					if player_data or vehicle_object.target_vehicle_id then
 						local target_pos = nil
@@ -13762,7 +14102,7 @@ function tickVehicles(game_ticks)
 							if peer.id == 0 or vehicle_object.state.is_simulating then
 								s.addMapObject(peer.id, vehicle_object.ui_id, 1, marker_type, 0, 0, 0, 0, vehicle_id, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							else -- draw at direct coordinates instead
-								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object[13], vehicle_object[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
+								s.addMapObject(peer.id, vehicle_object.ui_id, 0, marker_type, vehicle_object.transform[13], vehicle_object.transform[15], 0, 0, 0, 0, vehicle_name, vehicle_object.vision.radius, debug_data, r, g, b, 255)
 							end
 
 							if(#vehicle_object.path >= 1) then
@@ -14406,6 +14746,8 @@ function tickControls(game_ticks)
 				local path_projection = math.min(projected_dist, math.sqrt((vehicle_object.path[1].x-pos_on_path.x)^2+(vehicle_object.path[1].z-pos_on_path.z)^2)) -- metres
 
 				--d.print("path_projection: "..path_projection, true, 0)
+
+				-- close enough to next path, we can go to the next path.
 				if path_projection <= projected_dist/2 then
 					p.nextPath(vehicle_object)
 					goto break_control_vehicle
@@ -14979,6 +15321,21 @@ Flag.registerBooleanFlag(
 	"admin",
 	nil,
 	"Sets if the tick rate of the addon will be synced with the in game ticks, meaning that while sleeping, the addon will execute 400 ticks per tick call, to makeup for the game's speed being x400, Causes massive performance impacts while sleeping, which makes sleeping very slow. Not recommended to use."
+)
+
+-- show_capture_timer, if enabled, shows the capture timer on the tooltips for capture vehicles, for debug purposes.
+Flag.registerBooleanFlag(
+	"show_capture_timer_debug",
+	false,
+	{
+		"debug",
+		"internal",
+		"capture points"
+	},
+	"admin",
+	"admin",
+	nil,
+	"If enabled, shows the capture timer on the tooltips for capture vehicles, for debug purposes."
 )
 
 --[[

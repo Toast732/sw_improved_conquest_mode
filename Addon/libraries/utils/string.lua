@@ -210,3 +210,268 @@ function string.parseValue(val)
 	-- return the string
 	return val
 end
+
+-- variables for if you want to account for leap years or not.
+local days_in_a_year = 365.25
+local days_per_month = days_in_a_year/12
+
+---@class timeFormatUnit -- how to format each unit, use ${plural} to have an s be added if the number is plural.
+---@field prefix string the string before the number
+---@field suffix string the string after the number
+
+---@alias timeFormatUnits
+---| '"millisecond"'
+---| '"second"'
+---| '"minute"'
+---| '"hour"'
+---| '"day"'
+---| '"week"'
+---| '"month"'
+---| '"year"'
+
+---@class timeFormat
+---@field show_zeros boolean if zeros should be shown, if true, units with a value of 0 will be removed.
+---@field time_zero_string string the string to show if the time specified is 0
+---@field seperator string the seperator to be put inbetween each unit.
+---@field final_seperator string the seperator to put for the space inbetween the last units in the list
+---@field largest_first boolean if it should be sorted so the string has the highest unit be put first, set false to have the lowest unit be first.
+---@field units table<timeFormatUnits, timeFormatUnit>
+
+time_formats = {
+	yMwdhmsMS = {
+		show_zeros = false,
+		time_zero_string = "less than 1 millisecond",
+		seperator = ", ",
+		final_seperator = ", and ",
+		largest_first = true,
+		units = {
+			millisecond = {
+				prefix = "",
+				suffix = " millisecond${plural}"
+			},
+			second = {
+				prefix = "",
+				suffix = " second${plural}"
+			},
+			minute = {
+				prefix = "",
+				suffix = " minute${plural}"
+			},
+			hour = {
+				prefix = "",
+				suffix = " hour${plural}"
+			},
+			day = {
+				prefix = "",
+				suffix = " day${plural}"
+			},
+			week = {
+				prefix = "",
+				suffix = " week${plural}"
+			},
+			month = {
+				prefix = "",
+				suffix = " month${plural}"
+			},
+			year = {
+				prefix = "",
+				suffix = " year${plural}"
+			}
+		}
+	},
+	yMdhms = {
+		show_zeros = false,
+		time_zero_string = "less than 1 second",
+		seperator = ", ",
+		final_seperator = ", and ",
+		largest_first = true,
+		units = {
+			second = {
+				prefix = "",
+				suffix = " second${plural}"
+			},
+			minute = {
+				prefix = "",
+				suffix = " minute${plural}"
+			},
+			hour = {
+				prefix = "",
+				suffix = " hour${plural}"
+			},
+			day = {
+				prefix = "",
+				suffix = " day${plural}"
+			},
+			month = {
+				prefix = "",
+				suffix = " month${plural}"
+			},
+			year = {
+				prefix = "",
+				suffix = " year${plural}"
+			}
+		}
+	}
+}
+
+---@type table<timeFormatUnits, number> the seconds needed to make up each unit.
+local seconds_per_unit = {
+	millisecond = 0.001,
+	second = 1,
+	minute = 60,
+	hour = 3600,
+	day = 86400,
+	week = 604800,
+	month = 86400*days_per_month,
+	year = 86400*days_in_a_year
+}
+
+-- 1 being smallest unit, going up to largest unit
+---@type table<integer, timeFormatUnits>
+local unit_heiarchy = {
+	"millisecond",
+	"second",
+	"minute",
+	"hour",
+	"day",
+	"week",
+	"month",
+	"year"
+}
+
+---[[@param formatting string the way to format it into time, wrap the following in ${}, overflow will be put into the highest unit available. t is ticks, ms is milliseconds, s is seconds, m is minutes, h is hours, d is days, w is weeks, M is months, y is years. if you want to hide the number if its 0, use : after the time type, and then optionally put the message after that you want to only show if that time unit is not 0, for example, "${s: seconds}", enter "default" to use the default formatting.]]
+
+---@param format timeFormat the format type, check the time_formats table for examples or use one from there.
+---@param time number the time in seconds, decimals can be used for milliseconds.
+---@param as_game_time boolean? if you want it as in game time, leave false or nil for irl time (yet to be supported)
+---@return string formatted_time the time formatted into a more readable string.
+function string.formatTime(format, time, as_game_time)
+	--[[if formatting == "default" then
+		formatting = "${y: years, }${M: months, }${d: days, }${h: hours, }${m: minutes, }${s: seconds, }${ms: milliseconds}"]]
+
+	-- return the time_zero_string if the given time is zero.
+	if time == 0 then
+		return format.time_zero_string
+	end
+
+	local leftover_time = time
+
+	---@class formattedUnit
+	---@field unit_string string the string to put for this unit
+	---@field unit_name timeFormatUnits the unit's type
+
+	---@type table<integer, formattedUnit>
+	local formatted_units = {}
+
+	-- go through all of the units, largest unit to smallest.
+	for unit_index = #unit_heiarchy, 1, -1 do
+		-- get it's name
+		local unit_name = unit_heiarchy[unit_index]
+
+		-- the unit's format data
+		local unit_data = format.units[unit_name]
+
+		-- unit data is nil if its not formatted, so just skip if its not in the formatting
+		if not unit_data then
+			goto next_unit
+		end
+
+		-- how many seconds can go into this unit
+		local seconds_in_unit =  seconds_per_unit[unit_name]
+
+		-- get the number of this unit from the given time.
+		local time_unit_instances = leftover_time/seconds_in_unit
+
+		-- skip this unit if we don't want to show zeros, and this is less than 1.
+		if not format.show_zeros and math.abs(time_unit_instances) < 1 then
+			goto next_unit
+		end
+
+		-- format this unit
+		local unit_string = ("%s%0.0f%s"):format(unit_data.prefix, time_unit_instances, unit_data.suffix)
+
+		-- if this unit is not 1, then add an s to where it wants the plurals to be.
+		unit_string = unit_string:setField("plural", math.floor(time_unit_instances) == 1 and "" or "s")
+
+		-- add the formatted unit to the formatted units table.
+		table.insert(formatted_units, {
+			unit_string = unit_string,
+			unit_name = unit_name
+		} --[[@as formattedUnit]])
+
+		-- subtract the amount of time this unit used up, from the leftover time.
+		leftover_time = leftover_time - math.floor(time_unit_instances)*seconds_in_unit
+
+		::next_unit::
+	end
+
+	-- theres no formatted units, just put the message for when the time is zero.
+	if #formatted_units == 0 then
+		return format.time_zero_string
+	end
+
+	-- sort the formatted_units table by the way the format wants it sorted.
+	table.sort(formatted_units,
+		function(a, b)
+			return math.xor(
+				seconds_per_unit[a.unit_name] < seconds_per_unit[b.unit_name],
+				format.largest_first
+			)
+		end
+	)
+
+	local formatted_time = formatted_units[1].unit_string
+
+	local formatted_unit_count = #formatted_units
+	for formatted_unit_index = 2, formatted_unit_count do
+		if formatted_unit_index == formatted_unit_count then
+			formatted_time = formatted_time..format.final_seperator..formatted_units[formatted_unit_index].unit_string
+		else
+			formatted_time = formatted_time..format.seperator..formatted_units[formatted_unit_index].unit_string
+		end
+	end
+
+	return formatted_time
+end
+
+---# Sets the field in a string
+--- for example: <br> 
+---> self: "Money: ${money}" <br> field: "money" <br> value: 100 <br> **returns: "Money: 100"**
+---
+--- <br> This function is almost interchangable with gsub, but first checks if the string matches, which might help with performance in certain scenarios, also doesn't require the user to type the ${}, and can be cleaner to read.
+---@param str string the string to set the fields in
+---@param field string the field to set
+---@param value any the value to set the field to
+---@param skip_check boolean|nil if it should skip the check for if the field is in the string.
+---@return string str the string with the field set.
+function string.setField(str, field, value, skip_check)
+
+	local field_str = ("${%s}"):format(field)
+	-- early return, as the field is not in the string.
+	if not skip_check and not str:match(field_str) then
+		return str
+	end
+
+	-- set the field.
+	str = str:gsub(field_str, tostring(value))
+
+	return str
+end
+
+---# if a string has a field <br>
+---
+--- Useful for if you dont need to figure out the value to write for the field if it doesn't exist, to help with performance in certain scenarios
+---@param str string the string to find the field in.
+---@param field string the field to find in the string.
+---@return boolean found_field if the field was found.
+function string.hasField(str, field)
+	return str:match(("${%s}"):format(field))
+end
+
+function string:toLiteral(literal_percent)
+	if literal_percent then
+		return self:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%%%1")
+	end
+
+	return self:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
+end

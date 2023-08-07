@@ -216,7 +216,8 @@ function Setup.createVehiclePrefabs()
 					flag_prefab = { 
 						addon_index = addon_index,
 						location_index = location_index,
-						component_index = component_index
+						component_index = component_index,
+						transform = component_data.transform
 					}
 
 					goto createVehiclePrefabs_continue_component

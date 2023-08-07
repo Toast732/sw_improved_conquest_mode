@@ -28,9 +28,9 @@ local payroll_oversleeping_messages = {
 }
 
 local payroll_payout_messages = {
-	"Great job holding the points, I've sent your payroll of $@{payout}.",
-	"Good work, your payroll of $@{payout} has been sent.",
-	"Keep up the good work, I've sent you $@{payout} for your efforts."
+	"Great job holding the points, I've sent your payroll of $${payout}.",
+	"Good work, your payroll of $${payout} has been sent.",
+	"Keep up the good work, I've sent you $${payout} for your efforts."
 }
 
 ---@param game_ticks number the game_ticks given by onTick()
@@ -55,7 +55,7 @@ function CapturePointPayments.tick(game_ticks)
 			return
 		end
 
-		local payroll_per_island = g_savedata.flags.capture_point_pay_amount
+		local payroll_per_island = g_savedata.flags.capture_point_payroll_amount
 
 		-- the player always holds their main base, so give them that amount.
 		local pay_amount = payroll_per_island * g_savedata.player_base_island.payroll_multiplier
@@ -73,7 +73,7 @@ function CapturePointPayments.tick(game_ticks)
 
 		local payout_message = payroll_payout_messages[math.random(1, #payroll_payout_messages)]
 
-		payout_message = payout_message:gsub("@{payout}", pay_amount)
+		payout_message = payout_message:gsub("${payout}", pay_amount)
 
 		server.notify(-1, "Capture Point Payroll", payout_message, 4)
 
@@ -113,7 +113,7 @@ function CapturePointPayments.resetSleepTracker()
 		total = 0
 	}
 
-	g_savedata.libraries.capture_point_payments.last_payout = server.getDateValue() + g_savedata.flags.capture_point_pay_time
+	g_savedata.libraries.capture_point_payments.last_payout = server.getDateValue() + g_savedata.flags.capture_point_payroll_time
 end
 
 -- Gets the sleep ratio
@@ -162,7 +162,7 @@ Flag.registerNumberFlag(
 	controls how much money you get per capture point you hold.
 ]]
 Flag.registerNumberFlag(
-	"capture_point_pay_amount",
+	"capture_point_payroll_amount",
 	700,
 	{
 		"balance",
@@ -184,7 +184,7 @@ Flag.registerNumberFlag(
 	may have strange behaviour when the payroll frequency is less than 1.
 ]]
 Flag.registerNumberFlag(
-	"capture_point_pay_time",
+	"capture_point_payroll_time",
 	0.2916666667,
 	{
 		"balance",
