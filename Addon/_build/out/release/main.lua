@@ -44,7 +44,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.22)"
+ADDON_VERSION = "(0.4.0.23)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -225,13 +225,20 @@ SQUAD = {
 
 addon_setup = false
 
+---@class squadron
+---@field command string the squadron's command
+---@field vehicle_type string the vehicle type this squadron is made up of
+---@field role string the role this squadron has
+---@field vehicles table<integer, vehicle_object> the vehicles in this squadron
+---@field target_island AI_ISLAND|PLAYER_ISLAND|ISLAND the island this squadron is targetting
+
 g_savedata = {
 	ai_base_island = nil, ---@type AI_ISLAND
 	player_base_island = nil,
 	islands = {},
 	loaded_islands = {}, -- islands which are loaded
 	ai_army = { 
-		squadrons = { 
+		squadrons = { ---@type table<integer, squadron>
 			[RESUPPLY_SQUAD_INDEX] = { 
 				command = SQUAD.COMMAND.RESUPPLY, 
 				vehicle_type = "", 
@@ -416,6 +423,447 @@ limitations under the License.
 ]]
 
 -- required libraries
+
+-- where all of the registered flags are stored, their current values get stored in g_savedata.flags instead, though.
+---@type table<string, BooleanFlag | IntegerFlag | NumberFlag | StringFlag | AnyFlag>
+local registered_flags = {}
+
+
+-- where all of the registered permissions are stored.
+local registered_permissions = {}
+
+-- stores the functions for flags
+Flag = {}
+
+---@param name string the name of this permission
+---@param has_permission function the function to execute, to check if the player has permission (arg1 is peer_id)
+function Flag.registerPermission(name, has_permission)
+
+	-- if the permission already exists
+	if registered_permissions[name] then
+
+		--[[
+			this can be quite a bad error, so it bypasses debug being disabled.
+
+			for example, library A adds a permission called "mod", for mod authors
+			and then after, library B adds a permission called "mod", for moderators of the server
+			
+			when this fails, any commands library B will now just require the requirements for mod authors
+			now you've got issues of mod authors being able to access moderator commands
+
+			so having this always alert is to try to make this issue obvious. as if it was just silent in
+			the background, suddenly you've got privilage elevation.
+		]]
+		d.print(("(Flag.registerPermission) Permission level %s is already registered!"):format(name), false, 1)
+		return
+	end
+
+	registered_permissions[name] = has_permission
+end
+
+--# Register a boolean flag, can only be true or false.
+---@param name string the name of the flag
+---@param default_value boolean the default_value for this flag
+---@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
+---@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
+---@param description string the description of the flag
+function Flag.registerBooleanFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description)
+	local function_name = "Flag.registerBooleanFlag"
+
+	-- if this flag has already been registered
+	if registered_flags[name] then
+		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
+		return
+	end
+
+	---@class BooleanFlag
+	local flag = {
+		name = name,
+		default_value = default_value,
+		tags = tags,
+		read_permission_requirement = read_permission_requirement,
+		write_permission_requirement = write_permission_requirement,
+		function_to_execute = function_to_execute,
+		flag_type = "boolean"
+	}
+
+	registered_flags[name] = flag
+
+	if g_savedata.flags[name] == nil then
+		g_savedata.flags[name] = default_value
+	end
+end
+
+--# Register an integer flag, can only be an integer.
+---@param name string the name of the flag
+---@param default_value integer the default_value for this flag
+---@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
+---@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
+---@param description string the description of the flag
+---@param min integer|nil the minimum value for the flag (nil for none)
+---@param max integer|nil the maximum value for the flag (nil for none)
+function Flag.registerIntegerFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description, min, max)
+	local function_name = "Flag.registerIntegerFlag"
+
+	-- if this flag has already been registered
+	if registered_flags[name] then
+		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
+		return
+	end
+
+	---@class IntegerFlag
+	local flag = {
+		name = name,
+		default_value = default_value,
+		tags = tags,
+		read_permission_requirement = read_permission_requirement,
+		write_permission_requirement = write_permission_requirement,
+		function_to_execute = function_to_execute,
+		flag_type = "integer",
+		limit = {
+			min = min,
+			max = max
+		}
+	}
+
+	registered_flags[name] = flag
+
+	if g_savedata.flags[name] == nil then
+		g_savedata.flags[name] = default_value
+	end
+end
+
+--# Register an number flag, can only be an number.
+---@param name string the name of the flag
+---@param default_value number the default_value for this flag
+---@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
+---@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
+---@param description string the description of the flag
+---@param min integer|nil the minimum value for the flag (nil for none)
+---@param max integer|nil the maximum value for the flag (nil for none)
+function Flag.registerNumberFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description, min, max)
+	local function_name = "Flag.registerNumberFlag"
+
+	-- if this flag has already been registered
+	if registered_flags[name] then
+		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
+		return
+	end
+
+	---@class NumberFlag
+	local flag = {
+		name = name,
+		default_value = default_value,
+		tags = tags,
+		read_permission_requirement = read_permission_requirement,
+		write_permission_requirement = write_permission_requirement,
+		function_to_execute = function_to_execute,
+		flag_type = "number",
+		limit = {
+			min = min,
+			max = max
+		}
+	}
+
+	registered_flags[name] = flag
+
+	if g_savedata.flags[name] == nil then
+		g_savedata.flags[name] = default_value
+	end
+end
+
+--# Register a string flag, can only be an string.
+---@param name string the name of the flag
+---@param default_value string the default_value for this flag
+---@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
+---@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
+---@param description string the description of the flag
+function Flag.registerStringFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, description, function_to_execute)
+	local function_name = "Flag.registerStringFlag"
+
+	-- if this flag has already been registered
+	if registered_flags[name] then
+		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
+		return
+	end
+
+	---@class StringFlag
+	local flag = {
+		name = name,
+		default_value = default_value,
+		tags = tags,
+		read_permission_requirement = read_permission_requirement,
+		write_permission_requirement = write_permission_requirement,
+		function_to_execute = function_to_execute,
+		flag_type = "string",
+	}
+
+	registered_flags[name] = flag
+
+	if g_savedata.flags[name] == nil then
+		g_savedata.flags[name] = default_value
+	end
+end
+
+--# Register an any flag, can be any value.
+---@param name string the name of the flag
+---@param default_value any the default_value for this flag
+---@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
+---@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
+---@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
+---@param description string the description of the flag
+function Flag.registerAnyFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description)
+	local function_name = "Flag.registerAnyFlag"
+
+	-- if this flag has already been registered
+	if registered_flags[name] then
+		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
+		return
+	end
+
+	---@class AnyFlag
+	local flag = {
+		name = name,
+		default_value = default_value,
+		tags = tags,
+		read_permission_requirement = read_permission_requirement,
+		write_permission_requirement = write_permission_requirement,
+		function_to_execute = function_to_execute,
+		flag_type = "any",
+		description = description
+	}
+
+	registered_flags[name] = flag
+
+	if g_savedata.flags[name] == nil then
+		g_savedata.flags[name] = default_value
+	end
+end
+
+---@param full_message string the full_message of the player
+---@param peer_id integer the peer_id of the player who executed the command
+---@param is_admin boolean if the player has admin.
+---@param is_auth boolean if the player is authed.
+---@param command string the command the player entered
+---@param arg table<integer, string> the arguments to the command the player entered.
+function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, arg)
+	if command == "flag" then
+		local flag_name = arg[1]
+
+		if not flag_name then
+			d.print("You must specify a flag's name! get a list of flags via ?icm flags", false, 1, peer_id)
+			return
+		end
+
+		local flag = registered_flags[flag_name]
+
+		if not flag then
+			d.print(("The flag \"%s\" does not exist! Get a list of flags via ?icm flags"):format(flag_name), false, 1, peer_id)
+			return
+		end
+
+		-- the player is trying to read the flag
+		if not arg[2] then
+			-- check if the player has the permission to read the flag
+			
+			-- if the required read permission does not exist, default it to admin.
+
+			local read_permission = registered_permissions[flag.read_permission_requirement] or registered_permissions["admin"]
+
+			if not read_permission(peer_id) then
+				d.print(("You do not have permission to read this flag! You require the permission %s, contact a server admin/owner if you belive this is in mistake."):format(registered_permissions[flag.read_permission_requirement] and flag.read_permission_requirement or "admin"), false, 1, peer_id)
+				return
+			end
+
+			local flag_value = g_savedata.flags[flag_name]
+
+			if flag.flag_type ~= "string" and flag_value == "nil" then
+				flag_value = nil
+			end
+
+			-- if the flag's value is a string, format it as a string for display.
+			if type(flag_value) == "string" then
+				flag_value = ("\"%s\""):format(flag_value)
+			end
+
+			d.print(("%s's current value is: %s"):format(flag.name, flag_value), false, 0, peer_id)
+		else
+			-- the player is trying to set the flag
+
+			local write_permission = registered_permissions[flag.write_permission_requirement] or registered_permissions["admin"]
+
+			if not write_permission(peer_id) then
+				d.print(("You do not have permission to write this flag! You require the permission %s, contact a server admin/owner if you belive this is in mistake."):format(registered_permissions[flag.write_permission_requirement] and flag.write_permission_requirement or "admin"), false, 1, peer_id)
+				return
+			end
+
+			local set_value = table.concat(arg, " ", 2, #arg)
+			local original_set_value = set_value
+
+			if flag.flag_type ~= "string" then
+				if set_value == "nil" then
+					set_value = nil
+				end
+
+				-- number and integer flags
+				if flag.flag_type == "number" or flag.flag_type == "integer" then
+					-- convert to number if number, integer if integer
+					set_value = flag.flag_type == "number" and tonumber(set_value) or math.tointeger(set_value)
+
+					-- cannot be converted to number if number, or integer if integer.
+					if not set_value then
+						d.print(("%s is not a %s! The flag %s requires %s inputs only!"):format(original_set_value, flag.flag_type, flag.name, flag.flag_type), false, 1, peer_id)
+						return
+					end
+
+					-- check if outside of minimum
+					if flag.limit.min and set_value < flag.limit.min then
+						d.print(("The flag \"%s\" has a minimum value of %s, your input of %s is too low!"):format(flag.name, flag.limit.min, set_value), false, 1, peer_id)
+						return
+					end
+
+					-- check if outside of maximum
+					if flag.limit.max and set_value > flag.limit.max then
+						d.print(("The flag \"%s\" has a maximum value of %s, your input of %s is too high!"):format(flag.name, flag.limit.max, set_value), false, 1, peer_id)
+						return
+					end
+				end
+
+				-- boolean flags
+				if flag.flag_type == "boolean" then
+					set_value = string.toboolean(set_value)
+
+					if set_value == nil then
+						d.print(("The flag \"%s\" requires the input to be a boolean, %s is not a boolean!"):format(flag.name, original_set_value))
+					end
+				end
+
+				-- any flags
+				if flag.flag_type == "any" then
+
+					-- parse the value (turn it into the expected type)
+					set_value = string.parseValue(set_value)
+				end
+			end
+
+			local old_flag_value = g_savedata.flags[flag_name]
+
+			-- set the flag
+			g_savedata.flags[flag_name] = set_value
+
+			-- call the function for when the flag is written, if one is specified
+			if flag.function_to_execute ~= nil then
+				flag.function_to_execute(set_value, old_flag_value, peer_id)
+			end
+
+			d.print(("Successfully set the value for the flag \"%s\" to %s"):format(flag.name, set_value), false, 0, peer_id)
+		end
+	elseif command == "flags" then
+		if arg[1] then
+			d.print("Does not yet support the ability to search for flags, only able to give a full list for now, sorry!", false, 0, peer_id)
+			return
+		end
+
+		d.print("\n-- Flags --", false, 0, peer_id)
+
+		--TODO: make it sort by tags and filter by tags.
+
+		local flag_list = {}
+
+		-- clones, as we will be modifying them and sorting them for display purposes, and we don't want to modify the actual flags.
+		local cloned_registered_flags = table.copy.deep(registered_flags)
+		for _, flag in pairs(cloned_registered_flags) do
+			table.insert(flag_list, flag)
+		end
+
+		-- sort the list for display purposes
+		table.sort(flag_list, function(a, b)
+			-- if the types are the same, then sort alphabetically by name
+			if a.flag_type == b.flag_type then
+				return a.name < b.name
+			end
+		
+			-- the types are different, sort alphabetically by type.
+			return a.flag_type < b.flag_type
+		end)
+
+		local last_type = "none"
+
+		for flag_index = 1, #flag_list do
+			local flag = flag_list[flag_index]
+
+			-- print the following flag category, if this is now printing a new category of flags
+			if last_type ~= flag.flag_type then
+				d.print(("\n--- %s Flags ---"):format(flag.flag_type:upperFirst()), false, 0, peer_id)
+				last_type = flag.flag_type
+			end
+
+			-- print the flag data
+			d.print(("-----\nName: %s\nValue: %s\nTags: %s"):format(flag.name, g_savedata.flags[flag.name], table.concat(flag.tags, ", ")), false, 0, peer_id)
+		end
+	end
+end
+
+--[[
+
+	Register Default Permissions
+
+]]
+
+-- None Permission
+Flag.registerPermission(
+	"none",
+	function()
+		return true
+	end
+)
+
+-- Auth Permission
+Flag.registerPermission(
+	"auth",
+	function(peer_id)
+		local players = server.getPlayers()
+
+		for peer_index = 1, #players do
+			local player = players[peer_index]
+
+			if player.id == peer_id then
+				return player.auth
+			end
+		end
+
+		return false
+	end
+)
+
+-- Admin Permission
+Flag.registerPermission(
+	"admin",
+	function(peer_id)
+		local players = server.getPlayers()
+
+		for peer_index = 1, #players do
+			local player = players[peer_index]
+
+			if player.id == peer_id then
+				return player.admin
+			end
+		end
+
+		return false
+	end
+)
+
+-- required libraries (put at bottom to ensure the Flag variable and functions are created before them, but they're still required.)
 -- required libraries
 --[[
 
@@ -2045,7 +2493,7 @@ function table.fromString(S)
 
 			-- if this is a closing of a table.
 			elseif char == "}" then
-				if variable then
+				if variable and variable ~= "" then
 					T[variable] = str
 				elseif str ~= "" then
 					table.insert(T, str)
@@ -2060,7 +2508,7 @@ function table.fromString(S)
 
 			-- save the value of the variable
 			elseif char == "," then
-				if variable then
+				if variable and variable ~= "" then
 					T[variable] = str
 				elseif str ~= "" then
 					table.insert(T, str)
@@ -2204,7 +2652,6 @@ table.copy = {
 		return deepCopy(t)
 	end
 }
-
 
 -- library name
 Debugging = {}
@@ -3008,10 +3455,12 @@ function Debugging.buildArgs(args)
 		local arg_len = table.length(args)
 		for i = 1, arg_len do
 			local arg = args[i]
-			-- tempoarily disabled due to how long it makes the outputs.
-			--[[if type(arg) == "table" then
-				arg = string.gsub(string.fromTable(arg), "\n", " ")
-			end]]
+			-- only show tables if the traceback_print_tables flag is enabled
+			if g_savedata.flags.traceback_print_tables then
+				if type(arg) == "table" then
+					arg = string.gsub(string.fromTable(arg), "\n", " ")
+				end
+			end
 
 			-- wrap in "" if arg is a string
 			if type(arg) == "string" then
@@ -3046,446 +3495,25 @@ Debugging.trace = {
 		d.print(str, requires_debug or false, 8, peer_id or -1)
 	end
 }
- -- required to print messages -- required to get data on players -- required for some of its helpful string functions -- required for some of its helpful table functions
-
--- where all of the registered flags are stored, their current values get stored in g_savedata.flags instead, though.
----@type table<string, BooleanFlag | IntegerFlag | NumberFlag | StringFlag | AnyFlag>
-local registered_flags = {}
-
-
--- where all of the registered permissions are stored.
-local registered_permissions = {}
-
--- stores the functions for flags
-Flag = {}
-
----@param name string the name of this permission
----@param has_permission function the function to execute, to check if the player has permission (arg1 is peer_id)
-function Flag.registerPermission(name, has_permission)
-
-	-- if the permission already exists
-	if registered_permissions[name] then
-
-		--[[
-			this can be quite a bad error, so it bypasses debug being disabled.
-
-			for example, library A adds a permission called "mod", for mod authors
-			and then after, library B adds a permission called "mod", for moderators of the server
-			
-			when this fails, any commands library B will now just require the requirements for mod authors
-			now you've got issues of mod authors being able to access moderator commands
-
-			so having this always alert is to try to make this issue obvious. as if it was just silent in
-			the background, suddenly you've got privilage elevation.
-		]]
-		d.print(("(Flag.registerPermission) Permission level %s is already registered!"):format(name), false, 1)
-		return
-	end
-
-	registered_permissions[name] = has_permission
-end
-
---# Register a boolean flag, can only be true or false.
----@param name string the name of the flag
----@param default_value boolean the default_value for this flag
----@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
----@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
----@param description string the description of the flag
-function Flag.registerBooleanFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description)
-	local function_name = "Flag.registerBooleanFlag"
-
-	-- if this flag has already been registered
-	if registered_flags[name] then
-		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
-		return
-	end
-
-	---@class BooleanFlag
-	local flag = {
-		name = name,
-		default_value = default_value,
-		tags = tags,
-		read_permission_requirement = read_permission_requirement,
-		write_permission_requirement = write_permission_requirement,
-		function_to_execute = function_to_execute,
-		flag_type = "boolean"
-	}
-
-	registered_flags[name] = flag
-
-	if g_savedata.flags[name] == nil then
-		g_savedata.flags[name] = default_value
-	end
-end
-
---# Register an integer flag, can only be an integer.
----@param name string the name of the flag
----@param default_value integer the default_value for this flag
----@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
----@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
----@param description string the description of the flag
----@param min integer|nil the minimum value for the flag (nil for none)
----@param max integer|nil the maximum value for the flag (nil for none)
-function Flag.registerIntegerFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description, min, max)
-	local function_name = "Flag.registerIntegerFlag"
-
-	-- if this flag has already been registered
-	if registered_flags[name] then
-		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
-		return
-	end
-
-	---@class IntegerFlag
-	local flag = {
-		name = name,
-		default_value = default_value,
-		tags = tags,
-		read_permission_requirement = read_permission_requirement,
-		write_permission_requirement = write_permission_requirement,
-		function_to_execute = function_to_execute,
-		flag_type = "integer",
-		limit = {
-			min = min,
-			max = max
-		}
-	}
-
-	registered_flags[name] = flag
-
-	if g_savedata.flags[name] == nil then
-		g_savedata.flags[name] = default_value
-	end
-end
-
---# Register an number flag, can only be an number.
----@param name string the name of the flag
----@param default_value number the default_value for this flag
----@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
----@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
----@param description string the description of the flag
----@param min integer|nil the minimum value for the flag (nil for none)
----@param max integer|nil the maximum value for the flag (nil for none)
-function Flag.registerNumberFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description, min, max)
-	local function_name = "Flag.registerNumberFlag"
-
-	-- if this flag has already been registered
-	if registered_flags[name] then
-		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
-		return
-	end
-
-	---@class NumberFlag
-	local flag = {
-		name = name,
-		default_value = default_value,
-		tags = tags,
-		read_permission_requirement = read_permission_requirement,
-		write_permission_requirement = write_permission_requirement,
-		function_to_execute = function_to_execute,
-		flag_type = "number",
-		limit = {
-			min = min,
-			max = max
-		}
-	}
-
-	registered_flags[name] = flag
-
-	if g_savedata.flags[name] == nil then
-		g_savedata.flags[name] = default_value
-	end
-end
-
---# Register a string flag, can only be an string.
----@param name string the name of the flag
----@param default_value string the default_value for this flag
----@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
----@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
----@param description string the description of the flag
-function Flag.registerStringFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, description, function_to_execute)
-	local function_name = "Flag.registerStringFlag"
-
-	-- if this flag has already been registered
-	if registered_flags[name] then
-		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
-		return
-	end
-
-	---@class StringFlag
-	local flag = {
-		name = name,
-		default_value = default_value,
-		tags = tags,
-		read_permission_requirement = read_permission_requirement,
-		write_permission_requirement = write_permission_requirement,
-		function_to_execute = function_to_execute,
-		flag_type = "string",
-	}
-
-	registered_flags[name] = flag
-
-	if g_savedata.flags[name] == nil then
-		g_savedata.flags[name] = default_value
-	end
-end
-
---# Register an any flag, can be any value.
----@param name string the name of the flag
----@param default_value any the default_value for this flag
----@param tags table<integer, string> a table of tags for this flag, can be used to filter tags for displaying to the user.
----@param read_permission_requirement string the permission required to read this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param write_permission_requirement string the permission required to write to this flag. Create custom permissions via flag.registerPermission(), defaults are "none", "auth" and "admin"
----@param function_to_execute function|nil the function to execute when this value is set. params are (in order): "value, old_value, peer_id", if you do not need to specify a function, just provide nil to avoid extra performance cost of calling an empty function.
----@param description string the description of the flag
-function Flag.registerAnyFlag(name, default_value, tags, read_permission_requirement, write_permission_requirement, function_to_execute, description)
-	local function_name = "Flag.registerAnyFlag"
-
-	-- if this flag has already been registered
-	if registered_flags[name] then
-		d.print(("(%s) Flag %s already exists!"):format(function_name, name), true, 1)
-		return
-	end
-
-	---@class AnyFlag
-	local flag = {
-		name = name,
-		default_value = default_value,
-		tags = tags,
-		read_permission_requirement = read_permission_requirement,
-		write_permission_requirement = write_permission_requirement,
-		function_to_execute = function_to_execute,
-		flag_type = "any",
-		description = description
-	}
-
-	registered_flags[name] = flag
-
-	if g_savedata.flags[name] == nil then
-		g_savedata.flags[name] = default_value
-	end
-end
-
----@param full_message string the full_message of the player
----@param peer_id integer the peer_id of the player who executed the command
----@param is_admin boolean if the player has admin.
----@param is_auth boolean if the player is authed.
----@param command string the command the player entered
----@param arg table<integer, string> the arguments to the command the player entered.
-function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, arg)
-	if command == "flag" then
-		local flag_name = arg[1]
-
-		if not flag_name then
-			d.print("You must specify a flag's name! get a list of flags via ?icm flags", false, 1, peer_id)
-			return
-		end
-
-		local flag = registered_flags[flag_name]
-
-		if not flag then
-			d.print(("The flag \"%s\" does not exist! Get a list of flags via ?icm flags"):format(flag_name), false, 1, peer_id)
-			return
-		end
-
-		-- the player is trying to read the flag
-		if not arg[2] then
-			-- check if the player has the permission to read the flag
-			
-			-- if the required read permission does not exist, default it to admin.
-
-			local read_permission = registered_permissions[flag.read_permission_requirement] or registered_permissions["admin"]
-
-			if not read_permission(peer_id) then
-				d.print(("You do not have permission to read this flag! You require the permission %s, contact a server admin/owner if you belive this is in mistake."):format(registered_permissions[flag.read_permission_requirement] and flag.read_permission_requirement or "admin"), false, 1, peer_id)
-				return
-			end
-
-			local flag_value = g_savedata.flags[flag_name]
-
-			if flag.flag_type ~= "string" and flag_value == "nil" then
-				flag_value = nil
-			end
-
-			-- if the flag's value is a string, format it as a string for display.
-			if type(flag_value) == "string" then
-				flag_value = ("\"%s\""):format(flag_value)
-			end
-
-			d.print(("%s's current value is: %s"):format(flag.name, flag_value), false, 0, peer_id)
-		else
-			-- the player is trying to set the flag
-
-			local write_permission = registered_permissions[flag.write_permission_requirement] or registered_permissions["admin"]
-
-			if not write_permission(peer_id) then
-				d.print(("You do not have permission to write this flag! You require the permission %s, contact a server admin/owner if you belive this is in mistake."):format(registered_permissions[flag.write_permission_requirement] and flag.write_permission_requirement or "admin"), false, 1, peer_id)
-				return
-			end
-
-			local set_value = table.concat(arg, " ", 2, #arg)
-			local original_set_value = set_value
-
-			if flag.flag_type ~= "string" then
-				if set_value == "nil" then
-					set_value = nil
-				end
-
-				-- number and integer flags
-				if flag.flag_type == "number" or flag.flag_type == "integer" then
-					-- convert to number if number, integer if integer
-					set_value = flag.flag_type == "number" and tonumber(set_value) or math.tointeger(set_value)
-
-					-- cannot be converted to number if number, or integer if integer.
-					if not set_value then
-						d.print(("%s is not a %s! The flag %s requires %s inputs only!"):format(original_set_value, flag.flag_type, flag.name, flag.flag_type), false, 1, peer_id)
-						return
-					end
-
-					-- check if outside of minimum
-					if flag.limit.min and set_value < flag.limit.min then
-						d.print(("The flag \"%s\" has a minimum value of %s, your input of %s is too low!"):format(flag.name, flag.limit.min, set_value), false, 1, peer_id)
-						return
-					end
-
-					-- check if outside of maximum
-					if flag.limit.max and set_value > flag.limit.max then
-						d.print(("The flag \"%s\" has a maximum value of %s, your input of %s is too high!"):format(flag.name, flag.limit.max, set_value), false, 1, peer_id)
-						return
-					end
-				end
-
-				-- boolean flags
-				if flag.flag_type == "boolean" then
-					set_value = string.toboolean(set_value)
-
-					if set_value == nil then
-						d.print(("The flag \"%s\" requires the input to be a boolean, %s is not a boolean!"):format(flag.name, original_set_value))
-					end
-				end
-
-				-- any flags
-				if flag.flag_type == "any" then
-
-					-- parse the value (turn it into the expected type)
-					set_value = string.parseValue(set_value)
-				end
-			end
-
-			local old_flag_value = g_savedata.flags[flag_name]
-
-			-- set the flag
-			g_savedata.flags[flag_name] = set_value
-
-			-- call the function for when the flag is written, if one is specified
-			if flag.function_to_execute ~= nil then
-				flag.function_to_execute(set_value, old_flag_value, peer_id)
-			end
-
-			d.print(("Successfully set the value for the flag \"%s\" to %s"):format(flag.name, set_value), false, 0, peer_id)
-		end
-	elseif command == "flags" then
-		if arg[1] then
-			d.print("Does not yet support the ability to search for flags, only able to give a full list for now, sorry!", false, 0, peer_id)
-			return
-		end
-
-		d.print("\n-- Flags --", false, 0, peer_id)
-
-		--TODO: make it sort by tags and filter by tags.
-
-		local flag_list = {}
-
-		-- clones, as we will be modifying them and sorting them for display purposes, and we don't want to modify the actual flags.
-		local cloned_registered_flags = table.copy.deep(registered_flags)
-		for _, flag in pairs(cloned_registered_flags) do
-			table.insert(flag_list, flag)
-		end
-
-		-- sort the list for display purposes
-		table.sort(flag_list, function(a, b)
-			-- if the types are the same, then sort alphabetically by name
-			if a.flag_type == b.flag_type then
-				return a.name < b.name
-			end
-		
-			-- the types are different, sort alphabetically by type.
-			return a.flag_type < b.flag_type
-		end)
-
-		local last_type = "none"
-
-		for flag_index = 1, #flag_list do
-			local flag = flag_list[flag_index]
-
-			-- print the following flag category, if this is now printing a new category of flags
-			if last_type ~= flag.flag_type then
-				d.print(("\n--- %s Flags ---"):format(flag.flag_type:upperFirst()), false, 0, peer_id)
-				last_type = flag.flag_type
-			end
-
-			-- print the flag data
-			d.print(("-----\nName: %s\nValue: %s\nTags: %s"):format(flag.name, g_savedata.flags[flag.name], table.concat(flag.tags, ", ")), false, 0, peer_id)
-		end
-	end
-end
 
 --[[
-
-	Register Default Permissions
-
+Boolean Flags
 ]]
 
--- None Permission
-Flag.registerPermission(
-	"none",
-	function()
-		return true
-	end
-)
-
--- Auth Permission
-Flag.registerPermission(
-	"auth",
-	function(peer_id)
-		local players = server.getPlayers()
-
-		for peer_index = 1, #players do
-			local player = players[peer_index]
-
-			if player.id == peer_id then
-				return player.auth
-			end
-		end
-
-		return false
-	end
-)
-
--- Admin Permission
-Flag.registerPermission(
+-- traceback_print_tables, if enabled the tracebacks will print the tables, default disabled as some tables will break the messages and make them massive.
+Flag.registerBooleanFlag(
+	"traceback_print_tables",
+	false,
+	{
+		"debug",
+		"tracebacks"
+	},
 	"admin",
-	function(peer_id)
-		local players = server.getPlayers()
-
-		for peer_index = 1, #players do
-			local player = players[peer_index]
-
-			if player.id == peer_id then
-				return player.admin
-			end
-		end
-
-		return false
-	end
+	"admin",
+	nil,
+	"if enabled the tracebacks will print the tables, default disabled as some tables will break the messages and make them massive."
 )
+ -- required to print messages -- required to get data on players -- required for some of its helpful string functions -- required for some of its helpful table functions
 
 player_commands = {
 	normal = {
@@ -3700,6 +3728,12 @@ player_commands = {
 			desc = "allows you to get or set global variables, and call global functions with specified arguments.",
 			args = "(address)[(\"(\"function_args\")\") value]",
 			example = "?icm execute g_savedata.debug.traceback.enabled\n?icm execute g_savedata.debug.traceback.debug true\n?icm execute sm.train(\"reward\",\"attack\",5)"
+		},
+		ignite = {
+			short_desc = "allows you to ignite an ai vehicle",
+			desc = "allows you to ignite one or many ai vehicles by spawning a fire on them.",
+			args = "(vehicle_id)|\"all\" [size]",
+			example = "?icm ignite all\n?icm ignite 102 10"
 		}
 	},
 	host = {}
@@ -4610,6 +4644,37 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			end
 
 			::onCustomCommand_execute_fail::
+		elseif command == "ignite" then
+			local function igniteVehicle(vehicle_id)
+				local vehicle_pos, got_pos = server.getVehiclePos(vehicle_id)
+				if not got_pos then
+					d.print(("%s is not a vehicle!"):format(vehicle_id), false, -1, peer_id)
+					return
+				end
+
+				local is_loaded = server.getVehicleSimulating(vehicle_id)
+
+				if not is_loaded then
+					d.print(("%s is not loaded!"):format(vehicle_id), false, 1, peer_id)
+					return
+				end
+
+				server.spawnFire(vehicle_pos, tonumber(arg[2]) or 1, 0, true, false, vehicle_id, 0)
+			end
+			if arg[1] == "all" then
+				for _, squad in pairs(g_savedata.ai_army.squadrons) do
+					for _, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.state.is_simulating then
+							igniteVehicle(vehicle_object.id)
+						end
+					end
+				end
+			elseif tonumber(arg[1]) then
+				igniteVehicle(tonumber(arg[1]))
+			else
+				d.print(("Your specified argument %s is not a vehicle id or \"all\", do ?icm help ignite for help on how to use this command!"):format(arg[1]), false, 1, peer_id)
+			end
+
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)
@@ -5627,7 +5692,8 @@ local version_updates = {
 	"(0.3.2.6)",
 	"(0.3.2.8)",
 	"(0.3.2.9)",
-	"(0.4.0.21)"
+	"(0.4.0.21)"--[[,
+	"(0.4.0.23)"]]
 }
 
 --[[
@@ -5660,7 +5726,7 @@ function Compatibility.createVersionHistoryData(version)
 
 	--[[
 		calculate ticks played
-	]] 
+	]]
 	local ticks_played = g_savedata.tick_counter
 
 	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
@@ -6196,6 +6262,16 @@ function Compatibility.update()
 		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	--[[elseif version_data.newer_versions[1] == "(0.4.0.23)" then -- 0.4.0.23 changes
+
+		-- add the g_savedata for vehicleFires
+		g_savedata.libraries.vehicle_fires = {
+			potential_ai_fires = {}, ---@type table<integer, potentialAIFire>
+			ai_vehicles_with_fires = {} ---@type table<integer, AIVehicleWithFire>
+		}
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)]]
 	end
 
 	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)
@@ -10228,6 +10304,7 @@ function Cargo.reset(island, cargo_type)
 	return true, "reset"
 end
  -- functions relating to the Convoys and Cargo Vehicles -- functions relating to islands -- functions for the main objectives. -- functions relating to the Adaptive AI -- functions for squads -- functions related to vehicles, and parsing data on them
+--require("libraries.icm.vehicles.vehicleFires") -- functions for handling fires on the AI vehicles.
 --[[
 
 
@@ -11232,6 +11309,16 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 
 		if vehicle_object and squad_index then
 
+			--[[VehicleFires.onAIVehicleDamaged(
+				vehicle_id,
+				{
+					x = x,
+					y = y,
+					z = z
+				},
+				amount
+			)]]
+
 			--d.print(("body_id: %i\ndamage: %s\nmain_body_id: %i"):format(body_id, amount, vehicle_object.main_body), true, 0)
 
 			if body_id == 0 or body_id == vehicle_object.main_body then -- makes sure the damage was on the ai's main body
@@ -11340,6 +11427,7 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	d.print("(onVehicleDespawn) vehicle_id: "..vehicle_id.." peer_id: "..peer_id, true, 0)
 	if vehicle_object and squad_index then
 		d.print("(onVehicleDespawn) AI vehicle: "..vehicle_object.name.." ("..vehicle_id..")", true, 0)
+		--VehicleFires.onAIVehicleDespawn(vehicle_id)
 		cleanVehicle(squad_index, vehicle_id)
 	elseif vehicle_object or squad then
 		d.print("(onVehicleDespawn) AI vehicle: "..vehicle_id.." does not have a squad index! squad: "..(squad and "exists" or "doesn't exist").." vehicle_object: "..(vehicle_object and "exists" or "doesn't exist"), true, 0)
@@ -11471,13 +11559,17 @@ function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	end
 end
 
+--[[function onObjectLoad(object_id)
+	local object_data = server.getObjectData(object_id)
+
+	if object_data.object_type == 58 then -- fire
+		VehicleFires.onFireSpawn(object_id, object_data)
+	end
+end]]
+
 --[[
 function onSpawnAddonComponent(id, name, type, addon_index)
 	d.print("(onSpawnAddonComponent) id: "..tostring(id).."\nname: "..tostring(name).."\ntype: "..tostring(type).."\naddon_index: "..tostring(addon_index), true, 0)
-end
-
-function onObjectLoad(object_id)
-	d.print("(onObjectLoad) object_id: "..object_id, true, 0)
 end]]
 
 --[[function onCharacterSit(object_id, vehicle_id, seat_name)
@@ -14302,7 +14394,7 @@ function tickCargo(game_ticks)
 						d.print("spawning cargo vehicle...", true, 0)
 						local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(best_route[1].transport_method.name), nil, true, resupplier_island, 1, 20)
 						if not was_spawned then
-							d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
+							d.print("Was unable to spawn cargo vehicle! Error: "..tostring(vehicle_data), true, 1)
 						else
 							-- add it to the cargo vehicles list
 
@@ -14536,7 +14628,7 @@ function tickCargoVehicles(game_ticks)
 							local island, found_island = Island.getDataFromIndex(cargo_vehicle.route_data[1].island_index)
 							local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
 							if not was_spawned or not vehicle_data then
-								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
+								d.print("Was unable to spawn cargo vehicle! Error: "..tostring(vehicle_data), true, 1)
 							else
 								-- add it to the cargo vehicles list
 
@@ -14965,6 +15057,7 @@ function onTick(game_ticks)
 	tickIslands(game_ticks)
 	tickModifiers(game_ticks)
 	CapturePointPayments.tick(game_ticks)
+	--VehicleFires.tick(game_ticks)
 	-- tickOther()
 
 	d.stopProfiler("onTick()", true, "onTick()")

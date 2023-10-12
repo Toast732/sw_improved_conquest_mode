@@ -96,7 +96,7 @@ function table.fromString(S)
 
 			-- if this is a closing of a table.
 			elseif char == "}" then
-				if variable then
+				if variable and variable ~= "" then
 					T[variable] = str
 				elseif str ~= "" then
 					table.insert(T, str)
@@ -111,7 +111,7 @@ function table.fromString(S)
 
 			-- save the value of the variable
 			elseif char == "," then
-				if variable then
+				if variable and variable ~= "" then
 					T[variable] = str
 				elseif str ~= "" then
 					table.insert(T, str)

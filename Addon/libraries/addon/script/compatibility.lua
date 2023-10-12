@@ -35,7 +35,8 @@ local version_updates = {
 	"(0.3.2.6)",
 	"(0.3.2.8)",
 	"(0.3.2.9)",
-	"(0.4.0.21)"
+	"(0.4.0.21)"--[[,
+	"(0.4.0.23)"]]
 }
 
 --[[
@@ -68,7 +69,7 @@ function Compatibility.createVersionHistoryData(version)
 
 	--[[
 		calculate ticks played
-	]] 
+	]]
 	local ticks_played = g_savedata.tick_counter
 
 	if g_savedata.info.version_history and #g_savedata.info.version_history > 0 then
@@ -604,6 +605,16 @@ function Compatibility.update()
 		end
 
 		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)
+
+	--[[elseif version_data.newer_versions[1] == "(0.4.0.23)" then -- 0.4.0.23 changes
+
+		-- add the g_savedata for vehicleFires
+		g_savedata.libraries.vehicle_fires = {
+			potential_ai_fires = {}, ---@type table<integer, potentialAIFire>
+			ai_vehicles_with_fires = {} ---@type table<integer, AIVehicleWithFire>
+		}
+
+		d.print("Successfully updated "..SHORT_ADDON_NAME.." data to "..version_data.newer_versions[1], false, 0)]]
 	end
 
 	d.print(SHORT_ADDON_NAME.." data is now up to date with "..version_data.newer_versions[1]..".", false, 0)

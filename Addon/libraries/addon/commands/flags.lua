@@ -26,10 +26,6 @@ limitations under the License.
 ]]
 
 -- required libraries
-require("libraries.addon.script.debugging") -- required to print messages
-require("libraries.addon.script.players") -- required to get data on players
-require("libraries.utils.string") -- required for some of its helpful string functions
-require("libraries.utils.tables") -- required for some of its helpful table functions
 
 -- where all of the registered flags are stored, their current values get stored in g_savedata.flags instead, though.
 ---@type table<string, BooleanFlag | IntegerFlag | NumberFlag | StringFlag | AnyFlag>
@@ -469,3 +465,9 @@ Flag.registerPermission(
 		return false
 	end
 )
+
+-- required libraries (put at bottom to ensure the Flag variable and functions are created before them, but they're still required.)
+require("libraries.addon.script.debugging") -- required to print messages
+require("libraries.addon.script.players") -- required to get data on players
+require("libraries.utils.string") -- required for some of its helpful string functions
+require("libraries.utils.tables") -- required for some of its helpful table functions

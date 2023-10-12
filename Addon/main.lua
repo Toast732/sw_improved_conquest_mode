@@ -26,7 +26,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.22)"
+ADDON_VERSION = "(0.4.0.23)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -207,13 +207,20 @@ SQUAD = {
 
 addon_setup = false
 
+---@class squadron
+---@field command string the squadron's command
+---@field vehicle_type string the vehicle type this squadron is made up of
+---@field role string the role this squadron has
+---@field vehicles table<integer, vehicle_object> the vehicles in this squadron
+---@field target_island AI_ISLAND|PLAYER_ISLAND|ISLAND the island this squadron is targetting
+
 g_savedata = {
 	ai_base_island = nil, ---@type AI_ISLAND
 	player_base_island = nil,
 	islands = {},
 	loaded_islands = {}, -- islands which are loaded
 	ai_army = { 
-		squadrons = { 
+		squadrons = { ---@type table<integer, squadron>
 			[RESUPPLY_SQUAD_INDEX] = { 
 				command = SQUAD.COMMAND.RESUPPLY, 
 				vehicle_type = "", 
@@ -395,7 +402,9 @@ require("libraries.icm.island") -- functions relating to islands
 require("libraries.icm.objective") -- functions for the main objectives.
 require("libraries.icm.spawnModifiers") -- functions relating to the Adaptive AI
 require("libraries.icm.squad") -- functions for squads
-require("libraries.icm.vehicle") -- functions related to vehicles, and parsing data on them
+
+require("libraries.icm.vehicles.vehicle") -- functions related to vehicles, and parsing data on them
+--require("libraries.icm.vehicles.vehicleFires") -- functions for handling fires on the AI vehicles.
 
 require("libraries.utils.executionQueue") -- functions for queuing functions for conditions to be met.
 require("libraries.utils.math") -- custom math functions
@@ -1255,6 +1264,16 @@ function onVehicleDamaged(vehicle_id, amount, x, y, z, body_id)
 
 		if vehicle_object and squad_index then
 
+			--[[VehicleFires.onAIVehicleDamaged(
+				vehicle_id,
+				{
+					x = x,
+					y = y,
+					z = z
+				},
+				amount
+			)]]
+
 			--d.print(("body_id: %i\ndamage: %s\nmain_body_id: %i"):format(body_id, amount, vehicle_object.main_body), true, 0)
 
 			if body_id == 0 or body_id == vehicle_object.main_body then -- makes sure the damage was on the ai's main body
@@ -1363,6 +1382,7 @@ function onVehicleDespawn(vehicle_id, peer_id)
 	d.print("(onVehicleDespawn) vehicle_id: "..vehicle_id.." peer_id: "..peer_id, true, 0)
 	if vehicle_object and squad_index then
 		d.print("(onVehicleDespawn) AI vehicle: "..vehicle_object.name.." ("..vehicle_id..")", true, 0)
+		--VehicleFires.onAIVehicleDespawn(vehicle_id)
 		cleanVehicle(squad_index, vehicle_id)
 	elseif vehicle_object or squad then
 		d.print("(onVehicleDespawn) AI vehicle: "..vehicle_id.." does not have a squad index! squad: "..(squad and "exists" or "doesn't exist").." vehicle_object: "..(vehicle_object and "exists" or "doesn't exist"), true, 0)
@@ -1494,13 +1514,17 @@ function setVehicleKeypads(vehicle_id, vehicle_object, squad)
 	end
 end
 
+--[[function onObjectLoad(object_id)
+	local object_data = server.getObjectData(object_id)
+
+	if object_data.object_type == 58 then -- fire
+		VehicleFires.onFireSpawn(object_id, object_data)
+	end
+end]]
+
 --[[
 function onSpawnAddonComponent(id, name, type, addon_index)
 	d.print("(onSpawnAddonComponent) id: "..tostring(id).."\nname: "..tostring(name).."\ntype: "..tostring(type).."\naddon_index: "..tostring(addon_index), true, 0)
-end
-
-function onObjectLoad(object_id)
-	d.print("(onObjectLoad) object_id: "..object_id, true, 0)
 end]]
 
 --[[function onCharacterSit(object_id, vehicle_id, seat_name)
@@ -4325,7 +4349,7 @@ function tickCargo(game_ticks)
 						d.print("spawning cargo vehicle...", true, 0)
 						local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(best_route[1].transport_method.name), nil, true, resupplier_island, 1, 20)
 						if not was_spawned then
-							d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
+							d.print("Was unable to spawn cargo vehicle! Error: "..tostring(vehicle_data), true, 1)
 						else
 							-- add it to the cargo vehicles list
 
@@ -4559,7 +4583,7 @@ function tickCargoVehicles(game_ticks)
 							local island, found_island = Island.getDataFromIndex(cargo_vehicle.route_data[1].island_index)
 							local was_spawned, vehicle_data = v.spawnRetry(sm.getVehicleListID(cargo_vehicle.route_data[1].transport_method.name), nil, true, island, 1, 20)
 							if not was_spawned or not vehicle_data then
-								d.print("Was unable to spawn cargo vehicle! Error: "..vehicle_data, true, 1)
+								d.print("Was unable to spawn cargo vehicle! Error: "..tostring(vehicle_data), true, 1)
 							else
 								-- add it to the cargo vehicles list
 
@@ -4988,6 +5012,7 @@ function onTick(game_ticks)
 	tickIslands(game_ticks)
 	tickModifiers(game_ticks)
 	CapturePointPayments.tick(game_ticks)
+	--VehicleFires.tick(game_ticks)
 	-- tickOther()
 
 	d.stopProfiler("onTick()", true, "onTick()")

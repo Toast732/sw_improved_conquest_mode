@@ -33293,7 +33293,7 @@
 			<l id="158" name="LAND - Rook" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="2909" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,can_offroad" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_2909.xml" vehicle_file_store="4">
-						<spawn_transform 30="0.034774" 31="2.382319" 32="0.087677"/>
+						<spawn_transform 30="0.034774" 31="2.551622" 32="0.087677"/>
 						<spawn_bounds>
 							<min x="-2.875" y="-0.625" z="-1.125"/>
 							<max x="2.875" y="4.625" z="11.875"/>
@@ -33307,7 +33307,7 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="0.076852" 31="-1.033744" 32="-4.847207"/>
+						<vehicle_parent_transform 30="0.076852" 31="-1.203047" 32="-4.847207"/>
 						<graph_links/>
 					</c>
 					<c component_type="3" id="10067" name="type=dlc_weapons,vehicle_type=wep_land,size=medium,role=general,visibility_range=2400,radar,spawning_radius=15,speed=14,health=1750,can_offroad,variation=arid" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_10067.xml" vehicle_file_store="4">

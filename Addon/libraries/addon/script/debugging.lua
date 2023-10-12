@@ -6,6 +6,8 @@ require("libraries.addon.script.map")
 require("libraries.utils.string")
 require("libraries.utils.tables")
 
+require("libraries.addon.commands.flags")
+
 -- library name
 Debugging = {}
 
@@ -808,10 +810,12 @@ function Debugging.buildArgs(args)
 		local arg_len = table.length(args)
 		for i = 1, arg_len do
 			local arg = args[i]
-			-- tempoarily disabled due to how long it makes the outputs.
-			--[[if type(arg) == "table" then
-				arg = string.gsub(string.fromTable(arg), "\n", " ")
-			end]]
+			-- only show tables if the traceback_print_tables flag is enabled
+			if g_savedata.flags.traceback_print_tables then
+				if type(arg) == "table" then
+					arg = string.gsub(string.fromTable(arg), "\n", " ")
+				end
+			end
 
 			-- wrap in "" if arg is a string
 			if type(arg) == "string" then
@@ -846,3 +850,21 @@ Debugging.trace = {
 		d.print(str, requires_debug or false, 8, peer_id or -1)
 	end
 }
+
+--[[
+Boolean Flags
+]]
+
+-- traceback_print_tables, if enabled the tracebacks will print the tables, default disabled as some tables will break the messages and make them massive.
+Flag.registerBooleanFlag(
+	"traceback_print_tables",
+	false,
+	{
+		"debug",
+		"tracebacks"
+	},
+	"admin",
+	"admin",
+	nil,
+	"if enabled the tracebacks will print the tables, default disabled as some tables will break the messages and make them massive."
+)

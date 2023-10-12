@@ -216,6 +216,12 @@ player_commands = {
 			desc = "allows you to get or set global variables, and call global functions with specified arguments.",
 			args = "(address)[(\"(\"function_args\")\") value]",
 			example = "?icm execute g_savedata.debug.traceback.enabled\n?icm execute g_savedata.debug.traceback.debug true\n?icm execute sm.train(\"reward\",\"attack\",5)"
+		},
+		ignite = {
+			short_desc = "allows you to ignite an ai vehicle",
+			desc = "allows you to ignite one or many ai vehicles by spawning a fire on them.",
+			args = "(vehicle_id)|\"all\" [size]",
+			example = "?icm ignite all\n?icm ignite 102 10"
 		}
 	},
 	host = {}
@@ -1126,6 +1132,37 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 			end
 
 			::onCustomCommand_execute_fail::
+		elseif command == "ignite" then
+			local function igniteVehicle(vehicle_id)
+				local vehicle_pos, got_pos = server.getVehiclePos(vehicle_id)
+				if not got_pos then
+					d.print(("%s is not a vehicle!"):format(vehicle_id), false, -1, peer_id)
+					return
+				end
+
+				local is_loaded = server.getVehicleSimulating(vehicle_id)
+
+				if not is_loaded then
+					d.print(("%s is not loaded!"):format(vehicle_id), false, 1, peer_id)
+					return
+				end
+
+				server.spawnFire(vehicle_pos, tonumber(arg[2]) or 1, 0, true, false, vehicle_id, 0)
+			end
+			if arg[1] == "all" then
+				for _, squad in pairs(g_savedata.ai_army.squadrons) do
+					for _, vehicle_object in pairs(squad.vehicles) do
+						if vehicle_object.state.is_simulating then
+							igniteVehicle(vehicle_object.id)
+						end
+					end
+				end
+			elseif tonumber(arg[1]) then
+				igniteVehicle(tonumber(arg[1]))
+			else
+				d.print(("Your specified argument %s is not a vehicle id or \"all\", do ?icm help ignite for help on how to use this command!"):format(arg[1]), false, 1, peer_id)
+			end
+
 		end
 	elseif player_commands.admin[command] then
 		d.print("You do not have permission to use "..command..", contact a server admin if you believe this is incorrect.", false, 1, peer_id)

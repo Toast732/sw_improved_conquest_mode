@@ -14,7 +14,7 @@ require("libraries.addon.script.pathfinding")
 
 require("libraries.icm.objective")
 require("libraries.icm.squad")
-require("libraries.icm.vehicle")
+require("libraries.icm.vehicles.vehicle")
 
 require("libraries.utils.math")
 require("libraries.utils.tables")
