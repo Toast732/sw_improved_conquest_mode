@@ -61,37 +61,37 @@ function Squad.getSquad(vehicle_id) -- input a vehicle's id, and it will return 
 	end
 end
 
----@param vehicle_id integer the vehicle's id
+---@param group_id integer the group's id
 ---@return vehicle_object? vehicle_object the vehicle object, nil if not found
 ---@return integer? squad_index the index of the squad the vehicle is with, if the vehicle is invalid, then it returns nil
 ---@return SQUAD? squad the info of the squad, if not found, then returns nil
-function Squad.getVehicle(vehicle_id) -- input a vehicle's id, and it will return the vehicle_object, the squad index its from and the squad's data
+function Squad.getVehicle(group_id) -- input a group's id, and it will return the vehicle_object, the squad index its from and the squad's data
 
 	local vehicle_object = nil
 	local squad_index = nil
 	local squad = nil
 
-	if not vehicle_id then -- makes sure vehicle id was provided
-		d.print("(Squad.getVehicle) vehicle_id is nil!", true, 1)
+	if not group_id then -- makes sure vehicle id was provided
+		d.print("(Squad.getVehicle) group_id is nil!", true, 1)
 		return vehicle_object, squad_index, squad
 	else
-		squad_index, squad = Squad.getSquad(vehicle_id)
+		squad_index, squad = Squad.getSquad(group_id)
 	end
 
 	if not squad_index or not squad then -- if we were not able to get a squad index then return nil
 		return vehicle_object, squad_index, squad
 	end
 
-	vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id]
+	vehicle_object = g_savedata.ai_army.squadrons[squad_index].vehicles[group_id]
 
 	if not vehicle_object then
-		d.print("(Squad.getVehicle) failed to get vehicle_object for vehicle with id "..tostring(vehicle_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
+		d.print("(Squad.getVehicle) failed to get vehicle_object for group with id "..tostring(group_id).." and in a squad with the id of "..tostring(squad_index).." and with the vehicle_type of "..tostring(squad.vehicle_type), true, 1)
 	end
 
 	return vehicle_object, squad_index, squad
 end
 
----@param squad_index integer the squad's index which you want to create it under, if not specified it will use the next available index
+---@param squad_index integer? the squad's index which you want to create it under, if not specified it will use the next available index
 ---@param vehicle_object vehicle_object the vehicle object which is adding to the squad
 ---@return integer squad_index the index of the squad
 ---@return boolean squad_created if the squad was successfully created

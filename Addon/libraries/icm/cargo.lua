@@ -78,17 +78,17 @@ s_fluid_types = {
 
 ]]
 
---- @param vehicle_id integer the vehicle's id you want to clean
-function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it exists
+--- @param group_id integer the vehicle's id you want to clean
+function Cargo.clean(group_id) -- cleans the data on the cargo vehicle if it exists
 	-- check if it is a cargo vehicle
 	for cargo_vehicle_index, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
-		d.print("cargo vehicle id: "..cargo_vehicle.vehicle_data.id.."\nRequested id: "..vehicle_id, true, 0)
-		if cargo_vehicle.vehicle_data.id == vehicle_id then
+		d.print("cargo vehicle group id: "..cargo_vehicle.vehicle_data.group_id.."\nRequested id: "..group_id, true, 0)
+		if cargo_vehicle.vehicle_data.group_id == group_id then
 			d.print("cleaning cargo vehicle", true, 0)
 
 			--* remove the search area from the map
 			s.removeMapID(-1, cargo_vehicle.search_area.ui_id)
-			g_savedata.cargo_vehicles[vehicle_id] = nil
+			g_savedata.cargo_vehicles[group_id] = nil
 
 			-- clear all the island cargo data
 			g_savedata.ai_base_island.cargo_transfer = {
@@ -106,7 +106,7 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 			end
 
 			--* check if theres still vehicles in the squad, if so, set the squad's command to none
-			local squad_index, squad = Squad.getSquad(vehicle_id)
+			local squad_index, squad = Squad.getSquad(group_id)
 			if squad_index and squad then
 				g_savedata.ai_army.squadrons[squad_index].command = SQUAD.COMMAND.NONE
 			end
@@ -115,10 +115,10 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 			-- if there is, delete it to avoid a softlock
 			if g_savedata.cargo_vehicles[cargo_vehicle_index+1] then
 				if g_savedata.cargo_vehicles[cargo_vehicle_index+1].route_status == 3 then
-					local squad_index, squad = Squad.getSquad(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id)
+					local squad_index, squad = Squad.getSquad(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.group_id)
 
 					if squad_index then
-						v.kill(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.id, true, true)
+						v.kill(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data, true, true)
 					end
 				end
 			end
@@ -131,7 +131,7 @@ function Cargo.clean(vehicle_id) -- cleans the data on the cargo vehicle if it e
 	-- check if its a convoy vehicle
 	for _, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 		for convoy_index, convoy_vehicle_id in ipairs(cargo_vehicle.convoy) do
-			if vehicle_id == convoy_vehicle_id then
+			if group_id == convoy_vehicle_id then
 				table.remove(cargo_vehicle.convoy, convoy_index)
 				return
 			end
@@ -224,10 +224,10 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 	end
 
 	-- insert the cargo vehicle into the table for the convoy
-	g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[1 + math.floor(#possible_escorts/2)] = cargo_vehicle.id
+	g_savedata.cargo_vehicles[cargo_vehicle.group_id].convoy[1 + math.floor(#possible_escorts/2)] = cargo_vehicle.group_id
 
 	for escort_index, escort in ipairs(possible_escorts) do
-		local squad_index, _ = Squad.getSquad(cargo_vehicle.id)
+		local squad_index, _ = Squad.getSquad(cargo_vehicle.group_id)
 
 		if squad_index then
 			transferToSquadron(escort, squad_index, true)
@@ -241,10 +241,10 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 			-- insert the escorts into the table for the convoy
 			if not math.isWhole(escort_index/2) then 
 				--* put this vehicle at the front as its index is odd
-				g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[1 + math.floor(#possible_escorts/2) + math.ceil(escort_index/2)] = escort.id
+				g_savedata.cargo_vehicles[cargo_vehicle.group_id].convoy[1 + math.floor(#possible_escorts/2) + math.ceil(escort_index/2)] = escort.group_id
 			else
 				--* put this vehicle at the back as index is even
-				g_savedata.cargo_vehicles[cargo_vehicle.id].convoy[(1 + math.floor(#possible_escorts/2)) - math.ceil(escort_index/2)] = escort.id
+				g_savedata.cargo_vehicles[cargo_vehicle.group_id].convoy[(1 + math.floor(#possible_escorts/2)) - math.ceil(escort_index/2)] = escort.group_id
 			end
 		end
 	end
@@ -403,8 +403,8 @@ function Cargo.setKeypad(vehicle_id, keypad_name, cargo_type)
 	s.setVehicleKeypad(vehicle_id, keypad_name, s_fluid_types[cargo_type])
 end
 
----@param recipient any the island or vehicle object thats getting the cargo
----@param sender any the island or vehicle object thats sending the cargo
+---@param recipient vehicle_object|ISLAND|AI_ISLAND the island or vehicle object thats getting the cargo
+---@param sender vehicle_object|ISLAND|AI_ISLAND the island or vehicle object thats sending the cargo
 ---@param requested_cargo requestedCargo the cargo thats going between the sender and recipient
 ---@param transfer_time number how long the cargo transfer should take
 ---@param tick_rate number the tick rate
@@ -467,6 +467,15 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	elseif sender.object_type == "vehicle" then
 		-- if the sender is a vehicle
 
+		-- get the sender's main vehicle id
+		local main_vehicle_id = VehicleGroup.getMainVehicle(sender.group_id)
+
+		-- Ensure the main_vehicle_id is valid.
+		if not main_vehicle_id then
+			d.print(("(Cargo.transfer) failed to get main_vehicle_id for sender (group_id: %s), returned main_vehicle_id is nil!"):format(sender.group_id), true, 1)
+			return false, "error"
+		end
+
 		-- set the variables
 		for cargo_type, amount in pairs(cargo_to_transfer) do
 			if amount > 0 then
@@ -479,11 +488,11 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 			-- set the tanks
 			for slot, cargo in ipairs(vehicle_cargo_to_transfer) do
 				for i=1, sender.cargo.capacity/large_tank_capacity do
-					local set_cargo, error_message = Cargo.setTank(sender.id, "RESOURCE_TYPE_"..(slot-1).."_"..(i-1), cargo.cargo_type, -cargo.amount/sender.cargo.capacity, false)
+					local set_cargo, error_message = Cargo.setTank(main_vehicle_id, "RESOURCE_TYPE_"..(slot-1).."_"..(i-1), cargo.cargo_type, -cargo.amount/sender.cargo.capacity, false)
 					if not set_cargo then
 						d.print("(Cargo.transfer s) error setting tank: "..error_message, true, 1)
 					end
-					Cargo.setKeypad(sender.id, "RESOURCE_TYPE_"..(slot-1), cargo.cargo_type)
+					Cargo.setKeypad(main_vehicle_id, "RESOURCE_TYPE_"..(slot-1), cargo.cargo_type)
 				end
 			end
 		end
@@ -533,7 +542,16 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	elseif recipient.object_type == "vehicle" then
 		-- the recipient is a vehicle
 
-		local recipient, _, _ = Squad.getVehicle(recipient.id)
+		-- get the recipient's main vehicle id
+		local main_vehicle_id = VehicleGroup.getMainVehicle(recipient.group_id)
+
+		-- Ensure the main_vehicle_id is valid.
+		if not main_vehicle_id then
+			d.print(("(Cargo.transfer) failed to get main_vehicle_id for recipient (group_id: %s), returned main_vehicle_id is nil!"):format(recipient.group_id), true, 1)
+			return false, "error"
+		end
+
+		local recipient, _, _ = Squad.getVehicle(recipient.group_id)
 
 		if not recipient then
 			d.print("(Cargo.transfer) failed to get vehicle_object, returned recipient is nil!")
@@ -553,12 +571,12 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 			-- set the tanks
 			for slot, cargo in ipairs(vehicle_cargo_to_transfer) do
 				for i=1, recipient.cargo.capacity/large_tank_capacity do
-					local set_cargo, error_message = Cargo.setTank(recipient.id, "RESOURCE_TYPE_"..(slot-1).."_"..(i-1), cargo.cargo_type, cargo.amount/(recipient.cargo.capacity/large_tank_capacity))
+					local set_cargo, error_message = Cargo.setTank(main_vehicle_id, "RESOURCE_TYPE_"..(slot-1).."_"..(i-1), cargo.cargo_type, cargo.amount/(recipient.cargo.capacity/large_tank_capacity))
 					--d.print("(Cargo.transfer r) amount: "..(cargo.amount/(recipient.cargo.capacity/large_tank_capacity)), true, 0)
 					if not set_cargo then
-						d.print("(Cargo.transfer r) error setting tank: "..error_message, true, 1)
+						d.print("(Cargo.transfer) error setting tank: "..error_message, true, 1)
 					end
-					Cargo.setKeypad(recipient.id, "RESOURCE_TYPE_"..(slot-1), cargo.cargo_type)
+					Cargo.setKeypad(main_vehicle_id, "RESOURCE_TYPE_"..(slot-1), cargo.cargo_type)
 				end
 			end
 		end
@@ -579,8 +597,8 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	return false, "transfer incomplete"
 end
 
----@param island ISLAND the island you want to produce the cargo at
----@param natural_production string the natural production of this island
+---@param island ISLAND|AI_ISLAND|PLAYER_ISLAND the island you want to produce the cargo at
+---@param natural_production number? the natural production of this island
 function Cargo.produce(island, natural_production)
 
 	local natural_production = natural_production or 0 -- the ai_base island will produce these resources naturally at this rate per hour
@@ -631,8 +649,8 @@ function Cargo.produce(island, natural_production)
 	end
 end
 
----@return island ISLAND the island thats best to resupply
----@return weight weight[] the weights of all of the cargo types for the resupply island
+---@return ISLAND|AI_ISLAND island the island thats best to resupply
+---@return ICMResupplyWeights weight the weights of all of the cargo types for the resupply island
 function Cargo.getBestResupplyIsland()
 
 	local island_weights = {}
@@ -880,8 +898,8 @@ function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 	return requested_cargo
 end
 
----@param origin_island ISLAND the island of which the cargo is coming from
----@param dest_island ISLAND the island of which the cargo is going to
+---@param origin_island ISLAND|AI_ISLAND the island of which the cargo is coming from
+---@param dest_island ISLAND|AI_ISLAND the island of which the cargo is going to
 ---@return route[] best_route the best route to go from the origin to the destination
 function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier island | dest = resupply island
 	local start_time = s.getTimeMillisec()

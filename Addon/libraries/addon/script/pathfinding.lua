@@ -39,7 +39,7 @@ s = s or server
 
 ]]
 
----@class ICMPathfindPoint
+---@class PathfindPoint3D
 ---@field x number the x coordinate of the graph node
 ---@field y number the y coordinate of the graph node
 ---@field z number the z coordinate of the graph node
@@ -74,7 +74,7 @@ function Pathfinding.nextPath(vehicle_object)
 
 	--? makes sure the vehicle_object has paths
 	if not vehicle_object.path then
-		d.print("(Vehicle.nextPath) vehicle_object.path is nil! vehicle_id: "..tostring(vehicle_object.id), true, 1)
+		d.print("(Vehicle.nextPath) vehicle_object.path is nil! vehicle_id: "..tostring(vehicle_object.group_id), true, 1)
 		return nil, false
 	end
 
@@ -192,7 +192,7 @@ function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_dist
 
 		local exclude_offroad = false
 
-		local squad_index, squad = Squad.getSquad(vehicle_object.id)
+		local squad_index, squad = Squad.getSquad(vehicle_object.group_id)
 		if squad.command == SQUAD.COMMAND.CARGO then
 			for c_vehicle_id, c_vehicle_object in pairs(squad.vehicles) do
 				if g_savedata.cargo_vehicles[c_vehicle_id] then
@@ -277,7 +277,7 @@ function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_dist
 				Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
 			end
 		else
-			d.print(("(Pathfinding.addPath) despite moving the pathfinding start pos forward by %sm, pathfinding still failed for vehicle with id %s, aborting to avoid infinite recursion"):format(translate_forward_distance, vehicle_object.id), true, 0)
+			d.print(("(Pathfinding.addPath) despite moving the pathfinding start pos forward by %sm, pathfinding still failed for vehicle with id %s, aborting to avoid infinite recursion"):format(translate_forward_distance, vehicle_object.group_id), true, 0)
 		end
 	else
 		table.insert(vehicle_object.path, { 
@@ -301,6 +301,8 @@ end
 function Pathfinding.updatePathfinding()
 	local old_pathfind = server.pathfind --temporarily remember what the old function did
 	local old_pathfindOcean = server.pathfindOcean
+
+	---@return table<integer, PathfindPoint3D> path the path with the added y values
 	function server.pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --permanantly do this new function using the old name.
 		local path = old_pathfind(matrix_start, matrix_end, required_tags, avoided_tags) --do the normal old function
 		--d.print("(updatePathfinding) getting path y", true, 0)

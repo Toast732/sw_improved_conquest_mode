@@ -49,7 +49,7 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 		if type(message) ~= "table" and IS_DEVELOPMENT_VERSION then
 			if message then
-				debug.log(string.format("SW %s %s | %s", SHORT_ADDON_NAME, suffix, string.gsub(message, "\n", " \\n ")))
+				debug.log(string.format("SW %s %s | %s", SHORT_ADDON_NAME, suffix, --[[string.gsub(]]message--[[, "\n", " \\n ")]]))
 			else
 				debug.log(string.format("SW %s %s | (d.print) message is nil!", SHORT_ADDON_NAME, suffix))
 			end
@@ -77,7 +77,15 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 	-- print a traceback if this is a debug error message, and if tracebacks are enabled
 	if debug_type == 1 and d.getDebug(8) then
-		d.trace.print(_ENV, requires_debug, peer_id)
+		-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
+		__ENV = _ENV_NORMAL
+		__ENV._ENV_MODIFIED = _ENV
+		_ENV = __ENV
+
+		d.trace.print(_ENV_MODIFIED, requires_debug, peer_id)
+
+		-- swap back to modified environment
+		_ENV = _ENV_MODIFIED
 	end
 end
 
@@ -449,7 +457,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					return removeAndReturn(funct(...))
 				end)
 			end
-		
+
 			local function setupTraceback(t, n)
 
 				-- if this table is empty, return nil.
@@ -521,6 +529,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 						d.trace.print(_ENV_MODIFIED)
 
+						-- swap back to modified environment
 						_ENV = _ENV_MODIFIED
 
 						g_savedata.debug.traceback.stack_size = 0
@@ -740,7 +749,18 @@ end
 
 function Debugging.getProfilerData(debug_message)
 	for debug_name, debug_data in pairs(g_savedata.profiler.display.average) do
+
+		-- get the current ms for this profiler instance
+		current_ms = g_savedata.profiler.display.current[debug_name]
+
+		-- if current is nil, then don't display.
+		if not current_ms then
+			goto next_profiler_instance
+		end
+
 		debug_message = ("%s\n--\n%s: %.2f|%.2f|%.2f"):format(debug_message, debug_name, debug_data, g_savedata.profiler.display.max[debug_name], g_savedata.profiler.display.current[debug_name])
+	
+		::next_profiler_instance::
 	end
 	return debug_message
 end
@@ -810,16 +830,18 @@ function Debugging.buildArgs(args)
 		local arg_len = table.length(args)
 		for i = 1, arg_len do
 			local arg = args[i]
-			-- only show tables if the traceback_print_tables flag is enabled
-			if g_savedata.flags.traceback_print_tables then
-				if type(arg) == "table" then
-					arg = string.gsub(string.fromTable(arg), "\n", " ")
-				end
-			end
 
 			-- wrap in "" if arg is a string
 			if type(arg) == "string" then
 				arg = ("\"%s\""):format(arg)
+			end
+
+			-- only show tables if the traceback_print_tables flag is enabled
+			if g_savedata.flags.traceback_print_tables then
+				if type(arg) == "table" then
+					d.print("debugging.lua random ass debug: "..tostring(arg), false, 0)
+					arg = --[[string.gsub(]]string.fromTable(arg)--, "\n", " ")
+				end
 			end
 
 			s = ("%s%s%s"):format(s, arg, i ~= arg_len and ", " or "")

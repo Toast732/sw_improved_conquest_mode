@@ -40,14 +40,27 @@ end
 function SpawningUtils.spawnObjectType(spawn_transform, addon_index, location_index, component_data, parent_vehicle_id)
 
 	if component_data or component_data.component_index then
-		local component, is_success = s.spawnAddonComponent(spawn_transform, addon_index, location_index, component_data.component_index, parent_vehicle_id)
-		if is_success then
-			return component.id
-		else -- then it failed to spawn the addon component
-			d.print("this addon index: "..s.getAddonIndex(), false, 0)
-			d.print(("(Improved Conquest Mode) Please send this debug info to the discord server:\ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
-			return nil
+		local component, is_success = server.spawnAddonComponent(spawn_transform, addon_index, location_index, component_data.component_index, parent_vehicle_id)
+		-- if we got is_success and component isn't nil
+		if is_success and component then
+			-- if it's a group and a valid group_id, return the group_id
+			if component.group_id and component.group_id ~= 0 then
+				return component.group_id
+			-- if it's a object and a valid object_id, return the object_id
+			elseif component.object_id and component.object_id ~= 0 then
+				return component.object_id
+			end
 		end
+		
+		-- then it failed to spawn the addon component
+		d.print("this addon index: "..s.getAddonIndex(), false, 0)
+		-- turn the component into a string if its a table
+		if type(component) == "table" then
+			component = string.fromTable(component)
+		end
+		-- print an error
+		d.print(("(Improved Conquest Mode) Failed to spawn addon component! \ncomponent: %s\naddon_index: %s\nlocation index: %s"):format(component, addon_index, location_index), false, 1)
+		return nil
 	elseif component_data then
 		d.print("(su.spawningUtils) component_data.component_index is nil!", true, 1)
 		d.print(component_data, true, 1)
@@ -65,7 +78,8 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 
 	-- add object to spawned object tables
 
-	if spawned_object_id ~= nil and spawned_object_id ~= 0 then
+	-- if the id is valid
+	if spawned_object_id and spawned_object_id ~= 0 then
 
 		local l_vehicle_type = VEHICLE.TYPE.HELI
 		if Tags.has(component_data.tags, "vehicle_type=wep_plane") then

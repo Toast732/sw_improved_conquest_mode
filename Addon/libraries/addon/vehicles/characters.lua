@@ -6,6 +6,8 @@
 
 ]]
 
+---@diagnostic disable: duplicate-doc-field
+
 s = s or server
 
 -- required libraries
@@ -134,23 +136,32 @@ end
 ---@param vehicle_id integer the vehicle to spawn the characters for, the vehicle must be loaded in or previously been loaded in.
 ---@param valid_seats table<integer, VALID_SEAT> the valid seat names along with the outfit_id to use for them, set groups up in characters.lua in the valid_seats variable and then use them here
 function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
-	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+	local loaded_data, is_success = server.getVehicleComponents(vehicle_id)
 
-	-- failed to get vehicle data
+	-- failed to get component data
 	if not is_success then
-		d.print("(Characters.setupVehicle) failed to get vehicle data for vehicle_id: "..vehicle_id, true, 1)
+		d.print("(Characters.setupVehicle) failed to get loaded data for vehicle_id: "..vehicle_id, true, 1)
 		return {}, false
 	end
 
 	-- vehicle has never loaded
-	if not vehicle_data.components then
+	if not loaded_data.components then
 		d.print(("(Characters.setupVehicle) vehicle_id: %i has not been loaded yet!"):format(vehicle_id), true, 1)
 		return {}, false
 	end
 
 	-- vehicle has no seats
-	if not vehicle_data.components.seats[1] then
+	if not loaded_data.components.seats[1] then
 		d.print(("(Characters.setupVehicle) vehicle_id: %i has no seats!"):format(vehicle_id), true, 1)
+		return {}, false
+	end
+
+	-- get it's position
+	local vehicle_position, is_success = server.getVehiclePos(vehicle_id)
+
+	-- check if we got the position
+	if not is_success then
+		d.print(("(Characters.setupVehicle) failed to get position for vehicle_id: %i"):format(vehicle_id), true, 1)
 		return {}, false
 	end
 
@@ -162,14 +173,14 @@ function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
 	-- go through all valid seat types, and for each, go through all of the seats, this way the output table is sorted in the order the valid seats table is ordered.
 	for valid_seat_id = 1, #valid_seats do
 		local valid_seat = valid_seats[valid_seat_id]
-		for seat_id = 1, #vehicle_data.components.seats do
-			local seat_data = vehicle_data.components.seats[seat_id]
+		for seat_id = 1, #loaded_data.components.seats do
+			local seat_data = loaded_data.components.seats[seat_id]
 			if string.find(seat_data.name, valid_seat.name) then
 				-- this is a valid seat
-				local object_id, is_success = s.spawnCharacter(vehicle_data.transform, valid_seat.outfit_id)
+				local object_id, is_success = s.spawnCharacter(vehicle_position, valid_seat.outfit_id)
 				if not is_success then
 					d.print(("(Characters.setupVehicle) failed to spawn character for vehicle_id: %i!"):format(vehicle_id), true, 1)
-				else 
+				else
 					s.setCharacterData(object_id, s.getCharacterData(object_id).hp, valid_seat.is_interactable, valid_seat.is_ai)
 					s.setAIState(object_id, valid_seat.ai_state)
 					s.setAITargetVehicle(object_id, nil)
@@ -182,7 +193,7 @@ function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
 				end
 			end
 		end
-	end 
+	end
 
 	return characters, true
 end

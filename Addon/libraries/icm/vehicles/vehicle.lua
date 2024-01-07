@@ -1,8 +1,10 @@
+---@diagnostic disable: inject-field
 -- required libraries
 require("libraries.addon.components.spawningUtils")
 require("libraries.addon.components.tags")
 require("libraries.addon.script.debugging")
 require("libraries.addon.script.players")
+require("libraries.addon.script.safeServer")
 require("libraries.addon.script.matrix")
 require("libraries.icm.squad")
 require("libraries.icm.island")
@@ -30,10 +32,10 @@ function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressive
 		return 0, false
 	end
 
-	local _, squad = Squad.getSquad(vehicle_object.id)
+	local _, squad = Squad.getSquad(vehicle_object.group_id)
 
 	if not squad then
-		d.print("(Vehicle.getSpeed) squad is nil! vehicle_id: "..tostring(vehicle_object.id), true, 1)
+		d.print("(Vehicle.getSpeed) squad is nil! vehicle_id: "..tostring(vehicle_object.group_id), true, 1)
 		return 0, false
 	end
 
@@ -67,7 +69,7 @@ function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressive
 				terrain_type = v.getTerrainType(vehicle_object.transform)
 			end
 
-			local _, squad = Squad.getSquad(vehicle_object.id)
+			local _, squad = Squad.getSquad(vehicle_object.group_id)
 			
 			local aggressive = aggressiveness_override or not ignore_aggressiveness and squad.command == SQUAD.COMMAND.ENGAGE
 			if aggressive then
@@ -104,38 +106,61 @@ function Vehicle.getTerrainType(transform)
 	return terrain_type, found_terrain_type
 end
 
----@param vehicle_id integer the id of the vehicle
----@return prefab prefab the prefab of the vehicle if it was created
+---@param group_id integer the group id of the vehicle
+---@return prefab? prefab the prefab of the vehicle if it was created
 ---@return boolean was_created if the prefab was created
-function Vehicle.createPrefab(vehicle_id)
+function Vehicle.createPrefab(group_id)
+	if not group_id then
+		d.print("(Vehicle.createPrefab) group_id is nil!", true, 1)
+		return nil, false
+	end
+
+	-- get the main body id
+	local vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+	-- check if vehicle_id is nil
 	if not vehicle_id then
-		d.print("(Vehicle.createPrefab) vehicle_id is nil!", true, 1)
+		d.print(("(Vehicle.createPrefab) failed to get main body id! group_id: %s"):format(group_id), true, 1)
 		return nil, false
 	end
 
-	local vehicle_data, got_vehicle_data = s.getVehicleData(vehicle_id)
+	local loaded_data, _ = safe_server.getVehicleComponents(vehicle_id)
 
-	if not got_vehicle_data then
-		d.print("(Vehicle.createPrefab) failed to get vehicle data! vehicle_id: "..tostring(vehicle_id), true, 1)
+	-- commented out cause we dont need the vehicle to be loaded to create the prefab, as we can make it partially if its not loaded.
+	--[[if not got_loaded_data then
+		d.print("(Vehicle.createPrefab) failed to get loaded vehicle data! vehicle_id: "..tostring(vehicle_id), true, 1)
 		return nil, false
-	end
+	end]]
 
-	local vehicle_object, squad, squad_index = Squad.getVehicle(vehicle_id)
+	local vehicle_object, _, _ = Squad.getVehicle(group_id)
 
 	if not vehicle_object then
-		d.print("(Vehicle.createPrefab) failed to get vehicle_object! vehicle_id: "..tostring(vehicle_id), true, 1)
+		d.print("(Vehicle.createPrefab) failed to get vehicle_object! group_id: "..tostring(group_id), true, 1)
 		return nil, false
+	end
+
+	-- set the fully created variable
+	fully_created = true
+
+	-- if voxels is nil or 0, then set fully_created to false
+	if not loaded_data.voxels or loaded_data.voxels == 0 then
+		fully_created = false
+	end
+
+	-- if mass is nil or 0, then set fully_created to false
+	if not loaded_data.mass or loaded_data.mass == 0 then
+		fully_created = false
 	end
 
 	---@class prefab
 	local prefab = {
-		voxels = vehicle_data.voxels,
-		mass = vehicle_data.mass,
+		voxels = loaded_data.voxels,
+		mass = loaded_data.mass,
 		powertrain_types = v.getPowertrainTypes(vehicle_object),
 		role = vehicle_object.role,
 		vehicle_type = vehicle_object.vehicle_type,
 		strategy = vehicle_object.strategy,
-		fully_created = (vehicle_data.mass ~= 0) -- requires to be loaded
+		fully_created = fully_created
 	}
 
 	g_savedata.prefabs[string.removePrefix(vehicle_object.name)] = prefab
@@ -294,7 +319,7 @@ function Vehicle.getCost(vehicle_name)
 end
 
 ---@param vehicle_object vehicle_object the vehicle_object of the vehicle you want to get the powertrain type of
----@return powertrain_types powertrain_types the powertrain type(s) of the vehicle
+---@return powertrain_types? powertrain_types the powertrain type(s) of the vehicle
 ---@return boolean got_powertrain_type if the powertrain type was found
 function Vehicle.getPowertrainTypes(vehicle_object)
 
@@ -303,16 +328,25 @@ function Vehicle.getPowertrainTypes(vehicle_object)
 		return nil, false
 	end
 
-	local _, got_vehicle_data = s.getVehicleData(vehicle_object.id)
+	-- get the vehicle's main body id
+	local main_vehicle_id = VehicleGroup.getMainVehicle(vehicle_object.group_id)
 
-	if not got_vehicle_data then
-		d.print("(Vehicle.getPowertrainType) failed to get vehicle data! name: "..tostring(vehicle_object.name).."\nid: "..tostring(vehicle_object.id), true, 1)
+	-- check if main_vehicle_id is nil
+	if not main_vehicle_id then
+		d.print("(Vehicle.getPowertrainType) failed to get main vehicle id! group_id: "..tostring(vehicle_object.group_id), true, 1)
 		return nil, false
 	end
 
-	local _, is_jet = s.getVehicleTank(vehicle_object.id, "Jet 1")
+	local _, got_vehicle_data = s.getVehicleData(main_vehicle_id)
 
-	local _, is_diesel = s.getVehicleTank(vehicle_object.id, "Diesel 1")
+	if not got_vehicle_data then
+		d.print("(Vehicle.getPowertrainType) failed to get vehicle data! name: "..tostring(vehicle_object.name).."\nid: "..tostring(vehicle_object.group_id), true, 1)
+		return nil, false
+	end
+
+	local _, is_jet = s.getVehicleTank(main_vehicle_id, "Jet 1")
+
+	local _, is_diesel = s.getVehicleTank(main_vehicle_id, "Diesel 1")
 
 	---@class powertrain_types
 	local powertrain_types = {
@@ -327,7 +361,7 @@ end
 ---@param requested_prefab string? vehicle name or vehicle role, such as scout, will try to spawn that vehicle or type
 ---@param vehicle_type string? the vehicle type you want to spawn, such as boat, leave nil to ignore
 ---@param force_spawn boolean? if you want to force it to spawn, it will spawn at the ai's main base
----@param specified_island ISLAND? the island you want it to spawn at
+---@param specified_island ISLAND|AI_ISLAND? the island you want it to spawn at
 ---@param purchase_type integer? 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_object|string vehicle_object the vehicle's data if the the vehicle successfully spawned, otherwise its returns the error code
@@ -714,15 +748,16 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		--d.print("selected_spawn: "..selected_spawn, true, 0)
 
 		---@class vehicle_object
-		local vehicle_data = { 
-			id = spawned_objects.spawned_vehicle.id,
+		local vehicle_data = {
+			---@type integer
+			group_id = spawned_objects.spawned_vehicle.id,
 			name = selected_prefab.location_data.name,
 			home_island = g_savedata.islands[selected_spawn] or g_savedata.ai_base_island,
 			survivors = {},
-			path = { 
+			path = {
 				[0] = {
-					x = home_x, 
-					y = home_y, 
+					x = home_x,
+					y = home_y,
 					z = home_z
 				} 
 			},
@@ -739,10 +774,10 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				}
 			},
 			previous_squad = nil,
-			ui_id = s.getMapID(),
+			ui_id = server.getMapID() --[[@as SWUI_ID]],
 			vehicle_type = spawned_objects.spawned_vehicle.vehicle_type,
-			variation = Tags.getValue(selected_prefab.vehicle.tags, "variation", true) or "normal",
-			role = Tags.getValue(selected_prefab.vehicle.tags, "role", true) or "general",
+			variation = Tags.getValue(selected_prefab.vehicle.tags, "variation", true) or "normal" --[[@as string]],
+			role = Tags.getValue(selected_prefab.vehicle.tags, "role", true) or "general" --[[@as string]],
 			size = spawned_objects.spawned_vehicle.size or "small",
 			main_body = Tags.getValue(selected_prefab.vehicle.tags, "main_body") or 0,
 			holding_index = 1,
@@ -753,8 +788,8 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				purchase_type = purchase_type
 			},
 			vision = { 
-				radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
-				base_radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or VISIBLE_DISTANCE) * stats_multiplier,
+				radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or 500) * stats_multiplier,
+				base_radius = (Tags.getValue(selected_prefab.vehicle.tags, "visibility_range") or 500) * stats_multiplier,
 				is_radar = Tags.has(selected_prefab.vehicle.tags, "radar") and stats_multiplier >= 0.8,
 				is_sonar = Tags.has(selected_prefab.vehicle.tags, "sonar")
 			},
@@ -777,12 +812,15 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				}
 			},
 			is_aggressive = false,
+			---@type string?
+			terrain_type = nil,
 			is_killed = false,
 			just_strafed = true, -- used for fighter jet strafing
-			strategy = Tags.getValue(selected_prefab.vehicle.tags, "strategy", true) or "general",
+			---@type string
+			strategy = Tags.getValue(selected_prefab.vehicle.tags, "strategy", true) --[[@as string]] or "general",
 			can_offroad = Tags.has(selected_prefab.vehicle.tags, "can_offroad"),
 			is_resupply_on_load = false,
-			transform = spawn_transform,
+			transform = spawn_transform --[[@as SWMatrix]],
 			transform_history = {},
 			target_vehicle_id = nil,
 			target_player_id = nil,
@@ -836,10 +874,10 @@ end
 
 -- spawns a ai vehicle, if it fails then it tries again, the amount of times it retrys is how ever many was given
 ---@param requested_prefab any vehicle name or vehicle role, such as scout, will try to spawn that vehicle or type
----@param vehicle_type string the vehicle type you want to spawn, such as boat, leave nil to ignore
----@param force_spawn boolean if you want to force it to spawn, it will spawn at the ai's main base
----@param specified_island ISLAND the island you want it to spawn at
----@param purchase_type integer the way you want to purchase the vehicle 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
+---@param vehicle_type string? the vehicle type you want to spawn, such as boat, leave nil to ignore
+---@param force_spawn boolean? if you want to force it to spawn, it will spawn at the ai's main base
+---@param specified_island ISLAND? the island you want it to spawn at
+---@param purchase_type integer? the way you want to purchase the vehicle 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@param retry_count integer how many times to retry spawning the vehicle if it fails
 ---@return boolean|nil spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_object|nil vehicle_object the vehicle's data if the the vehicle successfully spawned, otherwise its nil
@@ -858,13 +896,13 @@ function Vehicle.spawnRetry(requested_prefab, vehicle_type, force_spawn, specifi
 end
 
 -- teleports a vehicle and all of the characters attached to the vehicle to avoid the characters being left behind
----@param vehicle_id integer the id of the vehicle which to teleport
+---@param group_id integer the id of the vehicle which to teleport
 ---@param transform SWMatrix where to teleport the vehicle and characters to
 ---@return boolean is_success if it successfully teleported all of the vehicles and characters
-function Vehicle.teleport(vehicle_id, transform)
+function Vehicle.teleport(group_id, transform)
 
 	-- make sure vehicle_id is not nil
-	if not vehicle_id then
+	if not group_id then
 		d.print("(Vehicle.teleport) vehicle_id is nil!", true, 1)
 		return false
 	end
@@ -875,12 +913,12 @@ function Vehicle.teleport(vehicle_id, transform)
 		return false
 	end
 
-	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	local vehicle_object, squad_index, squad = Squad.getVehicle(group_id)
 
 	local none_failed = true
 
 	if not vehicle_object then
-		d.print(("(Vehicle.teleport) failed to get vehicle_object! vehicle_id: %s returned squad_index: %s"):format(vehicle_id, squad_index), true, 1)
+		d.print(("(Vehicle.teleport) failed to get vehicle_object! vehicle_id: %s returned squad_index: %s"):format(group_id, squad_index), true, 1)
 		return false
 	end
 
@@ -894,37 +932,40 @@ function Vehicle.teleport(vehicle_id, transform)
 	end
 
 	-- set vehicle pos
-	local is_success = s.setVehiclePos(vehicle_id, transform)
+	local is_success = s.setGroupPos(group_id, transform)
 
 	if not is_success then
-		d.print("(Vehicle.teleport) failed to set vehicle position! vehicle_id: "..vehicle_id, true, 1)
+		d.print("(Vehicle.teleport) failed to set vehicle position! vehicle_id: "..group_id, true, 1)
 		none_failed = false
 	end
 
 	return none_failed
 end
 
----@param vehicle_id integer the id of the vehicle you want to kill
+---@param vehicle_object vehicle_object the vehicle object you want to kill
 ---@param kill_instantly boolean? if you want to kill the vehicle instantly, if not, it will despawn it when the vehicle is unloaded, or takes enough damage to explode
 ---@param force_kill boolean? if you want to forcibly kill the vehicle, if so, it will go without explosions, and will not affect the spawn modifiers. Used for things like ?impwep dv
 ---@return boolean is_success if it was able to successfully kill the vehicle
-function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
+function Vehicle.kill(vehicle_object, kill_instantly, force_kill)
 	local debug_prefix = "(Vehicle.kill) "
 
-	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	-- default to false if not specified.
+	kill_instantly = kill_instantly ~= nil and kill_instantly or false
+
+	local _, squad_index, squad = Squad.getVehicle(vehicle_object.group_id)
 
 	if not squad then
-		d.print(debug_prefix.."Failed to find the squad for vehicle "..tostring(vehicle_id), true, 1)
+		d.print(debug_prefix.."Failed to find the squad for group "..tostring(vehicle_object.group_id), true, 1)
 		return false
 	end
 
 	if not squad_index then
-		d.print(debug_prefix.."Failed to get the squad_index for vehicle "..tostring(vehicle_id), true, 1)
+		d.print(debug_prefix.."Failed to get the squad_index for group "..tostring(vehicle_object.group_id), true, 1)
 		return false
 	end
 
 	if not vehicle_object then
-		d.print(debug_prefix.."Failed to get the vehicle_object for vehicle "..tostring(vehicle_id), true, 1)
+		d.print(debug_prefix.."Failed to get the vehicle_object for group "..tostring(vehicle_object.group_id), true, 1)
 		return false
 	end
 
@@ -933,19 +974,19 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 		return false
 	end]]
 
-	d.print(debug_prefix..vehicle_id.." from squad "..squad_index.." is out of action", true, 0)
+	d.print(debug_prefix..vehicle_object.group_id.." from squad "..squad_index.." is out of action", true, 0)
 
 	-- set the vehicle to say its been killed, and set its death_timer to 0.
 	vehicle_object.is_killed = true
 	vehicle_object.death_timer = 0
 
 	-- clean the cargo vehicle if it is one
-	Cargo.clean(vehicle_id)
+	Cargo.clean(vehicle_object.group_id)
 
 	-- if it is a scout vehicle, we want to reset its scouting progress on whatever island it was on
 	-- as it lost all of the data as it was killed.
 	if vehicle_object.role == "scout" then
-		local target_island, origin_island = Objective.getIslandToAttack(true)
+		local target_island, _ = Objective.getIslandToAttack(true)
 		if target_island then
 
 			-- reset the island's scouted %
@@ -980,7 +1021,7 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 				local ai_reward_ratio = ai_damage_dealt//(ai_damaged * 0.3333)
 				sm.train(
 					REWARD, 
-					vehicle_role, math.clamp(ai_reward_ratio, 1, 2),
+					vehicle_object.role, math.clamp(ai_reward_ratio, 1, 2),
 					vehicle_object.vehicle_type, math.clamp(ai_reward_ratio, 1, 3), 
 					vehicle_object.strategy, math.clamp(ai_reward_ratio, 1, 2), 
 					constructable_vehicle_id, math.clamp(ai_reward_ratio, 1, 3)
@@ -989,7 +1030,7 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 				local ai_punish_ratio = (ai_damaged * 0.3333)//ai_damage_dealt
 				sm.train(
 					PUNISH, 
-					vehicle_role, math.clamp(ai_punish_ratio, 1, 2),
+					vehicle_object.role, math.clamp(ai_punish_ratio, 1, 2),
 					vehicle_object.vehicle_type, math.clamp(ai_punish_ratio, 1, 3),
 					vehicle_object.strategy, math.clamp(ai_punish_ratio, 1, 2),
 					constructable_vehicle_id, math.clamp(ai_punish_ratio, 1, 3)
@@ -1013,8 +1054,27 @@ function Vehicle.kill(vehicle_id, kill_instantly, force_kill)
 		end
 
 		-- despawn the vehicle
-		s.despawnVehicle(vehicle_id, kill_instantly)
+		local is_success = s.despawnVehicleGroup(vehicle_object.group_id, kill_instantly)
 
+		-- despawning failed, panic as maybe we were given the vehicle_id instead.
+		if not is_success then
+			-- usually not good to use this function, but its used here as a fallback
+			local vehicle_data, is_success = server.getVehicleData(vehicle_object.group_id)
+
+			-- if even getting vehicle data failed, panic even more - try to see if we can find an associated group_id.
+			if not is_success then
+				local actual_group_id = g_savedata.libraries.vehicle_group.translations[vehicle_object.group_id]
+
+				-- if even this failed, just give up.
+				if actual_group_id then
+					-- try this one instead
+					server.despawnVehicleGroup(vehicle_object.group_id, kill_instantly)
+				end
+			else
+				-- we could get vehicle_data, so use the group_id from the vehicle_data
+				server.despawnVehicleGroup(vehicle_data.group_id, kill_instantly)
+			end
+		end
 		-- despawn all of the enemy AI NPCs
 		for _, object_id in pairs(vehicle_object.survivors) do
 			s.despawnObject(object_id, kill_instantly)

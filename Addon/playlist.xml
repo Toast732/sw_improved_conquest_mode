@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<playlist folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.4.0.dev)">
-	<locations location_id_counter="468" component_id_counter="10073">
+<playlist folder_path="data/missions/Improved_Conquest_Mode_Majour_Updates" file_store="4" name="Improved Conquest Mode (0.4.0.pre)">
+	<locations location_id_counter="469" component_id_counter="10073">
 		<locations>
 			<l id="75" name="Flag" env_mod_spawn_num="1">
 				<components>
@@ -7691,7 +7691,7 @@
 			<l id="30" name="TURRET - Swatter" env_mod_spawn_num="1">
 				<components>
 					<c component_type="3" id="603" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM,size=small,visibility_range=3000,spawning_radius=5,radar,health=425,main_body=1" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_603.xml" vehicle_file_store="4" vehicle_is_static="true">
-						<spawn_transform 30="-0.183271" 31="0.865812" 32="-0.183271"/>
+						<spawn_transform 30="-0.183271" 31="1.166875" 32="-0.183271"/>
 						<spawn_bounds>
 							<min x="-4.375" y="-2.125" z="-5.625"/>
 							<max x="2.375" y="2.125" z="0.125"/>
@@ -7705,11 +7705,11 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.242365" 31="1.278351" 32="-0.931301"/>
+						<vehicle_parent_transform 30="-0.242365" 31="0.977288" 32="-0.931301"/>
 						<graph_links/>
 					</c>
 					<c component_type="3" id="10061" name="type=dlc_weapons,vehicle_type=wep_turret,role=SAM,size=small,visibility_range=3000,spawning_radius=5,radar,health=425,main_body=1,variation=arid" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_name="data/missions_working/vehicle_10061.xml" vehicle_file_store="4" vehicle_is_static="true">
-						<spawn_transform 30="6.583567" 31="0.916585" 32="-0.286012"/>
+						<spawn_transform 30="6.583567" 31="1.181655" 32="-0.286012"/>
 						<spawn_bounds>
 							<min x="-4.375" y="-2.125" z="-5.625"/>
 							<max x="2.375" y="2.125" z="0.125"/>
@@ -7723,7 +7723,7 @@
 							<min x="-1" y="-1" z="-1"/>
 							<max x="1" y="1" z="1"/>
 						</spawn_bounds>
-						<vehicle_parent_transform 30="-0.148773" 31="1.193547" 32="-0.617927"/>
+						<vehicle_parent_transform 30="-0.148774" 31="0.928477" 32="-0.617927"/>
 						<graph_links/>
 					</c>
 				</components>
@@ -38314,7 +38314,7 @@
 						<graph_links/>
 					</c>
 					<c component_type="10" id="4343" cargo_zone_import_cargo_type="turret,turret_type=SAM" dynamic_object_type="2" character_outfit_category="11" character_type="1" vehicle_file_store="1">
-						<spawn_transform 30="378.436584" 31="9.180485" 32="211.248886"/>
+						<spawn_transform 00="0.989682" 01="0.143284" 10="-0.143284" 11="0.989682" 30="378.436584" 31="9.180485" 32="211.248886"/>
 						<spawn_bounds>
 							<min x="-5" y="-5" z="-5"/>
 							<max x="5" y="5" z="5"/>

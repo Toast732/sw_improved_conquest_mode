@@ -1,6 +1,6 @@
 --[[
 	
-Copyright 2023 Liam Matthews
+Copyright 2024 Liam Matthews
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -162,11 +162,11 @@ function VehicleFires.tickVehicles()
 
 	for _, squad in pairs(g_savedata.ai_army.squadrons) do
 		for _, vehicle_object in pairs(squad.vehicles) do
-			if not isTickID(vehicle_object.id, vehicle_fire_tickrate) then
+			if not isTickID(vehicle_object.group_id, vehicle_fire_tickrate) then
 				goto next_vehicle
 			end
 
-			local vehicle_fire_data = g_vehicle_fires.ai_vehicles_with_fires[vehicle_object.id]
+			local vehicle_fire_data = g_vehicle_fires.ai_vehicles_with_fires[vehicle_object.group_id]
 
 			-- if this vehicle doesn't have any data with this.
 			if not vehicle_fire_data then
@@ -222,7 +222,7 @@ function VehicleFires.tickVehicles()
 				-- if this fire hit it's despawn timer
 				if g_savedata.tick_counter - ai_fire_data.spawned_at >= fire_despawn_timer * ai_fire_data.despawn_timer_multiplier then
 					-- despawn it, as it's hit it's despawn timer
-					d.print(("Removing fire %s from vehicle id %s as its reached its despawn timer."):format(ai_fire_data.object_id, vehicle_object.id), true, 0)
+					d.print(("Removing fire %s from vehicle id %s as its reached its despawn timer."):format(ai_fire_data.object_id, vehicle_object.group_id), true, 0)
 
 					VehicleFires.removeAIFire(ai_fire_data)
 				end

@@ -481,7 +481,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						-- they specified a type of vehicle to spawn
 							successfully_spawned, vehicle_data = v.spawn(nil, string.lower(arg[1]), true)
 					end
-					if successfully_spawned then
+					if successfully_spawned and type(vehicle_data) == "table" then
 						-- if the player didn't specify where to spawn it
 						if arg[2] == nil then
 							goto onCustomCommand_spawnVehicle_spawnNext
@@ -497,11 +497,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 										local new_location, found_new_location = s.getOceanTransform(player_pos, arg[3], arg[4])
 										if found_new_location then
 											-- teleport vehicle to new position
-											v.teleport(vehicle_data.id, new_location)
+											v.teleport(vehicle_data.group_id, new_location)
 											d.print("Spawned "..vehicle_data.name.." at x:"..new_location[13].." y:"..new_location[14].." z:"..new_location[15], false, 0, peer_id)
 										else
 											-- delete vehicle as it was unable to find a valid position
-											v.kill(vehicle_data.id, true, true)
+											v.kill(vehicle_data, true, true)
 											d.print("unable to find a valid area to spawn the ship! Try increasing the radius!", false, 1, peer_id)
 										end
 									elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
@@ -517,47 +517,47 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 										end
 										--]]
 										d.print("Sorry! As of now you are unable to select a spawn zone for land vehicles! this functionality will be added soon!", false, 1, peer_id)
-										v.kill(vehicle_data.id, true, true)
+										v.kill(vehicle_data, true, true)
 									else
 										local player_pos = s.getPlayerPos(peer_id)
 										vehicle_data.transform[13] = player_pos[13] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- x
 										vehicle_data.transform[14] = vehicle_data.transform[14] * 1.5 -- y
 										vehicle_data.transform[15] = player_pos[15] + math.random(-math.random(arg[3], arg[4]), math.random(arg[3], arg[4])) -- z
-										v.teleport(vehicle_data.id, vehicle_data.transform)
+										v.teleport(vehicle_data.group_id, vehicle_data.transform)
 										d.print("Spawned "..vehicle_data.name.." at x:"..vehicle_data.transform[13].." y:"..vehicle_data.transform[14].." z:"..vehicle_data.transform[15], false, 0, peer_id)
 									end
 								else
 									d.print("your maximum range must be greater or equal to the minimum range!", false, 1, peer_id)
-									v.kill(vehicle_data.id, true, true)
+									v.kill(vehicle_data, true, true)
 								end
 							else
 								d.print("the minimum range must be at least 150!", false, 1, peer_id)
-								v.kill(vehicle_data.id, true, true)
+								v.kill(vehicle_data, true, true)
 							end
 						else
 							if tonumber(arg[2]) and tonumber(arg[2]) >= 0 or tonumber(arg[2]) and tonumber(arg[2]) <= 0 then -- the player selected specific coordinates
 								if tonumber(arg[3]) and tonumber(arg[3]) >= 0 or tonumber(arg[3]) and tonumber(arg[3]) <= 0 then
 									if vehicle_data.vehicle_type == VEHICLE.TYPE.BOAT then
 										local new_pos = m.translation(arg[2], 0, arg[3])
-										v.teleport(vehicle_data.id, new_pos)
+										v.teleport(vehicle_data.group_id, new_pos)
 										vehicle_data.transform = new_pos
 										d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:0 z:"..arg[3], false, 0, peer_id)
 									elseif vehicle_data.vehicle_type == VEHICLE.TYPE.LAND then
 										d.print("sorry! but as of now you are unable to specify the coordinates of where to spawn a land vehicle!", false, 1, peer_id)
-										v.kill(vehicle_data.id, true, true)
+										v.kill(vehicle_data, true, true)
 									else -- air vehicle
 										local new_pos = m.translation(arg[2], CRUISE_HEIGHT * 1.5, arg[3])
-										v.teleport(vehicle_data.id, new_pos)
+										v.teleport(vehicle_data.group_id, new_pos)
 										vehicle_data.transform = new_pos
 										d.print("Spawned "..vehicle_data.name.." at x:"..arg[2].." y:"..(CRUISE_HEIGHT*1.5).." z:"..arg[3], false, 0, peer_id)
 									end
 								else
 									d.print("invalid z coordinate: "..tostring(arg[3]), false, 1, peer_id)
-									v.kill(vehicle_data.id, true, true)
+									v.kill(vehicle_data, true, true)
 								end
 							else
 								d.print("invalid x coordinate: "..tostring(arg[2]), false, 1, peer_id)
-								v.kill(vehicle_data.id, true, true)
+								v.kill(vehicle_data, true, true)
 							end
 						end
 					else
@@ -749,7 +749,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 								-- refund the cargo to the island which was sending the cargo
 								Cargo.refund(vehicle_id)
 
-								v.kill(vehicle_id, true, true)
+								v.kill(vehicle_object, true, true)
 								vehicle_counter = vehicle_counter + 1
 							end
 						end
@@ -769,7 +769,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 						-- refund the cargo to the island which was sending the cargo
 						Cargo.refund(tonumber(arg[1]))
 
-						v.kill(tonumber(arg[1]), true, true)
+						v.kill(vehicle_object, true, true)
 						d.print("Sucessfully deleted vehicle "..arg[1].." name: "..vehicle_object.name, false, 0, peer_id)
 					else
 						d.print("Unable to find vehicle with id "..arg[1]..", double check the ID!", false, 1, peer_id)
@@ -909,10 +909,10 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 								for cargo_vehicle_id, cargo_vehicle in pairs(g_savedata.cargo_vehicles) do
 
 									-- kill cargo vehicle
-									v.kill(cargo_vehicle.vehicle_data.id, true, true)
+									v.kill(cargo_vehicle.vehicle_data, true, true)
 
 									-- reset the squad's command
-									local squad_index, _ = Squad.getSquad(cargo_vehicle.vehicle_data.id)
+									local squad_index, _ = Squad.getSquad(cargo_vehicle.vehicle_data)
 									g_savedata.ai_army.squadrons[squad_index].command = SQUAD.COMMAND.NONE
 								end
 							end
@@ -1153,7 +1153,7 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 				for _, squad in pairs(g_savedata.ai_army.squadrons) do
 					for _, vehicle_object in pairs(squad.vehicles) do
 						if vehicle_object.state.is_simulating then
-							igniteVehicle(vehicle_object.id)
+							igniteVehicle(vehicle_object.group_id)
 						end
 					end
 				end
