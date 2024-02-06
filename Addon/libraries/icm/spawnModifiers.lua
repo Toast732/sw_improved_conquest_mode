@@ -180,6 +180,12 @@ end
 ---@param constructable_vehicle_id integer? the index of the vehicle in the constructable vehicle list
 ---@param vehicle_reinforcement integer? how much to reinforce the vehicle, 1-5
 function SpawnModifiers.train(reinforcement_type, role, role_reinforcement, type, type_reinforcement, strategy, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
+	-- Check if the role exists
+	if not g_savedata.constructable_vehicles[role] then
+		-- If not, return.
+		return
+	end
+	
 	if reinforcement_type == PUNISH then
 		if role and role_reinforcement then
 			d.print("punished role:"..role.." | amount punished: "..ai_training.punishments[role_reinforcement], true, 0)

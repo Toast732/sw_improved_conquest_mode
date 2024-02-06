@@ -86,6 +86,10 @@ function Debugging.print(message, requires_debug, debug_type, peer_id) -- "glori
 
 		-- swap back to modified environment
 		_ENV = _ENV_MODIFIED
+		-- Remove _ENV_MODIFIED from env, as it will contain itself over and over, without this, trying to disable tracebacks after, will result in a stack overflow.
+		_ENV_MODIFIED = nil
+		-- Also remove __ENV, for the same reason as above.
+		__ENV = nil
 	end
 end
 
@@ -509,6 +513,8 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
+			g_savedata.foo_bar = true
+
 			--onTick = setupTraceback(onTick, "onTick")
 
 			-- add the error checker
@@ -531,6 +537,10 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 						-- swap back to modified environment
 						_ENV = _ENV_MODIFIED
+						-- Remove _ENV_MODIFIED from env, as it will contain itself over and over, without this, trying to disable tracebacks after, will result in a stack overflow.
+						_ENV_MODIFIED = nil
+						-- Also remove __ENV, for the same reason as above.
+						__ENV = nil
 
 						g_savedata.debug.traceback.stack_size = 0
 					end
@@ -540,6 +550,8 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			)
 
 			ac.sendCommunication("DEBUG.TRACEBACK.ERROR_CHECKER", 0)
+
+			return "Enabled Tracebacks"
 		elseif not enabled and _ENV_NORMAL then
 			-- revert modified _ENV functions to be the non modified _ENV
 			--- @param t table the environment thats not been modified, will take all of the functions from this table and put it into the current _ENV
@@ -561,13 +573,31 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 			_ENV = removeTraceback(_ENV_NORMAL, _ENV)]]
 
-			__ENV = _ENV_NORMAL.table.copy.deep(_ENV_NORMAL, _ENV_NORMAL)
+			--[[d.print("Loading _ENV_NORMAL into _ENV...", true, 0)
+
+			-- Remove _ENV_MODIFIED from _ENV_NORMAL, to prevent potential infinite recursion when creating a deep copy.
+			_ENV_NORMAL._ENV_MODIFIED = nil
+
+			__ENV = _ENV_NORMAL.table.copy.deep(_ENV_NORMAL, _ENV_NORMAL, true)
 			__ENV.g_savedata = g_savedata
 			_ENV = __ENV
 
-			_ENV_NORMAL = nil
+			_ENV_NORMAL = nil]]
+
+			--[[
+				It seems that i'd have to figure out a system to only rollback functions, but keep variables.
+					however, some functions may not exist until after tracebacks are setup, which while would mean that
+					they wouldn't have tracebacks injected, would also mean we'd have to figure out if they already exist,
+					that way we can carry them over.
+
+				But instead, of making a super complex system, we could just disable tracebacks, and then just get the player to
+					reload scripts, which would be much simpler and less prone to bugs.
+
+				So thats the route I took.
+			]]
+
+			return "Tracebacks are set to be disabled, You must run \"?reload_scripts\" to finish disabling tracebacks."
 		end
-		return (enabled and "Enabled" or "Disabled").." Tracebacks"
 	end
 end
 
@@ -649,9 +679,24 @@ function Debugging.setDebug(debug_id, peer_id, override_state)
 			end
 			return (none_true and "Enabled" or "Disabled").." All Debug"
 		else
-			player_data.debug[debug_types[debug_id]] = override_state == nil and not player_data.debug[debug_types[debug_id]] or override_state
+			--[[
+				Set the player's debug state.
+			]]
 
+			-- Get the debug's name from it's id
+			local debug_name = debug_types[debug_id]
+
+			-- If the override state is unspecified, invert the player's current debug option.
+			if override_state == nil then
+				player_data.debug[debug_name] = not player_data.debug[debug_name]
+			-- Otherwise, set the player's debug option to the override_state.
+			else
+				player_data.debug[debug_name] = override_state
+			end
+			
+			-- if it's enabled for this player
 			if player_data.debug[debug_types[debug_id]] then
+				-- enable it globally
 				g_savedata.debug[debug_types[debug_id]].enabled = true
 			else
 				d.checkDebug()

@@ -26,7 +26,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.24)"
+ADDON_VERSION = "(0.4.0.25)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1416,6 +1416,24 @@ function onVehicleDespawn(vehicle_id, peer_id)
 		return
 	end
 
+	--[[
+		Don't despawn the vehicle if the vehicle_id that was despawned, is not the main vehicle_id of this vehicle.
+	]]
+
+	-- Get the main vehicle_id.
+	local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+	-- ensure we got the main_vehicle_id
+	if not main_vehicle_id then
+		d.print("(onVehicleDespawn) main_vehicle_id is nil", true, 1)
+		return
+	end
+
+	-- If the vehicle_ids are not equal, return, as it wasn't the main_vehicle_id which was despawned.
+	if main_vehicle_id ~= vehicle_id then
+		return
+	end
+
 	local vehicle_object, squad_index, squad = Squad.getVehicle(group_id)
 	d.print("(onVehicleDespawn) group_id: "..group_id.." peer_id: "..peer_id, true, 0)
 	if vehicle_object and squad_index then
@@ -2753,11 +2771,11 @@ function tickSquadrons(game_ticks)
 					end
 
 					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
-					local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+					local vehicle_component_data, is_success = server.getVehicleComponents(vehicle_id)
 
-					if is_success and vehicle_data.components and vehicle_data.components.guns then
-						for gun_index = 1, #vehicle_data.components.guns do
-							local gun_data = vehicle_data.components.guns[gun_index]
+					if is_success and vehicle_component_data.components and vehicle_component_data.components.guns then
+						for gun_index = 1, #vehicle_component_data.components.guns do
+							local gun_data = vehicle_component_data.components.guns[gun_index]
 
 							-- if this is a gun that might need reloading
 							if gun_data.ammo == 0 and (gun_data.name:match("^Ammo %d+$") or (gun_data.name:match("^Gunner %d+$"))) then
@@ -2765,8 +2783,8 @@ function tickSquadrons(game_ticks)
 								-- the target weapons we can reload from
 								local ammo_group = tonumber(table.pack(gun_data.name:gsub("[%a ]+", ""))[1])
 								local target_pattern = ("Reserve Ammo %i"):format(ammo_group)
-								for reserve_ammo_index = 1, #vehicle_data.components.guns do
-									local reserve_ammo_data = vehicle_data.components.guns[reserve_ammo_index]
+								for reserve_ammo_index = 1, #vehicle_component_data.components.guns do
+									local reserve_ammo_data = vehicle_component_data.components.guns[reserve_ammo_index]
 
 									-- we can reload from this weapon
 									if gun_index ~= reserve_ammo_index and reserve_ammo_data.ammo ~= 0 and reserve_ammo_data.name:match(target_pattern) then
@@ -4505,9 +4523,10 @@ function tickVehicleCleaner()
 			if isTickID(vehicle_object.group_id, 240) then
 				local main_vehicle_id = VehicleGroup.getMainVehicle(vehicle_object.group_id)
 
-				-- Ensure we got the main_vehicle_id
+				-- Delete the vehicle if we failed to get it's main_vehicle_id, as it likely does not exist anymore.
 				if not main_vehicle_id then
-					d.print(("main_vehicle_id is nil! group_id: %s"):format(vehicle_object.group_id), true, 1)
+					d.print(("Vehicle Cleaner found invalid vehicle with group_id: %s (failed to get main_vehicle_id), Deleting."):format(vehicle_object.group_id), true, 1)
+					deleteVehicle(vehicle_object, squad_index)
 					goto continue
 				end
 
@@ -5413,11 +5432,11 @@ function isVehicleNeedsReload(vehicle_id)
 
 	local guns_to_reload = {}
 
-	local vehicle_data, is_success = s.getVehicleData(vehicle_id)
+	local vehicle_component_data, is_success = server.getVehicleComponents(vehicle_id)
 	if is_success then
-		if vehicle_data.components and vehicle_data.components.buttons then
-			for i = 1, #vehicle_data.components.buttons do
-				local button = vehicle_data.components.buttons[i]
+		if vehicle_component_data.components and vehicle_component_data.components.buttons then
+			for i = 1, #vehicle_component_data.components.buttons do
+				local button = vehicle_component_data.components.buttons[i]
 				if button.on and button.name:match("AI_RELOAD_AMMO_") then
 					table.insert(guns_to_reload, tonumber(button.name:gsub("AI_RELOAD_AMMO_", "")))
 				end
