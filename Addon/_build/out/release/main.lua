@@ -44,7 +44,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.25)"
+ADDON_VERSION = "(0.4.0.26)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -881,6 +881,7 @@ Flag.registerPermission(
 ]]
 
 -- required libraries
+--require("libraries.addon.script.debugging")
 
 -- library name
 AddonCommunication = {}
@@ -906,6 +907,14 @@ replies_awaiting = {}
 
 ]]
 
+---@class ReplyAwaiting
+---@field short_addon_name string the addon's short name of the addon we're trying to listen to, so if we're trying to listen to Improved Conquest Mode, this would be "ICM"
+---@field message string the message to listen for, the execute_function will only be called if its an exact match.
+---@field port integer the port number, in the range of 0-65535. Calls to port 0 will result in it being called the very next tick.
+---@field execute_function fun(self: ReplyAwaiting) the function to execute when the message is received
+---@field count integer the number of times the function can be executed, -1 for infinite.
+---@field expiry number the time in milliseconds before the function expires, -1 for infinite.
+
 --[[
 
 
@@ -914,14 +923,18 @@ replies_awaiting = {}
 
 ]]
 
+--- Defines the function and criteria for a reply callback to be executed when a specific message is received.
+---@param short_addon_name string the addon's short name of the addon we're trying to listen to, so if we're trying to listen to Improved Conquest Mode, this would be "ICM"
+---@param message string the message to listen for, the execute_function will only be called if its an exact match.
+---@param port integer the port number, in the range of 0-65535. Calls to port 0 will result in it being called the very next tick.
+---@param execute_function fun(self: ReplyAwaiting) the function to execute when the message is received
+---@param count integer? the number of times the function can be executed, -1 for infinite (default 1)
+---@param timeout number? the time in seconds before the function expires, -1 for infinite (default -1)
 function AddonCommunication.executeOnReply(short_addon_name, message, port, execute_function, count, timeout)
-	short_addon_name = short_addon_name or SHORT_ADDON_NAME-- default to this addon's short name
 	if not message then
 		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
 		return
 	end
-
-	port = port or 0
 
 	if not execute_function then
 		d.print("(AddonCommunication.executeOnReply) execute_function was left blank!", true, 1)
@@ -3161,7 +3174,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			local start_traceback_setup_time = s.getTimeMillisec()
 
 			-- modify all functions in _ENV to have the debug "injected"
-			_ENV = setupTraceback(table.copy.deep(_ENV))
+			--_ENV = setupTraceback(table.copy.deep(_ENV))
 
 			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
@@ -3170,7 +3183,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			--onTick = setupTraceback(onTick, "onTick")
 
 			-- add the error checker
-			ac.executeOnReply(
+			AddonCommunication.executeOnReply(
 				SHORT_ADDON_NAME,
 				"DEBUG.TRACEBACK.ERROR_CHECKER",
 				0,
@@ -3179,12 +3192,14 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					if not g_savedata.debug.traceback.enabled then
 						self.count = 0
 
+					-- Otherwise, tracebacks are enabled, and the stack is not empty, that means that an error occured, so print the stack.
 					elseif g_savedata.debug.traceback.stack_size > 0 then
 						-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
-						__ENV =  _ENV_NORMAL
+						__ENV = _ENV_NORMAL
 						__ENV._ENV_MODIFIED = _ENV
 						_ENV = __ENV
 
+						-- Print the stack.
 						d.trace.print(_ENV_MODIFIED)
 
 						-- swap back to modified environment
@@ -3194,6 +3209,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						-- Also remove __ENV, for the same reason as above.
 						__ENV = nil
 
+						-- Set stack size to 0.
 						g_savedata.debug.traceback.stack_size = 0
 					end
 				end,
@@ -5361,17 +5377,17 @@ function Island.canSpawn(island, selected_prefab)
 end
 
 --# returns the island data from the provided flag vehicle id (warning: if you modify the returned data, it will not apply anywhere else, and will be local to that area.)
----@param vehicle_id integer the vehicle_id of the island's flag vehicle
+---@param group_id integer the group_id of the island's flag vehicle
 ---@return ISLAND|AI_ISLAND|PLAYER_ISLAND|nil island the island the flag vehicle belongs to
 ---@return boolean got_island if the island was gotten
-function Island.getDataFromVehicleID(vehicle_id)
-	if g_savedata.ai_base_island.flag_vehicle.id == vehicle_id then
+function Island.getDataFromGroupID(group_id)
+	if g_savedata.ai_base_island.flag_vehicle.group_id == group_id then
 		return g_savedata.ai_base_island, true
-	elseif g_savedata.player_base_island.flag_vehicle.id == vehicle_id then
+	elseif g_savedata.player_base_island.flag_vehicle.group_id == group_id then
 		return g_savedata.player_base_island, true
 	else
 		for _, island in pairs(g_savedata.islands) do
-			if island.flag_vehicle.id == vehicle_id then
+			if island.flag_vehicle.group_id == group_id then
 				return island, true
 			end
 		end
@@ -6513,6 +6529,28 @@ SpawnModifiers = {}
 -- shortened library name
 sm = SpawnModifiers
 
+--[[
+
+
+	Constants
+
+
+]]
+
+-- The smallest value the spawn modifier can be.
+MIN_MODIFIER_VALUE = 0.1
+
+-- The largest value the spawn modifier can be.
+MAX_MODIFIER_VALUE = 1.5
+
+--[[
+
+
+	Variables
+
+
+]]
+
 local default_mods = {
 	attack = 0.55,
 	general = 1,
@@ -6540,7 +6578,7 @@ function SpawnModifiers.create() -- populates the constructable vehicles with th
 					g_savedata.constructable_vehicles[role][veh_type].mod = 1
 				end
 			end
-			g_savedata.constructable_vehicles[role].mod = default_mods[role]
+			g_savedata.constructable_vehicles[role].mod = default_mods[role] or 1
 		end
 	end
 end
@@ -6675,56 +6713,145 @@ function SpawnModifiers.getVehicleListID(vehicle_name)
 end
 
 ---@param reinforcement_type string \"punish\" to make it less likely to spawn, \"reward\" to make it more likely to spawn
----@param role string the role of the vehicle, such as attack, general or defend
+---@param role_name string the role of the vehicle, such as attack, general or defend
 ---@param role_reinforcement integer how much to reinforce the role of the vehicle, 1-5
 ---@param type string? the vehicle type, such as boat, plane, heli, land or turret
 ---@param type_reinforcement integer? how much to reinforce the type of the vehicle, 1-5
----@param strategy string? strategy of the vehicle, such as strafe, bombing or general
+---@param strategy_name string? strategy of the vehicle, such as strafe, bombing or general
 ---@param strategy_reinforcement integer? how much to reinforce the strategy of the vehicle, 1-5
 ---@param constructable_vehicle_id integer? the index of the vehicle in the constructable vehicle list
 ---@param vehicle_reinforcement integer? how much to reinforce the vehicle, 1-5
-function SpawnModifiers.train(reinforcement_type, role, role_reinforcement, type, type_reinforcement, strategy, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
+function SpawnModifiers.train(reinforcement_type, role_name, role_reinforcement, type_name, type_reinforcement, strategy_name, strategy_reinforcement, constructable_vehicle_id, vehicle_reinforcement)
 	-- Check if the role exists
-	if not g_savedata.constructable_vehicles[role] then
+	if not g_savedata.constructable_vehicles[role_name] then
+		-- Print an error message.
+		d.print(("(SpawnModifiers.train) Requested to train vehicles with role %s, but theres no table for it in the g_savedata.constructable_vehicles table!"):format(role_name), true, 1)
 		-- If not, return.
 		return
 	end
-	
-	if reinforcement_type == PUNISH then
-		if role and role_reinforcement then
-			d.print("punished role:"..role.." | amount punished: "..ai_training.punishments[role_reinforcement], true, 0)
-			g_savedata.constructable_vehicles[role].mod = math.max(g_savedata.constructable_vehicles[role].mod + ai_training.punishments[role_reinforcement], 0)
-			if type and type_reinforcement then 
-				d.print("punished type:"..type.." | amount punished: "..ai_training.punishments[type_reinforcement], true, 0)
-				g_savedata.constructable_vehicles[role][type].mod = math.max(g_savedata.constructable_vehicles[role][type].mod + ai_training.punishments[type_reinforcement], 0.05)
-				if strategy and strategy_reinforcement then 
-					d.print("punished strategy:"..strategy.." | amount punished: "..ai_training.punishments[strategy_reinforcement], true, 0)
-					g_savedata.constructable_vehicles[role][type][strategy].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.punishments[strategy_reinforcement], 0.05)
-					if constructable_vehicle_id and vehicle_reinforcement then 
-						d.print("punished vehicle:"..constructable_vehicle_id.." | amount punished: "..ai_training.punishments[vehicle_reinforcement], true, 0)
-						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.max(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.punishments[vehicle_reinforcement], 0.05)
-					end
-				end
-			end
-		end
-	elseif reinforcement_type == REWARD then
-		if role and role_reinforcement then
-			d.print("rewarded role:"..role.." | amount rewarded: "..ai_training.rewards[role_reinforcement], true, 0)
-			g_savedata.constructable_vehicles[role].mod = math.min(g_savedata.constructable_vehicles[role].mod + ai_training.rewards[role_reinforcement], 1.5)
-			if type and type_reinforcement then 
-				d.print("rewarded type:"..type.." | amount rewarded: "..ai_training.rewards[type_reinforcement], true, 0)
-				g_savedata.constructable_vehicles[role][type].mod = math.min(g_savedata.constructable_vehicles[role][type].mod + ai_training.rewards[type_reinforcement], 1.5)
-				if strategy and strategy_reinforcement then 
-					d.print("rewarded strategy:"..strategy.." | amount rewarded: "..ai_training.rewards[strategy_reinforcement], true, 0)
-					g_savedata.constructable_vehicles[role][type][strategy].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy].mod + ai_training.rewards[strategy_reinforcement], 1.5)
-					if constructable_vehicle_id and vehicle_reinforcement then 
-						d.print("rewarded vehicle:"..constructable_vehicle_id.." | amount rewarded: "..ai_training.rewards[vehicle_reinforcement], true, 0)
-						g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod = math.min(g_savedata.constructable_vehicles[role][type][strategy][constructable_vehicle_id].mod + ai_training.rewards[vehicle_reinforcement], 1.5)
-					end
-				end
-			end
-		end
+
+	-- Get the role data
+	local role_data = g_savedata.constructable_vehicles[role_name]
+
+	-- Check if the modifier value for this role exists.
+	if not role_data.mod then
+		-- Print a warning message.
+		d.print(("(SpawnModifiers.train) Requested to train vehicles with role %s, but theres no modifier for it! This shouldn't be happening, but it's been added now to avoid an error."):format(role_name), true, 0)
+		
+		-- Create the modifier value for this role
+		role_data.mod = 1
 	end
+
+	-- Get the feedback depending on if this is punishment or reward.
+	local feedback_data = reinforcement_type == REWARD and ai_training.rewards or ai_training.punishments
+
+	-- Get the feedback type string
+	local feedback_type = reinforcement_type == REWARD and "Rewarded" or "Punished"
+
+	--[[
+		Vehicle Role
+	]]
+
+	-- If role_name or role_reinforcement was not specified, return early.
+	if not role_name or not role_reinforcement then
+		return
+	end
+
+	-- Apply the feedback to the role modifier
+	role_data.mod = math.clamp(role_data.mod + feedback_data[role_reinforcement], MIN_MODIFIER_VALUE, MAX_MODIFIER_VALUE)
+
+	-- Print
+	d.print(("%s Role: %s | Amount %s: %s"):format(feedback_type, role_name, feedback_type, feedback_data[role_reinforcement]), true, 0)
+
+	--[[
+		Vehicle Type
+	]]
+
+	-- If type_name or type_reinforcement was not specified, return early.
+	if not type_name or not type_reinforcement then
+		return
+	end
+
+	-- Get the type data
+	local type_data = role_data[type_name]
+
+	-- Apply the feedback to the type modifier
+	type_data.mod = math.clamp(type_data.mod + feedback_data[type_reinforcement], MIN_MODIFIER_VALUE, MAX_MODIFIER_VALUE)
+	
+	-- Print
+	d.print(("%s Type: %s | Amount %s: %s"):format(feedback_type, type_name, feedback_type, feedback_data[type_reinforcement]), true, 0)
+
+	--[[
+		Vehicle Strategy
+	]]
+
+	-- If strategy_name or strategy_reinforcement was not specified, return early.
+	if not strategy_name or not strategy_reinforcement then
+		return
+	end
+
+	-- Get the strategy data
+	local strategy_data = type_data[strategy_name]
+
+	-- Apply the feedback to the strategy modifier
+	strategy_data.mod = math.clamp(strategy_data.mod + feedback_data[strategy_reinforcement], MIN_MODIFIER_VALUE, MAX_MODIFIER_VALUE)
+	
+	-- Print
+	d.print(("%s Strategy: %s | Amount %s: %s"):format(feedback_type, strategy_name, feedback_type, feedback_data[strategy_reinforcement]), true, 0)
+
+	--[[
+		Vehicle
+	]]
+
+	-- If constructable_vehicle_id or vehicle_reinforcement was not specified, return early.
+	if not constructable_vehicle_id or not vehicle_reinforcement then
+		return
+	end
+
+	-- Get the vehicle_modifier data
+	local vehicle_modifier_data = strategy_data[constructable_vehicle_id]
+
+	-- Apply the feedback to the vehicle modifier
+	vehicle_modifier_data.mod = math.clamp(vehicle_modifier_data.mod + feedback_data[vehicle_reinforcement], MIN_MODIFIER_VALUE, MAX_MODIFIER_VALUE)
+	
+	-- Print
+	d.print(("%s Vehicle: %s | Amount %s: %s"):format(feedback_type, constructable_vehicle_id, feedback_type, feedback_data[vehicle_reinforcement]), true, 0)
+	
+	-- if reinforcement_type == PUNISH then
+	-- 	if role_name and role_reinforcement then
+	-- 		d.print("punished role:"..role_name.." | amount punished: "..ai_training.punishments[role_reinforcement], true, 0)
+	-- 		g_savedata.constructable_vehicles[role_name].mod = math.max(g_savedata.constructable_vehicles[role_name].mod + ai_training.punishments[role_reinforcement], 0)
+	-- 		if type and type_reinforcement then 
+	-- 			d.print("punished type:"..type.." | amount punished: "..ai_training.punishments[type_reinforcement], true, 0)
+	-- 			g_savedata.constructable_vehicles[role_name][type].mod = math.max(g_savedata.constructable_vehicles[role_name][type].mod + ai_training.punishments[type_reinforcement], 0.05)
+	-- 			if strategy_name and strategy_reinforcement then 
+	-- 				d.print("punished strategy:"..strategy_name.." | amount punished: "..ai_training.punishments[strategy_reinforcement], true, 0)
+	-- 				g_savedata.constructable_vehicles[role_name][type][strategy_name].mod = math.max(g_savedata.constructable_vehicles[role_name][type][strategy_name].mod + ai_training.punishments[strategy_reinforcement], 0.05)
+	-- 				if constructable_vehicle_id and vehicle_reinforcement then 
+	-- 					d.print("punished vehicle:"..constructable_vehicle_id.." | amount punished: "..ai_training.punishments[vehicle_reinforcement], true, 0)
+	-- 					g_savedata.constructable_vehicles[role_name][type][strategy_name][constructable_vehicle_id].mod = math.max(g_savedata.constructable_vehicles[role_name][type][strategy_name][constructable_vehicle_id].mod + ai_training.punishments[vehicle_reinforcement], 0.05)
+	-- 				end
+	-- 			end
+	-- 		end
+	-- 	end
+	-- elseif reinforcement_type == REWARD then
+	-- 	if role_name and role_reinforcement then
+	-- 		d.print("rewarded role:"..role_name.." | amount rewarded: "..ai_training.rewards[role_reinforcement], true, 0)
+	-- 		g_savedata.constructable_vehicles[role_name].mod = math.min(g_savedata.constructable_vehicles[role_name].mod + ai_training.rewards[role_reinforcement], 1.5)
+	-- 		if type and type_reinforcement then 
+	-- 			d.print("rewarded type:"..type.." | amount rewarded: "..ai_training.rewards[type_reinforcement], true, 0)
+	-- 			g_savedata.constructable_vehicles[role_name][type].mod = math.min(g_savedata.constructable_vehicles[role_name][type].mod + ai_training.rewards[type_reinforcement], 1.5)
+	-- 			if strategy_name and strategy_reinforcement then 
+	-- 				d.print("rewarded strategy:"..strategy_name.." | amount rewarded: "..ai_training.rewards[strategy_reinforcement], true, 0)
+	-- 				g_savedata.constructable_vehicles[role_name][type][strategy_name].mod = math.min(g_savedata.constructable_vehicles[role_name][type][strategy_name].mod + ai_training.rewards[strategy_reinforcement], 1.5)
+	-- 				if constructable_vehicle_id and vehicle_reinforcement then 
+	-- 					d.print("rewarded vehicle:"..constructable_vehicle_id.." | amount rewarded: "..ai_training.rewards[vehicle_reinforcement], true, 0)
+	-- 					g_savedata.constructable_vehicles[role_name][type][strategy_name][constructable_vehicle_id].mod = math.min(g_savedata.constructable_vehicles[role_name][type][strategy_name][constructable_vehicle_id].mod + ai_training.rewards[vehicle_reinforcement], 1.5)
+	-- 				end
+	-- 			end
+	-- 		end
+	-- 	end
+	-- end
 end
 
 ---@param peer_id integer the peer_id of the player who executed the command
@@ -11565,6 +11692,8 @@ function setupMain(is_world_create)
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for _, vehicle_object in pairs(squad.vehicles) do
+
+					-- Reset map for all of the vehicles
 					s.removeMapObject(-1, vehicle_object.ui_id)
 					s.removeMapLabel(-1, vehicle_object.ui_id)
 					s.removeMapLine(-1, vehicle_object.ui_id)
@@ -11574,6 +11703,9 @@ function setupMain(is_world_create)
 							s.removeMapLine(-1, waypoint.ui_id)
 						end
 					end
+
+					-- Reset the transform histories.
+					vehicle_object.transform_history = {}
 				end
 			end
 			s.removeMapObject(-1, g_savedata.player_base_island.ui_id)
@@ -12042,6 +12174,7 @@ end
 
 function onVehicleUnload(vehicle_id)
 	if not is_dlc_weapons then
+		d.print("(onVehicleUnload) is_dlc_weapons is false", true, 0)
 		return
 	end
 
@@ -12053,8 +12186,9 @@ function onVehicleUnload(vehicle_id)
 		return
 	end
 
-	local island, got_island = Island.getDataFromVehicleID(group_id)
+	local island, got_island = Island.getDataFromGroupID(group_id)
 	if got_island and island then
+		d.print(("Island %s was unloaded"):format(island.name), true, 0)
 		g_savedata.loaded_islands[island.index] = nil
 		return
 	end
@@ -12062,6 +12196,24 @@ function onVehicleUnload(vehicle_id)
 	local vehicle_object, squad_index, _ = Squad.getVehicle(group_id)
 
 	if squad_index and vehicle_object then
+
+		--[[
+			Don't mark the vehicle as unloaded if the vehicle_id that was unloaded, is not the main vehicle_id of this vehicle.
+		]]
+
+		-- Get the main vehicle_id.
+		local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+		-- ensure we got the main_vehicle_id
+		if not main_vehicle_id then
+			d.print("(onVehicleUnload) main_vehicle_id is nil", true, 1)
+			return
+		end
+
+		-- If the vehicle_ids are not equal, return, as it wasn't the main_vehicle_id which was despawned.
+		if main_vehicle_id ~= vehicle_id then
+			return
+		end
 
 		-- reset it's transform history
 		vehicle_object.transform_history = {}
@@ -12202,23 +12354,23 @@ function onVehicleLoad(vehicle_id)
 		return
 	end
 
-	-- set tooltips for main islands, and mark the island as loaded
-	local island, got_island = Island.getDataFromVehicleID(vehicle_id)
-	if got_island and island then
-		g_savedata.loaded_islands[island.index] = true
-
-		if island.index == g_savedata.ai_base_island.index then
-			s.setVehicleTooltip(g_savedata.ai_base_island.flag_vehicle.id, "AI Main Base, Cannot be Captured.")
-		elseif island.index == g_savedata.player_base_island.index then
-			s.setVehicleTooltip(g_savedata.player_base_island.flag_vehicle.id, "Your Main Base, Cannot be Captured by AI.")
-		end
-		return
-	end
-
 	-- get the vehicle's group_id
 	local group_id = VehicleGroup.getGroupID(vehicle_id)
 
 	if not group_id then
+		return
+	end
+
+	-- set tooltips for main islands, and mark the island as loaded
+	local island, got_island = Island.getDataFromGroupID(group_id)
+	if got_island and island then
+		g_savedata.loaded_islands[island.index] = true
+
+		if island.index == g_savedata.ai_base_island.index then
+			s.setVehicleTooltip(vehicle_id, "AI Main Base, Cannot be Captured.")
+		elseif island.index == g_savedata.player_base_island.index then
+			s.setVehicleTooltip(vehicle_id, "Your Main Base, Cannot be Captured by AI.")
+		end
 		return
 	end
 
@@ -12231,7 +12383,7 @@ function onVehicleLoad(vehicle_id)
 
 		if not prefab or not prefab.fully_created then
 			v.createPrefab(group_id)
-		end
+		end 
 
 		if vehicle_object.costs.buy_on_load then
 			local _, _, was_purchased = v.purchaseVehicle(vehicle_object.name, vehicle_object.home_island.name, vehicle_object.costs.purchase_type)
@@ -13256,14 +13408,31 @@ function tickSquadrons(game_ticks)
 
 			-- check if a vehicle needs resupply, removing from current squad and adding to the resupply squad
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if isVehicleNeedsResupply(vehicle_id, "Resupply") then
-						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
-							reload(vehicle_id)
-						else
-							transferToSquadron(g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], RESUPPLY_SQUAD_INDEX, true)
+				for group_id, vehicle_object in pairs(squad.vehicles) do
 
-							d.print(tostring(vehicle_id).." leaving squad "..tostring(squad_index).." to resupply", true, 0)
+					-- Get the main vehicle_id.
+					local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+					-- Ensure we got the main vehicle_id
+					if not main_vehicle_id then
+						-- skip this vehicle if we failed to get it.
+						goto next_vehicle
+					end
+
+					-- If this vehicle needs resupply.
+					if isVehicleNeedsResupply(main_vehicle_id, "Resupply") then
+						-- If this is a turret, then reload it.
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
+							-- Reload the turret.
+							reload(main_vehicle_id)
+
+						-- Otherwise, transfer it to the resupply squad.
+						else
+							-- transfer the vehicle to the resupply squad
+							transferToSquadron(g_savedata.ai_army.squadrons[squad_index].vehicles[group_id], RESUPPLY_SQUAD_INDEX, true)
+
+							-- print a debug message saying it's leaving the squad to resupply.
+							d.print(tostring(group_id).." leaving squad "..tostring(squad_index).." to resupply", true, 0)
 
 							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
@@ -13281,14 +13450,14 @@ function tickSquadrons(game_ticks)
 
 							squadInitVehicleCommand(squad, vehicle_object)
 						end
-					elseif isVehicleNeedsResupply(vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
+					elseif isVehicleNeedsResupply(main_vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
 						if not vehicle_object.is_killed then
 							v.kill(vehicle_object)
 						end
 					end
 
 					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
-					local vehicle_component_data, is_success = server.getVehicleComponents(vehicle_id)
+					local vehicle_component_data, is_success = server.getVehicleComponents(main_vehicle_id)
 
 					if is_success and vehicle_component_data.components and vehicle_component_data.components.guns then
 						for gun_index = 1, #vehicle_component_data.components.guns do
@@ -13309,10 +13478,10 @@ function tickSquadrons(game_ticks)
 										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
 
 										-- take that away from the reserve ammo container
-										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										server.setVehicleWeapon(main_vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
 										
 										-- move that into the gun
-										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+										server.setVehicleWeapon(main_vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
 
 										-- if the gun is not at capcity, continue on
 										-- otherwise, break.
@@ -13361,6 +13530,8 @@ function tickSquadrons(game_ticks)
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
 					end]]
+
+					::next_vehicle::
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -15532,6 +15703,30 @@ function tickControls(game_ticks)
 				end
 			end
 
+			-- force it to constantly just go directly towards the player.
+			--[[if vehicle_object.target_player_id then
+				local squad_vision = squadGetVisionData(squad)
+
+				local target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+
+				for i = 1, #vehicle_object.path do
+					table.remove(vehicle_object.path, 1)
+				end
+
+				vehicle_object.path[0] = {
+					x = vehicle_object.transform[13],
+					y = vehicle_object.transform[14],
+					z = vehicle_object.transform[15],
+					ui_id = 95912311 - vehicle_object.group_id
+				}
+
+				vehicle_object.path[1] =  {
+					x = target.last_known_pos[13],
+					y = target.last_known_pos[14],
+					z = target.last_known_pos[15],
+					ui_id = 95912312 + vehicle_object.group_id
+				}
+			end]]
 
 			--? we have at least 1 path
 			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[#vehicle_object.path].x and vehicle_object.path[0].y == vehicle_object.path[#vehicle_object.path].y and vehicle_object.path[0].z == vehicle_object.path[#vehicle_object.path].z) then
@@ -15618,6 +15813,7 @@ function tickControls(game_ticks)
 					z = vehicle_object.path[0].z + path_vector_normalized.z * (path_progress + path_projection)
 				}
 
+				-- Angle to the scalar projected target position.
 				local target_angle = math.atan(target_pos.x - vehicle_object.transform[13], target_pos.z - vehicle_object.transform[15])
 
 				local speed = v.getSpeed(vehicle_object, true)
@@ -15923,12 +16119,14 @@ function refuel(vehicle_id)
 	until (not success)
 end
 
-function reload(vehicle_id, from_storage)
+-- Reloads all ammo containers on a vehicle, by just refilling them. Set the vehicle_id to the id of vehicle you want to reload.
+---@param vehicle_id integer the vehicle you want to reload
+function reload(vehicle_id)
 	local i = 1
 	repeat
-		local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
+		local ammo, success = server.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
 		if success then
-			s.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
+			server.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
 		end
 		i = i + 1
 	until (not success)

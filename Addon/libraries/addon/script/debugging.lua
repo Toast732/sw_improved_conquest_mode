@@ -518,7 +518,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			--onTick = setupTraceback(onTick, "onTick")
 
 			-- add the error checker
-			ac.executeOnReply(
+			AddonCommunication.executeOnReply(
 				SHORT_ADDON_NAME,
 				"DEBUG.TRACEBACK.ERROR_CHECKER",
 				0,
@@ -527,12 +527,14 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 					if not g_savedata.debug.traceback.enabled then
 						self.count = 0
 
+					-- Otherwise, tracebacks are enabled, and the stack is not empty, that means that an error occured, so print the stack.
 					elseif g_savedata.debug.traceback.stack_size > 0 then
 						-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
-						__ENV =  _ENV_NORMAL
+						__ENV = _ENV_NORMAL
 						__ENV._ENV_MODIFIED = _ENV
 						_ENV = __ENV
 
+						-- Print the stack.
 						d.trace.print(_ENV_MODIFIED)
 
 						-- swap back to modified environment
@@ -542,6 +544,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						-- Also remove __ENV, for the same reason as above.
 						__ENV = nil
 
+						-- Set stack size to 0.
 						g_savedata.debug.traceback.stack_size = 0
 					end
 				end,

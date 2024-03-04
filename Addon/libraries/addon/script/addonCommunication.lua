@@ -7,7 +7,7 @@
 ]]
 
 -- required libraries
-require("libraries.addon.script.debugging")
+--require("libraries.addon.script.debugging")
 
 -- library name
 AddonCommunication = {}
@@ -33,6 +33,14 @@ replies_awaiting = {}
 
 ]]
 
+---@class ReplyAwaiting
+---@field short_addon_name string the addon's short name of the addon we're trying to listen to, so if we're trying to listen to Improved Conquest Mode, this would be "ICM"
+---@field message string the message to listen for, the execute_function will only be called if its an exact match.
+---@field port integer the port number, in the range of 0-65535. Calls to port 0 will result in it being called the very next tick.
+---@field execute_function fun(self: ReplyAwaiting) the function to execute when the message is received
+---@field count integer the number of times the function can be executed, -1 for infinite.
+---@field expiry number the time in milliseconds before the function expires, -1 for infinite.
+
 --[[
 
 
@@ -41,14 +49,18 @@ replies_awaiting = {}
 
 ]]
 
+--- Defines the function and criteria for a reply callback to be executed when a specific message is received.
+---@param short_addon_name string the addon's short name of the addon we're trying to listen to, so if we're trying to listen to Improved Conquest Mode, this would be "ICM"
+---@param message string the message to listen for, the execute_function will only be called if its an exact match.
+---@param port integer the port number, in the range of 0-65535. Calls to port 0 will result in it being called the very next tick.
+---@param execute_function fun(self: ReplyAwaiting) the function to execute when the message is received
+---@param count integer? the number of times the function can be executed, -1 for infinite (default 1)
+---@param timeout number? the time in seconds before the function expires, -1 for infinite (default -1)
 function AddonCommunication.executeOnReply(short_addon_name, message, port, execute_function, count, timeout)
-	short_addon_name = short_addon_name or SHORT_ADDON_NAME-- default to this addon's short name
 	if not message then
 		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
 		return
 	end
-
-	port = port or 0
 
 	if not execute_function then
 		d.print("(AddonCommunication.executeOnReply) execute_function was left blank!", true, 1)

@@ -26,7 +26,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.25)"
+ADDON_VERSION = "(0.4.0.26)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -1048,6 +1048,8 @@ function setupMain(is_world_create)
 		else
 			for squad_index, squad in pairs(g_savedata.ai_army.squadrons) do
 				for _, vehicle_object in pairs(squad.vehicles) do
+
+					-- Reset map for all of the vehicles
 					s.removeMapObject(-1, vehicle_object.ui_id)
 					s.removeMapLabel(-1, vehicle_object.ui_id)
 					s.removeMapLine(-1, vehicle_object.ui_id)
@@ -1057,6 +1059,9 @@ function setupMain(is_world_create)
 							s.removeMapLine(-1, waypoint.ui_id)
 						end
 					end
+
+					-- Reset the transform histories.
+					vehicle_object.transform_history = {}
 				end
 			end
 			s.removeMapObject(-1, g_savedata.player_base_island.ui_id)
@@ -1525,6 +1530,7 @@ end
 
 function onVehicleUnload(vehicle_id)
 	if not is_dlc_weapons then
+		d.print("(onVehicleUnload) is_dlc_weapons is false", true, 0)
 		return
 	end
 
@@ -1536,8 +1542,9 @@ function onVehicleUnload(vehicle_id)
 		return
 	end
 
-	local island, got_island = Island.getDataFromVehicleID(group_id)
+	local island, got_island = Island.getDataFromGroupID(group_id)
 	if got_island and island then
+		d.print(("Island %s was unloaded"):format(island.name), true, 0)
 		g_savedata.loaded_islands[island.index] = nil
 		return
 	end
@@ -1545,6 +1552,24 @@ function onVehicleUnload(vehicle_id)
 	local vehicle_object, squad_index, _ = Squad.getVehicle(group_id)
 
 	if squad_index and vehicle_object then
+
+		--[[
+			Don't mark the vehicle as unloaded if the vehicle_id that was unloaded, is not the main vehicle_id of this vehicle.
+		]]
+
+		-- Get the main vehicle_id.
+		local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+		-- ensure we got the main_vehicle_id
+		if not main_vehicle_id then
+			d.print("(onVehicleUnload) main_vehicle_id is nil", true, 1)
+			return
+		end
+
+		-- If the vehicle_ids are not equal, return, as it wasn't the main_vehicle_id which was despawned.
+		if main_vehicle_id ~= vehicle_id then
+			return
+		end
 
 		-- reset it's transform history
 		vehicle_object.transform_history = {}
@@ -1685,23 +1710,23 @@ function onVehicleLoad(vehicle_id)
 		return
 	end
 
-	-- set tooltips for main islands, and mark the island as loaded
-	local island, got_island = Island.getDataFromVehicleID(vehicle_id)
-	if got_island and island then
-		g_savedata.loaded_islands[island.index] = true
-
-		if island.index == g_savedata.ai_base_island.index then
-			s.setVehicleTooltip(g_savedata.ai_base_island.flag_vehicle.id, "AI Main Base, Cannot be Captured.")
-		elseif island.index == g_savedata.player_base_island.index then
-			s.setVehicleTooltip(g_savedata.player_base_island.flag_vehicle.id, "Your Main Base, Cannot be Captured by AI.")
-		end
-		return
-	end
-
 	-- get the vehicle's group_id
 	local group_id = VehicleGroup.getGroupID(vehicle_id)
 
 	if not group_id then
+		return
+	end
+
+	-- set tooltips for main islands, and mark the island as loaded
+	local island, got_island = Island.getDataFromGroupID(group_id)
+	if got_island and island then
+		g_savedata.loaded_islands[island.index] = true
+
+		if island.index == g_savedata.ai_base_island.index then
+			s.setVehicleTooltip(vehicle_id, "AI Main Base, Cannot be Captured.")
+		elseif island.index == g_savedata.player_base_island.index then
+			s.setVehicleTooltip(vehicle_id, "Your Main Base, Cannot be Captured by AI.")
+		end
 		return
 	end
 
@@ -1714,7 +1739,7 @@ function onVehicleLoad(vehicle_id)
 
 		if not prefab or not prefab.fully_created then
 			v.createPrefab(group_id)
-		end
+		end 
 
 		if vehicle_object.costs.buy_on_load then
 			local _, _, was_purchased = v.purchaseVehicle(vehicle_object.name, vehicle_object.home_island.name, vehicle_object.costs.purchase_type)
@@ -2739,14 +2764,31 @@ function tickSquadrons(game_ticks)
 
 			-- check if a vehicle needs resupply, removing from current squad and adding to the resupply squad
 			if squad_index ~= RESUPPLY_SQUAD_INDEX then
-				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-					if isVehicleNeedsResupply(vehicle_id, "Resupply") then
-						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
-							reload(vehicle_id)
-						else
-							transferToSquadron(g_savedata.ai_army.squadrons[squad_index].vehicles[vehicle_id], RESUPPLY_SQUAD_INDEX, true)
+				for group_id, vehicle_object in pairs(squad.vehicles) do
 
-							d.print(tostring(vehicle_id).." leaving squad "..tostring(squad_index).." to resupply", true, 0)
+					-- Get the main vehicle_id.
+					local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+					-- Ensure we got the main vehicle_id
+					if not main_vehicle_id then
+						-- skip this vehicle if we failed to get it.
+						goto next_vehicle
+					end
+
+					-- If this vehicle needs resupply.
+					if isVehicleNeedsResupply(main_vehicle_id, "Resupply") then
+						-- If this is a turret, then reload it.
+						if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then
+							-- Reload the turret.
+							reload(main_vehicle_id)
+
+						-- Otherwise, transfer it to the resupply squad.
+						else
+							-- transfer the vehicle to the resupply squad
+							transferToSquadron(g_savedata.ai_army.squadrons[squad_index].vehicles[group_id], RESUPPLY_SQUAD_INDEX, true)
+
+							-- print a debug message saying it's leaving the squad to resupply.
+							d.print(tostring(group_id).." leaving squad "..tostring(squad_index).." to resupply", true, 0)
 
 							if g_savedata.ai_army.squadrons[squad_index] and table.length(g_savedata.ai_army.squadrons[squad_index].vehicles) <= 0 then -- squad has no more vehicles
 								g_savedata.ai_army.squadrons[squad_index] = nil
@@ -2764,14 +2806,14 @@ function tickSquadrons(game_ticks)
 
 							squadInitVehicleCommand(squad, vehicle_object)
 						end
-					elseif isVehicleNeedsResupply(vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
+					elseif isVehicleNeedsResupply(main_vehicle_id, "AI_NO_MORE_MISSILE") then -- if its out of missiles, then kill it
 						if not vehicle_object.is_killed then
 							v.kill(vehicle_object)
 						end
 					end
 
 					-- check if the vehicle simply needs to reload from a disconnected ammo belt, barrel or box
-					local vehicle_component_data, is_success = server.getVehicleComponents(vehicle_id)
+					local vehicle_component_data, is_success = server.getVehicleComponents(main_vehicle_id)
 
 					if is_success and vehicle_component_data.components and vehicle_component_data.components.guns then
 						for gun_index = 1, #vehicle_component_data.components.guns do
@@ -2792,10 +2834,10 @@ function tickSquadrons(game_ticks)
 										local ammo_to_move = math.min(gun_data.capacity - gun_data.ammo, reserve_ammo_data.ammo)
 
 										-- take that away from the reserve ammo container
-										s.setVehicleWeapon(vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
+										server.setVehicleWeapon(main_vehicle_id, reserve_ammo_data.pos.x, reserve_ammo_data.pos.y, reserve_ammo_data.pos.z, reserve_ammo_data.ammo - ammo_to_move)
 										
 										-- move that into the gun
-										s.setVehicleWeapon(vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
+										server.setVehicleWeapon(main_vehicle_id, gun_data.pos.x, gun_data.pos.y, gun_data.pos.z, gun_data.ammo + ammo_to_move)
 
 										-- if the gun is not at capcity, continue on
 										-- otherwise, break.
@@ -2844,6 +2886,8 @@ function tickSquadrons(game_ticks)
 							s.setVehicleWeapon(vehicle_id, "Ammo "..gun_info[2], ammo_data[#ammo_data].capacity)
 						end
 					end]]
+
+					::next_vehicle::
 				end
 			else
 				for vehicle_id, vehicle_object in pairs(squad.vehicles) do
@@ -5015,6 +5059,30 @@ function tickControls(game_ticks)
 				end
 			end
 
+			-- force it to constantly just go directly towards the player.
+			--[[if vehicle_object.target_player_id then
+				local squad_vision = squadGetVisionData(squad)
+
+				local target = squad_vision.visible_players_map[vehicle_object.target_player_id].obj
+
+				for i = 1, #vehicle_object.path do
+					table.remove(vehicle_object.path, 1)
+				end
+
+				vehicle_object.path[0] = {
+					x = vehicle_object.transform[13],
+					y = vehicle_object.transform[14],
+					z = vehicle_object.transform[15],
+					ui_id = 95912311 - vehicle_object.group_id
+				}
+
+				vehicle_object.path[1] =  {
+					x = target.last_known_pos[13],
+					y = target.last_known_pos[14],
+					z = target.last_known_pos[15],
+					ui_id = 95912312 + vehicle_object.group_id
+				}
+			end]]
 
 			--? we have at least 1 path
 			if not vehicle_object.path[1] or (vehicle_object.path[0].x == vehicle_object.path[#vehicle_object.path].x and vehicle_object.path[0].y == vehicle_object.path[#vehicle_object.path].y and vehicle_object.path[0].z == vehicle_object.path[#vehicle_object.path].z) then
@@ -5101,6 +5169,7 @@ function tickControls(game_ticks)
 					z = vehicle_object.path[0].z + path_vector_normalized.z * (path_progress + path_projection)
 				}
 
+				-- Angle to the scalar projected target position.
 				local target_angle = math.atan(target_pos.x - vehicle_object.transform[13], target_pos.z - vehicle_object.transform[15])
 
 				local speed = v.getSpeed(vehicle_object, true)
@@ -5406,12 +5475,14 @@ function refuel(vehicle_id)
 	until (not success)
 end
 
-function reload(vehicle_id, from_storage)
+-- Reloads all ammo containers on a vehicle, by just refilling them. Set the vehicle_id to the id of vehicle you want to reload.
+---@param vehicle_id integer the vehicle you want to reload
+function reload(vehicle_id)
 	local i = 1
 	repeat
-		local ammo, success = s.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
+		local ammo, success = server.getVehicleWeapon(vehicle_id, "Ammo "..i) -- get the number of ammo containers to reload
 		if success then
-			s.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
+			server.setVehicleWeapon(vehicle_id, "Ammo "..i, ammo.capacity) -- reload the ammo container
 		end
 		i = i + 1
 	until (not success)
