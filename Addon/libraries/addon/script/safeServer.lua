@@ -66,7 +66,7 @@ safe_server = {}
 ]]
 
 ---@param vehicle_id integer the vehicle_id to get the loaded data for.
----@return LOADED_VEHICLE_DATA loaded_vehicle_data the loaded vehicle data for the vehicle
+---@return SWVehicleComponentData loaded_vehicle_data the loaded vehicle data for the vehicle
 ---@return boolean is_success if it ran without error
 function safe_server.getVehicleComponents(vehicle_id)
 	-- call the normal function

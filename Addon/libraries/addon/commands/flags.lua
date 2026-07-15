@@ -1,6 +1,6 @@
 --[[
 	
-Copyright 2024 Liam Matthews
+Copyright 2025 Liam Matthews
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,12 @@ limitations under the License.
 ]]
 
 -- required libraries
+require("libraries.addon.script.debugging") -- required to print messages
+require("libraries.addon.script.players") -- required to get data on players
+require("libraries.utils.string") -- required for some of its helpful string functions
+require("libraries.utils.tables") -- required for some of its helpful table functions
+
+g_savedata.flags = {}
 
 -- where all of the registered flags are stored, their current values get stored in g_savedata.flags instead, though.
 ---@type table<string, BooleanFlag | IntegerFlag | NumberFlag | StringFlag | AnyFlag>
@@ -252,14 +258,62 @@ function Flag.registerAnyFlag(name, default_value, tags, read_permission_require
 	end
 end
 
----@param full_message string the full_message of the player
----@param peer_id integer the peer_id of the player who executed the command
----@param is_admin boolean if the player has admin.
----@param is_auth boolean if the player is authed.
----@param command string the command the player entered
----@param arg table<integer, string> the arguments to the command the player entered.
-function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, arg)
-	if command == "flag" then
+--[[
+
+	Register Default Permissions
+
+]]
+
+-- None Permission
+Flag.registerPermission(
+	"none",
+	function()
+		return true
+	end
+)
+
+-- Auth Permission
+Flag.registerPermission(
+	"auth",
+	function(peer_id)
+		local players = server.getPlayers()
+
+		for peer_index = 1, #players do
+			local player = players[peer_index]
+
+			if player.id == peer_id then
+				return player.auth
+			end
+		end
+
+		return false
+	end
+)
+
+-- Admin Permission
+Flag.registerPermission(
+	"admin",
+	function(peer_id)
+		local players = server.getPlayers()
+
+		for peer_index = 1, #players do
+			local player = players[peer_index]
+
+			if player.id == peer_id then
+				return player.admin
+			end
+		end
+
+		return false
+	end
+)
+
+Command.registerCommand(
+	"flag",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
 		local flag_name = arg[1]
 
 		if not flag_name then
@@ -309,6 +363,7 @@ function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, a
 				return
 			end
 
+			---@type string|nil|boolean|number
 			local set_value = table.concat(arg, " ", 2, #arg)
 			local original_set_value = set_value
 
@@ -370,7 +425,20 @@ function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, a
 
 			d.print(("Successfully set the value for the flag \"%s\" to %s"):format(flag.name, set_value), false, 0, peer_id)
 		end
-	elseif command == "flags" then
+	end,
+	"none",
+	"Used to manage more advanced settings, such as disabling modules.",
+	"Used to manage more advanced settings.",
+	{"sync_tick_rate false","sync_tick_rate"},
+	"<flag_name> [value]"
+)
+
+Command.registerCommand(
+	"flags",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
 		if arg[1] then
 			d.print("Does not yet support the ability to search for flags, only able to give a full list for now, sorry!", false, 0, peer_id)
 			return
@@ -413,61 +481,9 @@ function Flag.onFlagCommand(full_message, peer_id, is_admin, is_auth, command, a
 			-- print the flag data
 			d.print(("-----\nName: %s\nValue: %s\nTags: %s"):format(flag.name, g_savedata.flags[flag.name], table.concat(flag.tags, ", ")), false, 0, peer_id)
 		end
-	end
-end
-
---[[
-
-	Register Default Permissions
-
-]]
-
--- None Permission
-Flag.registerPermission(
+	end,
 	"none",
-	function()
-		return true
-	end
+	"Used to list all of the flags which you have permission to read, flags are used for more advanced settings.",
+	"Used to list the flags.",
+	{"flags"}
 )
-
--- Auth Permission
-Flag.registerPermission(
-	"auth",
-	function(peer_id)
-		local players = server.getPlayers()
-
-		for peer_index = 1, #players do
-			local player = players[peer_index]
-
-			if player.id == peer_id then
-				return player.auth
-			end
-		end
-
-		return false
-	end
-)
-
--- Admin Permission
-Flag.registerPermission(
-	"admin",
-	function(peer_id)
-		local players = server.getPlayers()
-
-		for peer_index = 1, #players do
-			local player = players[peer_index]
-
-			if player.id == peer_id then
-				return player.admin
-			end
-		end
-
-		return false
-	end
-)
-
--- required libraries (put at bottom to ensure the Flag variable and functions are created before them, but they're still required.)
-require("libraries.addon.script.debugging") -- required to print messages
-require("libraries.addon.script.players") -- required to get data on players
-require("libraries.utils.string") -- required for some of its helpful string functions
-require("libraries.utils.tables") -- required for some of its helpful table functions

@@ -115,6 +115,7 @@ function Characters.overrides()
 	end
 end
 
+--- @param object_id integer
 function Characters.setIntoSeat(object_id)
 	local seat_char_data = g_savedata.libraries.characters.characters_to_seat[object_id]
 
@@ -129,6 +130,8 @@ function Characters.setIntoSeat(object_id)
 		s.setCharacterData(object_id, object_data.hp, seat_char_data.char_config.is_interactable, seat_char_data.char_config.is_ai)
 		s.setAIState(object_id, seat_char_data.char_config.ai_state)
 		s.setAITargetVehicle(object_id, nil)
+	else
+		d.print(("(Characters.setIntoSeat) Failed to get character data for object %i"):format(object_id), true, 1)
 	end
 end
 
@@ -190,6 +193,7 @@ function Characters.createAndSetCharactersIntoSeat(vehicle_id, valid_seats)
 						vehicle_id = vehicle_id,
 						char_config = valid_seat
 					}
+					d.print(("(Characters.setupVehicle) Successfully spawned character %i for seat %s on vehicle %i"):format(object_id, seat_data.name, vehicle_id), true, 0)
 				end
 			end
 		end

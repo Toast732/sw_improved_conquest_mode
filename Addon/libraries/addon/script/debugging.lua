@@ -30,6 +30,22 @@ d = Debugging
 
 ]]
 
+---@alias DebugType
+---| "all"
+---| "chat"
+---| "error"
+---| "profiler"
+---| "map"
+---| "graph_node"
+---| "driving"
+---| "vehicle"
+---| "function"
+---| "traceback"
+
+---@alias DebugID integer
+
+
+
 --[[
 
 
@@ -212,11 +228,11 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 				b = 225
 
 				if NSO == 2 then -- darker for non NSO
-					b = 200
-					g = 50
+					b = 190
+					g = 25
 				elseif NSO == 1 then -- brighter for NSO
 					b = 255
-					g = 0
+					g = 100
 				end
 
 			elseif node_type == "land_path" then

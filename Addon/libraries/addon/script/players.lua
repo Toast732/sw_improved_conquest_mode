@@ -250,12 +250,12 @@ local addon_contributors = {
 ---@field peer_id integer the peer_id of the player
 ---@field steam_id string the steam_id of the player, as a string
 ---@field object_id integer the object_id of the player
----@field debug table<DEBUG_TYPE, boolean> a table of the debugs the player has enabled, indexed by the name of the debug, value being if its enabled or not
+---@field debug table<DebugType, boolean> a table of the debugs the player has enabled, indexed by the name of the debug, value being if its enabled or not
 ---@field acknowledgements table<nil>
 ---@field updateName function<nil> updates the player's name in player_data with the name they currently have
 ---@field updatePID function<nil> updates the player's peer_id in player_data with the peer_id they currently have
 ---@field updateOID function<nil> updates the player's object_id in player_data with the object_id they currently have
----@field getDebug function<DEBUG_ID> returns wether or not the player has the debug with the specified id enabled, set to -1 for any debug enabled
+---@field getDebug function<DebugID> returns wether or not the player has the debug with the specified id enabled, set to -1 for any debug enabled
 ---@field getSWPlayer function<nil> returns the SWPlayer attached to this player.
 
 --[[
@@ -344,7 +344,7 @@ function Players.setupOOP(player)
 			end
 
 			-- handle the debug (handles enabling of debugs and such)
-			d.handleDebug(debug_type, enabled, self.peer_id, self.steam_id)
+			d.handleDebug(debug_type, enabled, self.peer_id)
 		end
 	end
 

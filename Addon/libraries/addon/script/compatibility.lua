@@ -8,7 +8,7 @@
 
 -- required libraries
 require("libraries.addon.script.debugging")
-require("libraries.icm.island")
+require("libraries.icm.islands.island")
 require("libraries.addon.script.setup")
 
 -- library name
@@ -121,7 +121,7 @@ end
 
 --# migrates the version system to the new one implemented in 0.3.0.78
 ---@param overwrite_g_savedata boolean if you want to overwrite g_savedata, usually want to keep false unless you've already got a backup of g_savedata
----@return table migrated_g_savedata
+---@return table? migrated_g_savedata
 ---@return boolean is_success if it successfully migrated the versioning system
 function Compatibility.migrateVersionSystem(overwrite_g_savedata)
 
@@ -170,7 +170,7 @@ end
 
 --# returns the version id from the provided version
 ---@param version string the version you want to get the id of
----@return integer version_id the id of the version
+---@return integer? version_id the id of the version
 ---@return boolean is_success if it found the id of the version
 function Compatibility.getVersionID(version)
 	--[[
@@ -221,7 +221,7 @@ end
 
 --# returns the version from the version_id
 ---@param version_id integer the id of the version
----@return string version the version associated with the id
+---@return string? version the version associated with the id
 ---@return boolean is_success if it successfully got the version from the id
 function Compatibility.getVersion(version_id)
 
@@ -242,8 +242,8 @@ function Compatibility.getVersion(version_id)
 end
 
 --# returns version data about the specified version, or if left blank, the current version
----@param version string the current version, leave blank if want data on current version
----@return VERSION_DATA version_data the data about the version
+---@param version string? the current version, leave blank if want data on current version
+---@return VERSION_DATA? version_data the data about the version
 ---@return boolean is_success if it successfully got the version data
 function Compatibility.getVersionData(version)
 
@@ -268,8 +268,8 @@ function Compatibility.getVersionData(version)
 
 	-- (1) check if the version system is not migrated
 	if not g_savedata.info.version_history then
-		local migrated_g_savedata, is_success = comp.migrateVersionSystem() -- migrate the version data
-		if not is_success then
+		local migrated_g_savedata, is_success = comp.migrateVersionSystem(false) -- migrate the version data
+		if not is_success or migrated_g_savedata == nil then
 			d.print("(comp.getVersionData) failed to migrate version system. This is probably not good!", false, 1)
 			return nil, false
 		end
@@ -364,6 +364,10 @@ function Compatibility.saveBackup()
 	end
 
 	local version_data, is_success = comp.getVersionData()
+	if version_data == nil or not is_success then
+		d.print("(comp.saveBackup) failed to get version data. This is probably not good!", false, 1)
+		return false
+	end
 	if version_data.data_version ~= g_savedata.info.version_history[#g_savedata.info.version_history].version then
 		--d.print("version_data.data_version: "..tostring(version_data.data_version).."\ng_savedata.info.version_history[#g_savedata.info.version.version_history].version: "..tostring(g_savedata.info.version_history[#g_savedata.info.version_history].version))
 		g_savedata.info.version_history[#g_savedata.info.version_history + 1] = comp.createVersionHistoryData()
@@ -402,7 +406,7 @@ function Compatibility.update()
 
 	-- ensure that we're actually outdated before proceeding
 	local version_data, is_success = comp.getVersionData()
-	if not is_success then
+	if not is_success or version_data == nil then
 		d.print("(comp.update) failed to get version data! this is probably bad!", false, 1)
 		return
 	end
@@ -651,7 +655,7 @@ function Compatibility.verify()
 		-- check if we're outdated
 		local version_data, is_success = comp.getVersionData()
 
-		if not is_success then
+		if not is_success or version_data == nil then
 			d.print("(comp.verify) failed to get version data! this is probably bad!", false, 1)
 			return
 		end
