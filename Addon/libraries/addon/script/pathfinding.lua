@@ -11,7 +11,10 @@
 require("libraries.addon.components.tags")
 require("libraries.addon.script.debugging")
 require("libraries.addon.script.matrix")
+require("libraries.addon.script.map")
 require("libraries.addon.vehicles.ai")
+require("libraries.addon.commands.command.command")
+
 
 require("libraries.icm.spawnModifiers")
 
@@ -52,6 +55,18 @@ s = s or server
 
 ]]
 
+-- Get the pathfinding exclusion tags
+---@return "not_NSO"|"NSO" exclude the pathfinding exclusion tags
+function Pathfinding.getExclusionTags()
+	-- if NSO is enabled, then exclude vanilla only graph nodes.
+	if g_savedata.info.mods.NSO then
+		return "not_NSO"
+	-- otherwise, exclude NSO only graph nodes.
+	else
+		return "NSO"
+	end
+end
+
 function Pathfinding.resetPath(vehicle_object)
 	for _, v in pairs(vehicle_object.path) do
 		s.removeMapID(-1, v.ui_id)
@@ -79,8 +94,9 @@ function Pathfinding.nextPath(vehicle_object)
 	end
 
 	if vehicle_object.path[1] then
+		s.removeMapID(-1, vehicle_object.path[1].ui_id) --Delete the next paths debug label since it wont be able to be deleted after this
 		if vehicle_object.path[0] then
-			s.removeMapID(-1, vehicle_object.path[0].ui_id)
+			--s.removeMapID(-1, vehicle_object.path[0].ui_id)
 		end
 		vehicle_object.path[0] = {
 			x = vehicle_object.path[1].x,
@@ -100,13 +116,7 @@ end
 function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_distance)
 
 	-- path tags to exclude
-	local exclude = ""
-
-	if g_savedata.info.mods.NSO then
-		exclude = "not_NSO" -- exclude non NSO graph nodes
-	else
-		exclude = "NSO" -- exclude NSO graph nodes
-	end
+	local exclude = Pathfinding.getExclusionTags()
 
 	if vehicle_object.vehicle_type == VEHICLE.TYPE.TURRET then 
 		AI.setState(vehicle_object, VEHICLE.STATE.STATIONARY)
@@ -192,8 +202,8 @@ function Pathfinding.addPath(vehicle_object, target_dest, translate_forward_dist
 
 		local exclude_offroad = false
 
-		local squad_index, squad = Squad.getSquad(vehicle_object.group_id)
-		if squad.command == SQUAD.COMMAND.CARGO then
+		local squad_index, squad = Squad.getSquadFromGroup(vehicle_object.group_id)
+		if squad and squad.command == SQUAD.COMMAND.CARGO then
 			for c_vehicle_id, c_vehicle_object in pairs(squad.vehicles) do
 				if g_savedata.cargo_vehicles[c_vehicle_id] then
 					exclude_offroad = not g_savedata.cargo_vehicles[c_vehicle_id].route_data.can_offroad
@@ -333,7 +343,10 @@ end
 
 -- Credit to woe
 function Pathfinding.createPathY() --this looks through all env mods to see if there is a "zone" then makes a table of y values based on x and z as keys.
-
+	--- If the input string is 'land_path' or 'ocean_path', returns the input. If not, returns false
+	--- @generic T: string
+	--- @param tag T the tag to check
+	--- @return false|T
 	local isGraphNode = function(tag)
 		if tag == "land_path" or tag == "ocean_path" then
 			return tag
@@ -394,3 +407,325 @@ function Pathfinding.createPathY() --this looks through all env mods to see if t
 	end
 	d.print("Got Y level of all paths\nNumber of nodes: "..total_paths.."\nTime taken: "..(millisecondsSince(start_time)/1000).."s", true, 0)
 end
+
+-----------------------------------------
+--- Pathfinding Commands / Debuggers  ---
+-----------------------------------------
+
+-- path preview (drawn map lines) helpers
+local function getOrCreatePathPreviewUIID(peer_id)
+	g_savedata.routing = g_savedata.routing or {}
+	g_savedata.routing.path_preview_ui_ids = g_savedata.routing.path_preview_ui_ids or {}
+
+	if not g_savedata.routing.path_preview_ui_ids[peer_id] then
+		g_savedata.routing.path_preview_ui_ids[peer_id] = s.getMapID()
+	end
+
+	return g_savedata.routing.path_preview_ui_ids[peer_id]
+end
+
+local function clearPathPreview(peer_id)
+	if not g_savedata.routing or not g_savedata.routing.path_preview_ui_ids then
+		return
+	end
+
+	local ui_id = g_savedata.routing.path_preview_ui_ids[peer_id]
+	if ui_id then
+		s.removeMapID(peer_id, ui_id)
+	end
+end
+
+Command.registerCommand(
+	"test_path",
+	---@param full_message string
+	---@param peer_id integer
+	---@param arg table
+	function(full_message, peer_id, arg)
+		-- Usage:
+		--   ?impwep test_path <x> <z> [y] [land|ocean]
+		-- Examples:
+		--   ?impwep test_path 1000 2000
+		--   ?impwep test_path 1000 2000 ocean
+		--   ?impwep test_path 1000 2000 5 land
+		local x = tonumber(arg[1])
+		local z = tonumber(arg[2])
+		if not x or not z then
+			d.print("Invalid syntax! Usage: ?impwep test_path (x) (z) [y] [land|ocean]", false, 1, peer_id)
+			return
+		end
+
+		local y
+		local graph_arg
+		if arg[3] ~= nil then
+			local y_num = tonumber(arg[3])
+			if y_num ~= nil then
+				y = y_num
+				graph_arg = arg[4]
+			else
+				graph_arg = arg[3]
+			end
+		end
+
+		local required_tags = "land_path"
+		if graph_arg then
+			local g = tostring(graph_arg):lower()
+			if g == "land" or g == "land_path" then
+				required_tags = "land_path"
+			elseif g == "ocean" or g == "ocean_path" then
+				required_tags = "ocean_path"
+			else
+				d.print("Invalid path type! Use land or ocean.", false, 1, peer_id)
+				return
+			end
+		end
+
+		local player_matrix = s.getPlayerPos(peer_id)
+		if not player_matrix then
+			d.print("Failed to get player position.", false, 1, peer_id)
+			return
+		end
+
+		local dest_y = y
+		if dest_y == nil then
+			if required_tags == "ocean_path" then
+				dest_y = 0
+			else
+				dest_y = player_matrix[14]
+			end
+		end
+		local dest_matrix = m.translation(x, dest_y, z)
+
+		-- clear previous preview for this peer
+		clearPathPreview(peer_id)
+		local ui_id = getOrCreatePathPreviewUIID(peer_id)
+
+		local excluded_tags = Pathfinding.getExclusionTags()
+		local path = s.pathfind(player_matrix, dest_matrix, required_tags, excluded_tags)
+		if not path or #path == 0 then
+			d.print("No path found.", false, 1, peer_id)
+			return
+		end
+
+		-- draw path as connected lines
+		local prev = player_matrix
+		for i = 1, #path do
+			local node = path[i]
+			local node_y = node.y or 0
+			local next = m.translation(node.x, node_y, node.z)
+			s.addMapLine(peer_id, ui_id, prev, next, 0.35, 0, 200, 255, 200)
+			prev = next
+		end
+
+		s.addMapLabel(peer_id, ui_id, 2, "Path Preview", x, z)
+		d.print(("Drew path preview with %d nodes (%s). Use ?impwep clear_test_path to remove."):format(#path, required_tags), false, 0, peer_id)
+	end,
+	"admin",
+	"Pathfinds from your position to specified coordinates as shows it on the map. Used for debugging purposes.",
+	"Draws a temporary pathfinding preview.",
+	{"1000 2000", "1000 2000 ocean", "1000 2000 5 land"},
+	"(x) (z) [y] [land|ocean]"
+)
+
+Command.registerCommand(
+	"clear_test_path",
+	---@param full_message string
+	---@param peer_id integer
+	---@param arg table
+	function(full_message, peer_id, arg)
+		clearPathPreview(peer_id)
+		d.print("Cleared path preview.", false, 0, peer_id)
+	end,
+	"admin",
+	"Clears the temporary path preview drawn by path_preview.",
+	"Clears the path preview.",
+	{""}
+)
+
+Command.registerCommand(
+	"show_dead_ends",
+	function(full_message, peer_id, arg)
+		-- ensure graph nodes are built
+		if not g_savedata.graph_nodes.init then
+			p.createPathY()
+			g_savedata.graph_nodes.init = true
+		end
+
+		local draw_lines = false
+		if arg[1] and string.lower(arg[1]) == "true" then
+			draw_lines = true
+		end
+
+		d.print("Starting dead end search... This may take a while.", false, 0, peer_id)
+
+		g_savedata.routing = g_savedata.routing or {}
+		g_savedata.routing.dead_ends_ui_id = g_savedata.routing.dead_ends_ui_id or s.getMapID()
+		
+		-- Clear existing
+		s.removeMapID(peer_id, g_savedata.routing.dead_ends_ui_id)
+
+		local task_data = {
+			peer_id = peer_id,
+			nodes_list = {},
+			spatial_grid = {},
+			grid_cell_size = 400, --Significantly affects the speed, but lower values might fail to detect some long-distance connections
+			current_index = 1,
+			dead_ends = {},
+			ui_id = g_savedata.routing.dead_ends_ui_id,
+			processed_count = 0,
+			start_time = s.getTimeMillisec(),
+			draw_lines = draw_lines,
+			ignore_NSO = true,
+		}
+
+		-- Build node list and spatial grid
+		for x_str, z_table in pairs(g_savedata.graph_nodes.nodes) do
+			for z_str, node_data in pairs(z_table) do
+				local x = tonumber(x_str)
+				local z = tonumber(z_str)
+				if x and z and node_data.type == "land_path" then
+					if not task_data.ignore_NSO or node_data.NSO ~= 1 then
+						local node = {
+							x = x,
+							y = node_data.y,
+							z = z,
+							type = node_data.type
+						}
+						table.insert(task_data.nodes_list, node)
+						
+						-- Add to grid
+						local gx = math.floor(x / task_data.grid_cell_size)
+						local gz = math.floor(z / task_data.grid_cell_size)
+						task_data.spatial_grid[gx] = task_data.spatial_grid[gx] or {}
+						task_data.spatial_grid[gx][gz] = task_data.spatial_grid[gx][gz] or {}
+						table.insert(task_data.spatial_grid[gx][gz], node)
+					end
+				end
+			end
+		end
+
+		d.print(("Found %d nodes. Processing..."):format(#task_data.nodes_list), false, 0, peer_id)
+
+		eq.queue(
+			function() return true end, -- Always execute
+			function(self)
+				local data = self:getVar(1)
+				local max_time_ms = 20 -- Max ms per tick to avoid freezing the game
+				local tick_start = s.getTimeMillisec()
+				local avoidString = ""
+				if data.ignore_NSO then
+					avoidString = "NSO"
+				else
+
+				end
+
+				while data.current_index <= #data.nodes_list do
+					if s.getTimeMillisec() - tick_start > max_time_ms then
+						break
+					end
+
+					local node = data.nodes_list[data.current_index]
+					local neighbors = {}
+					
+					-- Find candidates in nearby grid cells
+					local gx = math.floor(node.x / data.grid_cell_size)
+					local gz = math.floor(node.z / data.grid_cell_size)
+					
+					for ox = -1, 1 do
+						for oz = -1, 1 do
+							if data.spatial_grid[gx + ox] and data.spatial_grid[gx + ox][gz + oz] then
+								for _, target in pairs(data.spatial_grid[gx + ox][gz + oz]) do
+									-- Check if same type and not same node
+									if target ~= node and target.type == node.type then
+										-- Distance check (optional optimization before pathfinding)
+										local dist_sq = (node.x - target.x)^2 + (node.z - target.z)^2
+										if dist_sq <= data.grid_cell_size^2 then
+											-- Pathfind
+											local path = s.pathfind(
+												m.translation(node.x, node.y, node.z),
+												m.translation(target.x, target.y, target.z),
+												node.type,
+												avoidString
+											)
+											
+											if path and #path >= 2 then
+												-- The neighbor is the second node in the path
+												local neighbor_node = path[2]
+												-- Create a unique key for the neighbor
+												local key = (path_res):format(neighbor_node.x) .. "," .. (path_res):format(neighbor_node.z)
+												
+												if not neighbors[key] then
+													neighbors[key] = true
+													if data.draw_lines then
+														s.addMapLine(data.peer_id, data.ui_id, m.translation(node.x, node.y, node.z), m.translation(neighbor_node.x, neighbor_node.y, neighbor_node.z), 0.5, 130, 0, 80, 100)
+													end
+												end
+											end
+										end
+									end
+								end
+							end
+						end
+					end
+					
+					-- Count neighbors
+					local neighbor_count = 0
+					for _ in pairs(neighbors) do neighbor_count = neighbor_count + 1 end
+					
+					if neighbor_count == 1 then
+						table.insert(data.dead_ends, node)
+					end
+
+					data.current_index = data.current_index + 1
+					data.processed_count = data.processed_count + 1
+				end
+
+				-- Check if done
+				if data.current_index > #data.nodes_list then
+					self.expired = true
+					
+					-- Report results
+					local duration = (s.getTimeMillisec() - data.start_time) / 1000
+					d.print(("Finished processing %d nodes in %.1fs."):format(#data.nodes_list, duration), false, 0, data.peer_id)
+					d.print(("Found %d dead ends."):format(#data.dead_ends), false, 0, data.peer_id)
+					
+					-- Draw markers
+					if not data.draw_lines then
+						s.removeMapID(data.peer_id, data.ui_id)
+					end
+					for _, node in pairs(data.dead_ends) do
+						s.addMapLabel(data.peer_id, data.ui_id, 1, "Dead End", node.x, node.z)
+						Map.addMapCircle(data.peer_id, data.ui_id, m.translation(node.x, node.y, node.z), 5, 1, 255, 0, 0, 255)
+					end
+				elseif data.processed_count % 100 == 0 then
+					-- Progress update every 100 nodes
+					d.print(("Processed %d/%d nodes..."):format(data.processed_count, #data.nodes_list), false, 0, data.peer_id)
+					debug.log(("Processed %d/%d nodes..."):format(data.processed_count, #data.nodes_list))
+				end
+			end,
+			{task_data},
+			-1 -- Infinite executions until done
+		)
+	end,
+	"admin",
+	"Finds and marks dead end pathfinding nodes (nodes with only 1 connection). If given true as its argument, also draws the connections between close graph_nodes.",
+	"Finds dead end nodes.",
+	{"true","false"},
+	"[true|false]"
+)
+
+Command.registerCommand(
+	"clear_dead_ends",
+	function(full_message, peer_id, arg)
+		if g_savedata.routing and g_savedata.routing.dead_ends_ui_id then
+			s.removeMapID(peer_id, g_savedata.routing.dead_ends_ui_id)
+			d.print("Cleared dead end markers.", false, 0, peer_id)
+		else
+			d.print("No dead end markers to clear.", false, 0, peer_id)
+		end
+	end,
+	"admin",
+	"Clears the dead end markers.",
+	"Clears dead end markers.",
+	{""}
+)
+

@@ -1,11 +1,12 @@
 -- required libraries
 require("libraries.addon.script.debugging")
 require("libraries.utils.tables")
+require("libraries.addon.commands.command.command")
 
 -- library name
 Cache = {}
 
----@param location string where to reset the data, if left blank then resets all cache data
+---@param location string? where to reset the data, if left blank then resets all cache data
 ---@return boolean is_success returns true if successfully cleared the cache
 function Cache.reset(location) -- resets the cache
 	if not location then
@@ -70,10 +71,41 @@ end
 ---@return boolean exists if the data exists at the location
 function Cache.exists(location)
 	if g_savedata.cache[location] and g_savedata.cache[location] ~= {} and (type(g_savedata.cache[location]) ~= "table" or table.length(g_savedata.cache[location]) > 0) or g_savedata.cache[location] == false then
-		d.print("g_savedata.Cache."..location.." exists", true, 0)
+		--d.print("g_savedata.Cache."..location.." exists", true, 0)
 
 		return true
 	end
-	d.print("g_savedata.Cache."..location.." doesn't exist", true, 0)
+	--d.print("g_savedata.Cache."..location.." doesn't exist", true, 0)
 	return false
 end
+
+-- Define commands related to cache
+Command.registerCommand(
+	"clearcache",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		d.print("clearing cache", false, 0, peer_id)
+		Cache.reset()
+		d.print("cache reset", false, 0, peer_id)
+	end,
+	"admin",
+	"",
+	"",
+	{""}
+)
+
+Command.registerCommand(
+	"debugcache",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		d.print("Cache Writes: "..g_savedata.cache_stats.writes.."\nCache Failed Writes: "..g_savedata.cache_stats.failed_writes.."\nCache Reads: "..g_savedata.cache_stats.reads, false, 0, peer_id)
+	end,
+	"admin",
+	"",
+	"",
+	{""}
+)

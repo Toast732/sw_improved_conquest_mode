@@ -1,0 +1,69 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name'
+        required: true
+        type: string
+      release_body:
+        description: 'Release notes / Changelog'
+        required: false
+        type: string
+        default: 'Automated release - no release notes were given'
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        required: false
+        type: boolean
+        default: false
+      is_draft:
+        description: 'Create as Draft'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create staging directory
+        run: mkdir -p release_staging
+      
+      - name: Copy playlist.xml
+        run: cp Addon/playlist.xml release_staging/
+      
+      - name: Copy vehicle XML files
+        run: cp Addon/vehicle_*.xml release_staging/
+      
+      - name: Copy and rename main.lua to script.lua
+        run: cp Addon/_build/out/release/main.lua release_staging/script.lua
+
+      - name: Generate safe names
+        run: |
+          SAFE_NAME=$(echo "${{ inputs.release_name }}" | tr ' ' '_')
+          echo "SAFE_NAME=$SAFE_NAME" >> $GITHUB_ENV
+      
+      - name: Create ZIP archive
+        run: |
+          cd release_staging
+          zip -r "../${{ env.SAFE_NAME }}.zip" .
+          cd ..
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.SAFE_NAME }}
+          name: ${{ inputs.release_name }}
+          body: ${{ inputs.release_body }}
+          files: ${{ env.SAFE_NAME }}.zip
+          draft: ${{ inputs.is_draft }}
+          prerelease: ${{ inputs.is_prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

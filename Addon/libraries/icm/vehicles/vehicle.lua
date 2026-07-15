@@ -1,5 +1,6 @@
 ---@diagnostic disable: inject-field
 -- required libraries
+require("libraries.addon.commands.command.command")
 require("libraries.addon.components.spawningUtils")
 require("libraries.addon.components.tags")
 require("libraries.addon.script.debugging")
@@ -7,17 +8,20 @@ require("libraries.addon.script.players")
 require("libraries.addon.script.safeServer")
 require("libraries.addon.script.matrix")
 require("libraries.icm.squad")
-require("libraries.icm.island")
+require("libraries.icm.islands.island")
 require("libraries.icm.spawnModifiers")
 require("libraries.icm.cargo")
 require("libraries.icm.objective")
 require("libraries.utils.string")
+
 
 -- library name
 Vehicle = {}
 
 -- shortened library name
 v = Vehicle
+
+---@alias cost number
 
 ---@param vehicle_object vehicle_object the vehicle you want to get the speed of
 ---@param ignore_terrain_type ?boolean if false or nil, it will include the terrain type in speed, otherwise it will return the offroad speed (only applicable to land vehicles)
@@ -26,16 +30,16 @@ v = Vehicle
 ---@param aggressiveness_override ?string \"normal" to override the speed as always normal, "aggressive" to override the speed as always aggressive (only applicable to land vehicles)
 ---@return number speed the speed of the vehicle, 0 if not found
 ---@return boolean got_speed if the speed was found
-function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiveness, terrain_type_override, aggressiveness_override, ignore_convoy_modifier)
+function Vehicle.getTargetSpeed(vehicle_object, ignore_terrain_type, ignore_aggressiveness, terrain_type_override, aggressiveness_override, ignore_convoy_modifier)
 	if not vehicle_object then
-		d.print("(Vehicle.getSpeed) vehicle_object is nil!", true, 1)
+		d.print("(Vehicle.getTargetSpeed) vehicle_object is nil!", true, 1)
 		return 0, false
 	end
 
-	local _, squad = Squad.getSquad(vehicle_object.group_id)
+	local _, squad = Squad.getSquadFromGroup(vehicle_object.group_id)
 
 	if not squad then
-		d.print("(Vehicle.getSpeed) squad is nil! vehicle_id: "..tostring(vehicle_object.group_id), true, 1)
+		d.print("(Vehicle.getTargetSpeed) squad is nil! vehicle_id: "..tostring(vehicle_object.group_id), true, 1)
 		return 0, false
 	end
 
@@ -68,8 +72,6 @@ function Vehicle.getSpeed(vehicle_object, ignore_terrain_type, ignore_aggressive
 			else
 				terrain_type = v.getTerrainType(vehicle_object.transform)
 			end
-
-			local _, squad = Squad.getSquad(vehicle_object.group_id)
 			
 			local aggressive = aggressiveness_override or not ignore_aggressiveness and squad.command == SQUAD.COMMAND.ENGAGE
 			if aggressive then
@@ -292,14 +294,14 @@ function Vehicle.getCost(vehicle_name)
 
 	if not vehicle_name then
 		d.print("(Vehicle.getCost) vehicle_name is nil!", true, 1)
-		return 0, nil, false
+		return 0, false, false
 	end
 
 	vehicle_name = string.removePrefix(vehicle_name)
 
 	local prefab, got_prefab = v.getPrefab(vehicle_name)
 
-	if not got_prefab then
+	if not got_prefab or not prefab then
 		return 0, false, true
 	end
 
@@ -358,10 +360,10 @@ function Vehicle.getPowertrainTypes(vehicle_object)
 	return powertrain_types, true	
 end
 
----@param requested_prefab string? vehicle name or vehicle role, such as scout, will try to spawn that vehicle or type
+---@param requested_prefab string|integer|nil vehicle name or vehicle role, such as scout, will try to spawn that vehicle or type
 ---@param vehicle_type string? the vehicle type you want to spawn, such as boat, leave nil to ignore
 ---@param force_spawn boolean? if you want to force it to spawn, it will spawn at the ai's main base
----@param specified_island ISLAND|AI_ISLAND? the island you want it to spawn at
+---@param specified_island ISLAND? the island you want it to spawn at
 ---@param purchase_type integer? 0 for dont buy, 1 for free (cost will be 0 no matter what), 2 for free but it has lower stats, 3 for spend as much as you can but the less spent will result in lower stats. 
 ---@return boolean spawned_vehicle if the vehicle successfully spawned or not
 ---@return vehicle_object|string vehicle_object the vehicle's data if the the vehicle successfully spawned, otherwise its returns the error code
@@ -512,7 +514,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				return false, "no islands to attack! cancelling spawning of attack vehicle"
 			end
 			for island_index, island in pairs(g_savedata.islands) do
-				if is.canSpawn(island, selected_prefab) and (selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform)) then
+				if Island.canSpawnPrefab(island, selected_prefab) and (selected_spawn_transform == nil or m.xzDistance(target.transform, island.transform) < m.xzDistance(target.transform, selected_spawn_transform)) then
 					selected_spawn_transform = island.transform
 					selected_spawn = island_index
 				end
@@ -526,7 +528,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			local islands_needing_checked = {}
 
 			for island_index, island in pairs(g_savedata.islands) do
-				if is.canSpawn(island, selected_prefab) then
+				if Island.canSpawnPrefab(island, selected_prefab) then
 					if not lowest_defenders or island.defenders < lowest_defenders then -- choose the island with the least amount of defence (A)
 						lowest_defenders = island.defenders -- set the new lowest defender amount on an island
 						selected_spawn_transform = island.transform
@@ -572,7 +574,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			local valid_islands = {}
 			local valid_island_index = {}
 			for island_index, island in pairs(g_savedata.islands) do
-				if is.canSpawn(island, selected_prefab) then
+				if Island.canSpawnPrefab(island, selected_prefab) then
 					table.insert(valid_islands, island)
 					table.insert(valid_island_index, island_index)
 				end
@@ -587,7 +589,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 		-- if they specified the island they want it to spawn at
 		if not force_spawn then
 			-- if they did not force the vehicle to spawn
-			if is.canSpawn(specified_island, selected_prefab) then
+			if Island.canSpawnPrefab(specified_island, selected_prefab) then
 				selected_spawn_transform = specified_island.transform
 				selected_spawn = specified_island.index
 			end
@@ -713,7 +715,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 	-- check to make sure no vehicles are too close, as this could result in them spawning inside each other
 	for _, squad in pairs(g_savedata.ai_army.squadrons) do
 		for vehicle_id, vehicle_object in pairs(squad.vehicles) do
-			if m.distance(spawn_transform, vehicle_object.transform) < (Tags.getValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
+			if m.distance(spawn_transform, vehicle_object.transform) < (Tags.getValue(selected_prefab.vehicle.tags, "spawning_radius") or DEFAULT_SPAWNING_DISTANCE + vehicle_object.spawning_transform.distance) then
 				return false, "spawn location was too close to vehicle "..vehicle_id
 			end
 		end
@@ -794,7 +796,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 				is_sonar = Tags.has(selected_prefab.vehicle.tags, "sonar")
 			},
 			spawning_transform = {
-				distance = Tags.getValue(selected_prefab.vehicle.tags, "spawning_distance") or DEFAULT_SPAWNING_DISTANCE
+				distance = Tags.getValue(selected_prefab.vehicle.tags, "spawning_radius") or DEFAULT_SPAWNING_DISTANCE
 			},
 			speed = {
 				speed = Tags.getValue(selected_prefab.vehicle.tags, "speed") or 0,
@@ -818,6 +820,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			just_strafed = true, -- used for fighter jet strafing
 			---@type string
 			strategy = Tags.getValue(selected_prefab.vehicle.tags, "strategy", true) --[[@as string]] or "general",
+			sink_depth = Tags.getValue(selected_prefab.vehicle.tags, "sink_depth") or explosion_depths[spawned_objects.spawned_vehicle.vehicle_type] or -4,
 			can_offroad = Tags.has(selected_prefab.vehicle.tags, "can_offroad"),
 			is_resupply_on_load = false,
 			transform = spawn_transform --[[@as SWMatrix]],
@@ -837,11 +840,27 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			vehicle_data.fire_id = spawned_objects.fires[1].id
 		end
 
-		local squad = addToSquadron(vehicle_data)
+		-- Add to a squad
+		local squad = Squad.getBestSquadForVehicle(vehicle_data)
+		if squad then
+			d.print("(Vehicle.spawn) adding vehicle to existing squad: "..squad.index, true, 0)
+			Squad.addVehicle(squad, vehicle_data)
+		else
+			d.print("(Vehicle.spawn) no valid squad found, will create a new squad for vehicle", true, 0)
+			local new_squad_index, squad_created = Squad.create(nil, vehicle_data)
+			squad = Squad.getSquadFromIndex(new_squad_index)
+			if not squad or not squad_created then
+				d.print("(Vehicle.spawn) failed to create new squad for vehicle!", true, 1)
+				return false, "failed to create new squad for vehicle"
+			end
+			Squad.addVehicle(squad, vehicle_data)
+		end
+
+		-- Set special vehicle commands based on vehicle role
 		if Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "scout" then
-			setSquadCommand(squad, SQUAD.COMMAND.SCOUT)
+			Squad.setCommand(squad, SQUAD.COMMAND.SCOUT)
 		elseif Tags.getValue(selected_prefab.vehicle.tags, "vehicle_type", true) == "wep_turret" then
-			setSquadCommand(squad, SQUAD.COMMAND.TURRET)
+			Squad.setCommand(squad, SQUAD.COMMAND.TURRET)
 
 			-- set the zone it spawned at to say that a turret was spawned there
 			if g_savedata.islands[selected_spawn] then -- set at their island
@@ -851,7 +870,7 @@ function Vehicle.spawn(requested_prefab, vehicle_type, force_spawn, specified_is
 			end
 
 		elseif Tags.getValue(selected_prefab.vehicle.tags, "role", true) == "cargo" then
-			setSquadCommand(squad, SQUAD.COMMAND.CARGO)
+			Squad.setCommand(squad, SQUAD.COMMAND.CARGO)
 		end
 
 		local prefab, got_prefab = v.getPrefab(selected_prefab.location_data.name)
@@ -1101,3 +1120,49 @@ function Vehicle.kill(vehicle_object, kill_instantly, force_kill)
 
 	return true
 end
+
+Command.registerCommand(
+	"killvehicle",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg string[] the arguments of the command.
+	function(full_message, peer_id, arg)
+		group_id = tonumber(arg[1])
+		if group_id == nil then
+			d.print("(Command.killvehicle) invalid vehicle id given: "..tostring(arg[1]), false, 0, peer_id)
+			return
+		end
+		targetVehicle = Squad.getVehicle(group_id)
+		if targetVehicle == nil then
+			d.print("(Command.killvehicle) failed to get vehicle with id: "..tostring(arg[1]), false, 0, peer_id)
+			return
+		end
+		-- Optional arguments
+		local kill_instantly = false
+		if arg[2] ~= nil then
+			local lowered_arg = string.lower(arg[2])
+			kill_instantly = lowered_arg == "true"
+			if lowered_arg ~= "true" and lowered_arg ~= "false" then
+				d.print("(Command.killvehicle) Invalid kill_instantly argument: "..tostring(arg[2])..". Valid values are \"true\" or \"false\".", false, 0, peer_id)
+				return
+			end
+		end
+		local force_kill = false
+		if arg[3] ~= nil then
+			local lowered_arg = string.lower(arg[3])
+			force_kill = lowered_arg == "true"
+			if lowered_arg ~= "true" and lowered_arg ~= "false" then
+				d.print("(Command.killvehicle) Invalid force_kill argument: "..tostring(arg[3])..". Valid values are \"true\" or \"false\".", false, 0, peer_id)
+				return
+			end
+		end
+
+
+		Vehicle.kill(targetVehicle, kill_instantly, force_kill)
+	end,
+	"admin",
+	"Marks a AI vehicle as killed, eventually despawning it. Used primarly for debugging, you may want to use despawnvehicle insteaed.",
+	"Marks a AI vehicle as killed, Use 'true' to enable the second and third argument",
+	{""},
+	"(group_id) kill_instantly? force_kill?"
+)

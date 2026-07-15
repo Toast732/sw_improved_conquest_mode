@@ -1,6 +1,6 @@
 --[[
 	
-Copyright 2024 Liam Matthews
+Copyright 2025 Liam Matthews
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,13 +33,16 @@ require("libraries.utils.string")
 
 ---@alias defaultCommandPermissions "none"|"auth"|"admin"|"script"|"auth_script"|"admin_script"
 
+---@alias commandFunctionToExecute fun(full_message: string, peer_id: integer, ...)
+
 ---@class Command
 ---@field name string the name of the command
----@field function_to_execute function the function to execute when the command is called, given params are: full_message, peer_id, arg
+---@field function_to_execute commandFunctionToExecute the function to execute when the command is called, given params are: full_message, peer_id, arg
 ---@field required_permission defaultCommandPermissions|string the permission this command requires
 ---@field description string the description of the command
 ---@field short_description string the short description for this command
 ---@field examples table<integer, string> the examples of using this command
+---@field args string the arguments for this command, eg: "<arg1> [arg2]"
 ---@field prefix string the prefix for this command
 
 --[[
@@ -47,6 +50,24 @@ require("libraries.utils.string")
 ---@type table<string, command>
 local registered_commands = {}
 ]]
+command_aliases = {
+	dbg = "debug",
+	pseudospeed = "speed",
+	sv = "spawnvehicle",
+	dv = "deletevehicle",
+	kill = "deletevehicle",
+	cp = "capturepoint",
+	capture = "capturepoint",
+	captureisland = "capturepoint",
+	st = "spawnturret",
+	si = "scoutintel",
+	setintel = "scoutintel",
+	vl = "vehiclelist",
+	listvehicles = "vehiclelist",
+	tp = "teleport",
+	teleport_vehicle = "teleport",
+	kamikaze = "airvehicleskamikaze"
+}
 
 ---@type table<prefix, table<commandName, Command>>
 commands = {}
@@ -80,6 +101,11 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 	-- make the command lowercase
 	command = command:friendly()
 
+	-- check for command aliases
+	if command_aliases[command] then
+		command = command_aliases[command]
+	end
+
 	-- if the command does not exist for the provided prefix
 	if not commands[prefix][command] then return end
 
@@ -104,8 +130,34 @@ function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, comma
 		return
 	end
 
+	-- if dlc_weapons is disabled or the player does not have it (if in singleplayer)
+	local args = table.pack(...)
+	if not is_dlc_weapons then
+
+		if not full_message:match("-f") then
+
+			--? if vanilla conquest mode was left enabled
+			if g_savedata.info.addons.default_conquest_mode then
+				d.print("Improved Conquest Mode is disabled as you left Vanilla Conquest Mode enabled! Please create a new world and disable \"DLC Weapons AI\"", false, 1, peer_id)
+			end
+
+			d.print("Error: Improved Conquest Mode has been disabled.", false, 1, peer_id)
+
+			return
+		end
+
+		d.print("Bypassed addon being disabled!", false, 0, peer_id)
+
+		-- remove -f from the args
+		for argument = 1, #arg do
+			if arg[argument] == "-f" then
+				table.remove(arg, argument)
+			end
+		end
+	end
+
 	-- call the command
-	command_data.function_to_execute(full_message, peer_id, table.pack(...))
+	command_data.function_to_execute(full_message, peer_id, args)
 
 	return true
 end
@@ -129,13 +181,14 @@ end
 
 ---# Registers a command
 ---@param name commandName the name of the command
----@param function_to_execute function the function to execute when the command is called, params are (full_message, peer_id, args)
+---@param function_to_execute commandFunctionToExecute the function to execute when the command is called, params are (full_message, peer_id, args)
 ---@param required_permission defaultCommandPermissions|string the permission required to execute this command.
 ---@param description string the description of the command
 ---@param short_description string the shortened description of the command
 ---@param examples table<integer, string> examples of using the command, prefix and the command will be added to the strings automatically.
+---@param args string? the arguments for this command, eg: "<arg1> [arg2]"
 ---@param unformatted_prefix prefix? the prefix for the command, leave blank to use the addon's short name as the prefix.
-function Command.registerCommand(name, function_to_execute, required_permission, description, short_description, examples, unformatted_prefix)
+function Command.registerCommand(name, function_to_execute, required_permission, description, short_description, examples, args, unformatted_prefix)
 	
 	-- Format the prefix.
 	local prefix = Command.formatPrefix(unformatted_prefix)
@@ -157,6 +210,7 @@ function Command.registerCommand(name, function_to_execute, required_permission,
 		description = description or "",
 		short_description = short_description or "",
 		examples = examples or {},
+		args = args or "",
 		prefix = prefix
 	}
 

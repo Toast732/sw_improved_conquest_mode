@@ -1,6 +1,6 @@
 --[[
 	
-Copyright 2024 Liam Matthews
+Copyright 2025 Liam Matthews
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,3 +27,6 @@ require("libraries.addon.commands.command.definitions.genericCommands")
 
 -- Adds the variable interaction commands, eg: "print_variable", "set_variable"
 require("libraries.addon.commands.command.definitions.variableInteractionCommands")
+
+-- Add the ICM specific commands not included in their own libraries
+require("libraries.addon.commands.command.definitions.icmCommands")

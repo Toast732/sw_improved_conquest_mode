@@ -57,10 +57,13 @@ replies_awaiting = {}
 ---@param count integer? the number of times the function can be executed, -1 for infinite (default 1)
 ---@param timeout number? the time in seconds before the function expires, -1 for infinite (default -1)
 function AddonCommunication.executeOnReply(short_addon_name, message, port, execute_function, count, timeout)
+	short_addon_name = short_addon_name or SHORT_ADDON_NAME-- default to this addon's short name
 	if not message then
 		d.print("(AddonCommunication.executeOnReply) message was left blank!", true, 1)
 		return
 	end
+
+	port = port or 0
 
 	if not execute_function then
 		d.print("(AddonCommunication.executeOnReply) execute_function was left blank!", true, 1)

@@ -213,6 +213,7 @@ function Setup.createVehiclePrefabs()
 
 				-- check if this is the flag
 				if not flag_prefab and Tags.has(component_data.tags, "type=dlc_weapons_flag") and component_data.type == "vehicle" then
+					---@class FLAG_PREFAB
 					flag_prefab = { 
 						addon_index = addon_index,
 						location_index = location_index,

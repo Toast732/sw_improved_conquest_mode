@@ -11,10 +11,12 @@ require("libraries.addon.components.tags")
 require("libraries.addon.script.debugging")
 require("libraries.addon.script.matrix")
 require("libraries.addon.script.pathfinding")
+require("libraries.addon.commands.command.command")
 
 require("libraries.icm.objective")
 require("libraries.icm.squad")
 require("libraries.icm.vehicles.vehicle")
+require("libraries.icm.squad")
 
 require("libraries.utils.math")
 require("libraries.utils.tables")
@@ -69,6 +71,12 @@ s_fluid_types = {
 ---@field diesel number the weight for diesel
 ---@field jet_fuel number the weight for jet fuel
 
+---@class ICMRouteSegment
+---@field island_index integer the index of the island to travel to
+---@field transport_method PREFAB_DATA|{name: string, movement_speed: number} the vehicle prefab to use for transport
+---@field transport_type "heli"|"land"|"plane"|"sea" the type of transport
+
+
 
 --[[
 
@@ -106,8 +114,9 @@ function Cargo.clean(group_id) -- cleans the data on the cargo vehicle if it exi
 			end
 
 			--* check if theres still vehicles in the squad, if so, set the squad's command to none
-			local squad_index, squad = Squad.getSquad(group_id)
+			local squad_index, squad = Squad.getSquadFromGroup(group_id)
 			if squad_index and squad then
+				-- Can't use Squad.setCommand as it doesn't allow removing the CARGO command
 				g_savedata.ai_army.squadrons[squad_index].command = SQUAD.COMMAND.NONE
 			end
 
@@ -115,10 +124,13 @@ function Cargo.clean(group_id) -- cleans the data on the cargo vehicle if it exi
 			-- if there is, delete it to avoid a softlock
 			if g_savedata.cargo_vehicles[cargo_vehicle_index+1] then
 				if g_savedata.cargo_vehicles[cargo_vehicle_index+1].route_status == 3 then
-					local squad_index, squad = Squad.getSquad(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.group_id)
+					d.print("(Cargo.clean) convoy vehicle "..tostring(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.group_id).." was waiting for vehicle "..tostring(group_id)..", removing to prevent deadlock.", true, 1)
+					local squad_index, squad = Squad.getSquadFromGroup(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data.group_id)
 
 					if squad_index then
 						v.kill(g_savedata.cargo_vehicles[cargo_vehicle_index+1].vehicle_data, true, true)
+					else
+						d.print("(Cargo.clean) removal failed, squad_index was nil!", true, 1)
 					end
 				end
 			end
@@ -227,10 +239,10 @@ function Cargo.getEscorts(cargo_vehicle, island) -- gets the escorts for the car
 	g_savedata.cargo_vehicles[cargo_vehicle.group_id].convoy[1 + math.floor(#possible_escorts/2)] = cargo_vehicle.group_id
 
 	for escort_index, escort in ipairs(possible_escorts) do
-		local squad_index, _ = Squad.getSquad(cargo_vehicle.group_id)
+		local squad_index, _ = Squad.getSquadFromGroup(cargo_vehicle.group_id)
 
 		if squad_index then
-			transferToSquadron(escort, squad_index, true)
+			Squad.transferToSquad(escort, squad_index, true)
 			p.resetPath(escort)
 			if cargo_vehicle.transform then
 				p.addPath(escort, cargo_vehicle.transform)
@@ -267,7 +279,7 @@ function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight
 	end
 
 	-- calculate weight based on difference of speed
-	speed_weight = v.getSpeed(cargo_vehicle) - v.getSpeed(escort_vehicle)
+	speed_weight = v.getTargetSpeed(cargo_vehicle) - v.getTargetSpeed(escort_vehicle)
 	
 	--? if the escort vehicle is slower, then make it affect the weight more
 	if speed_weight > 0 then
@@ -286,38 +298,39 @@ function Cargo.getEscortWeight(cargo_vehicle, escort_vehicle) --* get the weight
 	return weight
 end
 
---- @param vehicle_id number the vehicle's id
---- @return table|nil cargo the contents of the cargo vehicle's tanks
+--- Adds up the total amount of cargo a vehicle has in its tanks
+--- @param group_id number the group's id
+--- @return requestedCargo? cargo the contents of the cargo vehicle's tanks
 --- @return boolean got_tanks wether or not we were able to get the tanks
-function Cargo.getTank(vehicle_id)
+function Cargo.getTank(group_id)
 
-	if not vehicle_id then
+	if not group_id then
 		d.print("(Cargo.getTank) vehicle_id is nil!", true, 0)
 		return nil, false
 	end
 
-	if not g_savedata.cargo_vehicles[vehicle_id] then
-		d.print("(Cargo.getTank) "..vehicle_id.." is not a cargo vehicle!", true, 0)
+	if not g_savedata.cargo_vehicles[group_id] then
+		d.print("(Cargo.getTank) "..group_id.." is not a cargo vehicle!", true, 0)
 		return nil, false
 	end
 
 	---@type requestedCargo
 	local cargo = {
 		[1] = {
-			cargo_type = g_savedata.cargo_vehicles[vehicle_id].requested_cargo[1].cargo_type,
+			cargo_type = g_savedata.cargo_vehicles[group_id].requested_cargo[1].cargo_type,
 			amount = 0
 		},
 		[2] = {
-			cargo_type = g_savedata.cargo_vehicles[vehicle_id].requested_cargo[2].cargo_type,
+			cargo_type = g_savedata.cargo_vehicles[group_id].requested_cargo[2].cargo_type,
 			amount = 0
 		},
 		[3] = {
-			cargo_type = g_savedata.cargo_vehicles[vehicle_id].requested_cargo[3].cargo_type,
+			cargo_type = g_savedata.cargo_vehicles[group_id].requested_cargo[3].cargo_type,
 			amount = 0
 		}
 	}
 
-	local vehicle_object, squad_index, squad = Squad.getVehicle(vehicle_id)
+	local vehicle_object, squad_index, squad = Squad.getVehicle(group_id)
 
 	if not vehicle_object then
 		d.print("(Cargo.getTank) vehicle_object is nil!", true, 0)
@@ -330,10 +343,18 @@ function Cargo.getTank(vehicle_id)
 
 	--d.print("(Cargo.getTank) cargo_tanks_per_set: "..tonumber(cargo_tanks_per_set), true, 0)
 
+	local main_vehicle_id = VehicleGroup.getMainVehicle(group_id)
+
+	-- ensure we got the main_vehicle_id
+	if not main_vehicle_id then
+		d.print("(Cargo.getTank) main_vehicle_id is nil", true, 1)
+		return cargo, false
+	end
+
 	for tank_set=0, 2 do
 		for tank_index=0, cargo_tanks_per_set-1 do
 
-			local tank_data, got_data = s.getVehicleTank(vehicle_id, "RESOURCE_TYPE_"..tank_set.."_"..tank_index)
+			local tank_data, got_data = s.getVehicleTank(main_vehicle_id, "RESOURCE_TYPE_"..tank_set.."_"..tank_index)
 
 			if got_data then
 				if tank_data.value > 0 then
@@ -343,7 +364,7 @@ function Cargo.getTank(vehicle_id)
 					d.print("(Cargo.getTank) Tank is empty.\ntank_set: "..tank_set.." tank_index: "..tank_index, true, 1)]]
 				end
 			else
-				d.print("(Cargo.getTank) Error getting tank data for "..vehicle_id.." Tank set: "..tank_set.." Tank index: "..tank_index, true, 1)
+				d.print("(Cargo.getTank) Error getting tank data for "..main_vehicle_id.." Tank set: "..tank_set.." Tank index: "..tank_index, true, 1)
 			end
 		end
 	end
@@ -403,8 +424,8 @@ function Cargo.setKeypad(vehicle_id, keypad_name, cargo_type)
 	s.setVehicleKeypad(vehicle_id, keypad_name, s_fluid_types[cargo_type])
 end
 
----@param recipient vehicle_object|ISLAND|AI_ISLAND the island or vehicle object thats getting the cargo
----@param sender vehicle_object|ISLAND|AI_ISLAND the island or vehicle object thats sending the cargo
+---@param recipient vehicle_object|ISLAND the island or vehicle object thats getting the cargo
+---@param sender vehicle_object|ISLAND the island or vehicle object thats sending the cargo
 ---@param requested_cargo requestedCargo the cargo thats going between the sender and recipient
 ---@param transfer_time number how long the cargo transfer should take
 ---@param tick_rate number the tick rate
@@ -597,7 +618,7 @@ function Cargo.transfer(recipient, sender, requested_cargo, transfer_time, tick_
 	return false, "transfer incomplete"
 end
 
----@param island ISLAND|AI_ISLAND|PLAYER_ISLAND the island you want to produce the cargo at
+---@param island ISLAND the island you want to produce the cargo at
 ---@param natural_production number? the natural production of this island
 function Cargo.produce(island, natural_production)
 
@@ -649,7 +670,7 @@ function Cargo.produce(island, natural_production)
 	end
 end
 
----@return ISLAND|AI_ISLAND island the island thats best to resupply
+---@return ISLAND island the island thats best to resupply
 ---@return ICMResupplyWeights weight the weights of all of the cargo types for the resupply island
 function Cargo.getBestResupplyIsland()
 
@@ -748,7 +769,7 @@ function Cargo.getBestResupplierIsland(resupply_weights)
 end
 
 ---@param island ISLAND the island you want to get the resupply weight of
----@return weight[] weights the weights of all of the cargo types for the resupply island
+---@return ICMResupplyWeights weights the weights of all of the cargo types for the resupply island
 function Cargo.getResupplyWeight(island) -- get the weight of the island (for resupplying the island)
 	-- weight by how much cargo the island has
 	local oil_weight = ((RULES.LOGISTICS.CARGO.ISLANDS.max_capacity - island.cargo.oil) / (RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.9)) -- oil
@@ -774,7 +795,7 @@ function Cargo.getResupplyWeight(island) -- get the weight of the island (for re
 	return weight
 end
 
----@param island ISLAND|AI_ISLAND the island you want to get the resupplier weight of
+---@param island ISLAND the island you want to get the resupplier weight of
 ---@return ICMResupplyWeights weights the weights of all of the cargo types for the resupplier island
 function Cargo.getResupplierWeight(island) -- get weight of the island (for using it to resupply another island)
 	local oil_weight = (island.cargo.oil/(RULES.LOGISTICS.CARGO.ISLANDS.max_capacity*0.9)) -- oil
@@ -811,7 +832,7 @@ function Cargo.newRequestedCargoItem(cargo_type, amount)
 end
 
 
----@param cargo_weight weight[] the weight for the cargo trip
+---@param cargo_weight ICMResupplyWeights the weight for the cargo trip
 ---@param vehicle_object vehicle_object the vehicle data for the first cargo trip
 ---@return requestedCargo requested_cargo the cargo type for each tank set, and the amount for each tank set
 function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
@@ -898,9 +919,9 @@ function Cargo.getRequestedCargo(cargo_weight, vehicle_object)
 	return requested_cargo
 end
 
----@param origin_island ISLAND|AI_ISLAND the island of which the cargo is coming from
----@param dest_island ISLAND|AI_ISLAND the island of which the cargo is going to
----@return route[] best_route the best route to go from the origin to the destination
+---@param origin_island ISLAND the island of which the cargo is coming from
+---@param dest_island ISLAND the island of which the cargo is going to
+---@return ICMRouteSegment[] best_route the best route to go from the origin to the destination
 function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier island | dest = resupply island
 	local start_time = s.getTimeMillisec()
 
@@ -918,37 +939,45 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 
 	-- checks for all vehicles, and fills in some info to avoid errors if it doesnt exist
 	if not transport_vehicle.heli then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.heli = {
 			name = "none"
 		}
 	elseif not transport_vehicle.heli.name then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.heli = {
 			name = "unknown"
 		}
 	end
 	if not transport_vehicle.land then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.land = {
 			name = "none"
 		}
 	elseif not transport_vehicle.land.name then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.land = {
 			name = "unknown"
 		}
 	end
 	if not transport_vehicle.plane then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.plane = {
 			name = "none"
 		}
 	elseif not transport_vehicle.plane.name then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.plane = {
 			name = "unknown"
 		}
 	end
 	if not transport_vehicle.sea then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.sea = {
 			name = "none"
 		}
 	elseif not transport_vehicle.sea.name then
+		---@diagnostic disable-next-line: missing-fields
 		transport_vehicle.sea = {
 			name = "unknown"
 		}
@@ -1296,7 +1325,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 				end
 			end
 
-			if first_route_time > best_route_time then
+			if first_route_time > best_route_time or not first_route.island_index then
 				goto break_first_island
 			end
 
@@ -1327,7 +1356,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 						end
 					end
 
-					if second_route_time + first_route_time > best_route_time then
+					if second_route_time + first_route_time > best_route_time or not second_route.island_index then
 						goto break_second_island
 					end
 
@@ -1359,7 +1388,7 @@ function Cargo.getBestRoute(origin_island, dest_island) -- origin = resupplier i
 								end
 							end
 
-							if third_route_time + second_route_time + first_route_time > best_route_time then
+							if third_route_time + second_route_time + first_route_time > best_route_time or not third_route.island_index then
 								goto break_third_island
 							end
 
@@ -1411,11 +1440,10 @@ function Cargo.getTransportVehicle(vehicle_type)
 	return prefabs_data
 end
 
----@param island1 ISLAND|AI_ISLAND|PLAYER_ISLAND the first island you want to get the distance from
----@param island2 ISLAND|AI_ISLAND|PLAYER_ISLAND the second island you want to get the distance to
+---@param island1 ISLAND the first island you want to get the distance from
+---@param island2 ISLAND the second island you want to get the distance to
 ---@return table distance the distance between the first island and the second island | distance.land | distance.sea | distance.air
 function Cargo.getIslandDistance(island1, island2)
-
 	local first_cache_index = island2.index
 	local second_cache_index = island1.index
 
@@ -1572,3 +1600,122 @@ function Cargo.reset(island, cargo_type)
 
 	return true, "reset"
 end
+
+-- Define commands related to cargo
+Command.registerCommand(
+	"resetcargo",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		local was_reset, error = Cargo.reset(is.getDataFromName(arg[1]), string.friendly(arg[2]))
+        if was_reset then
+            d.print("Reset the cargo storages for all islands", false, 0, peer_id)
+        else
+            d.print("Cargo failed to reset! error: "..error, false, 1, peer_id)
+        end
+	end,
+	"admin",
+	"resets the all island cargo storages to 0 for each resource, leave island blank for all islands, leave cargo_type blank for all resources",
+	"resets the ai's cargo storages",
+	{"", "North_Harbour", "Garrison_Toddy oil"},
+	"[island] [cargo_type]"
+)
+
+-- Queue convoy command
+Command.registerCommand(
+	"queueconvoy",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		g_savedata.tick_extensions.cargo_vehicle_spawn = RULES.LOGISTICS.CARGO.VEHICLES.spawn_time - g_savedata.tick_counter - 1
+		d.print("Updated convoy tick extension so a convoy will spawn when possible.", false, 0, peer_id)
+	end,
+	"admin",
+	"queues a convoy to be sent out, will be sent out once theres not any convoys",
+	"queues a convoy",
+	{""}
+)
+
+Command.registerCommand(
+	"convoycooldown",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		local rate = RULES.LOGISTICS.CARGO.VEHICLES.spawn_time
+		local offset = g_savedata.tick_extensions.cargo_vehicle_spawn or 0
+		local ticks_remaining = (rate - ((g_savedata.tick_counter + offset) % rate)) % rate
+		local time_remaining = ticks_remaining / time.second
+		if time_remaining > 60 then
+			time_remaining = ticks_remaining / time.minute
+			d.print("Current convoy cooldown: "..math.ceil(time_remaining).." minutes", false, 0, peer_id)
+		else
+			d.print("Current convoy cooldown: "..math.ceil(time_remaining).." seconds", false, 0, peer_id)
+		end
+	end,
+	"admin",
+	"Prints the time remaining until the next convoy can be sent out",
+	"prints the current convoy cooldown",
+	{""}
+)
+
+Command.registerCommand(
+	"debugcargo1",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		d.print("asking cargo to do things...(get island distance)", false, 0, peer_id)
+        for island_index, island in pairs(g_savedata.islands) do
+            if island.faction == ISLAND.FACTION.AI then
+                Cargo.getIslandDistance(g_savedata.ai_base_island, island)
+            end
+        end
+	end,
+	"admin",
+	"Debugging command which has Cargo calculate the distance for every island from the AI base",
+	"Debugging command for cargo distance calculations",
+	{""}
+)
+
+Command.registerCommand(
+	"debugcargo2",
+	---@param full_message string the full message
+	---@param peer_id integer the peer_id of the sender
+	---@param arg table the arguments of the command.
+	function(full_message, peer_id, arg)
+		d.print("asking cargo to do things...(get best route)", false, 0, peer_id)
+		if arg[1] == nil then
+			d.print("Missing island id argument!", false, 0, peer_id)
+			return
+		end
+		if tonumber(arg[1]) == nil then
+			d.print("Island ID must be a number!", false, 0, peer_id)
+			return
+		end
+        island_selected = g_savedata.islands[tonumber(arg[1])]
+        if island_selected then
+            d.print("selected island index: "..island_selected.index, false, 0, peer_id)
+            local best_route = Cargo.getBestRoute(g_savedata.ai_base_island, island_selected)
+            if best_route[1] then
+                d.print("first transportation method: "..best_route[1].transport_method, false, 0, peer_id)
+            else
+                d.print("unable to find cargo route!", false, 0, peer_id)
+            end
+            if best_route[2] then
+                d.print("second transportation method: "..best_route[2].transport_method, false, 0, peer_id)
+            end
+            if best_route[3] then
+                d.print("third transportation method: "..best_route[3].transport_method, false, 0, peer_id)
+            end
+        else
+            d.print("incorrect island id: "..arg[1], false, 0, peer_id)
+        end
+	end,
+	"admin",
+	"Runs Cargo.getBestRoute for the given island id and prints the calculated route",
+	"Prints the best cargo route from the AI base to the given island id",
+	{""}
+)
