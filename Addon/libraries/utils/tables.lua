@@ -130,6 +130,8 @@ function table.fromString(S)
 	return table.pack(stringToTable(S, 1))[1]
 end
 
+
+
 --- Returns the value at the path in _ENV
 ---@param path string the path we want to get the value at
 ---@return any value the value at the path, if it reached a nil value in the given path, it will return the value up to that point, and is_success will be false.
@@ -140,13 +142,22 @@ function table.getValueAtPath(path)
 		return nil, false
 	end
 
+	-- If path is _ENV, then set it to an empty string.
+	if path == "_ENV" then
+		path = ""
+	end
+
 	local cur_path
 	-- if our environment is modified, we will have to make a deep copy under the non-modified environment.
 	if _ENV_NORMAL then
+		-- make sure _ENV_MODIFIED is removed from _ENV_NORMAL to prevent infinite recursion
+		_ENV_NORMAL._ENV_MODIFIED = nil
 		cur_path = _ENV_NORMAL.table.copy.deep(_ENV, _ENV_NORMAL)
 	else
 		cur_path = table.copy.deep(_ENV)
 	end
+	
+	--cur_path = safe_copy_deep(_ENV)
 
 	local cur_path_string = "_ENV"
 
@@ -162,14 +173,21 @@ function table.getValueAtPath(path)
 	return cur_path, true
 end
 
+
 --- Sets the value at the path in _ENV
 ---@param path string the path we want to set the value at
 ---@param set_value any the value we want to set the value of what the path is
 ---@return boolean is_success if it successfully got the value at the path
 function table.setValueAtPath(path, set_value)
+	
 	if type(path) ~= "string" then
 		d.print(("(table.setValueAtPath) path must be a string! given path: %s type: %s"):format(path, type(path)), true, 1)
 		return false
+	end
+
+	-- If path is _ENV, then set it to an empty string.
+	if path == "_ENV" then
+		path = ""
 	end
 
 	local cur_path = _ENV
@@ -240,6 +258,8 @@ table.copy = {
 
 		__ENV = __ENV or _ENV
 
+		-- Normal Version
+
 		local function deepCopy(T)
 			local copy = {}
 			if __ENV.type(T) == "table" then
@@ -251,7 +271,24 @@ table.copy = {
 			end
 			return copy
 		end
+
+		-- Debug Version (For fixing stack overflows)
+		local function deepCopyDebug(T, p_key)
+			local copy = {}
+			debug.log("SW ICM  Debug: | "..p_key)
+			if __ENV.type(T) == "table" then
+				for key, value in __ENV.next, T, nil do
+					copy[deepCopyDebug(key, p_key.."."..tostring(key))] = deepCopyDebug(value, p_key.."."..tostring(key))
+				end
+			else
+				copy = T
+			end
+			return copy
+		end
+
+		--return deepCopy(t)
 	
-		return deepCopy(t)
+		return deepCopy(t ,"")
+		
 	end
 }

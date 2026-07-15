@@ -26,7 +26,7 @@ limitations under the License.
 --- Developed using LifeBoatAPI - Stormworks Lua plugin for VSCode - https://code.visualstudio.com/download (search "Stormworks Lua with LifeboatAPI" extension)
 --- If you have any issues, please report them here: https://github.com/nameouschangey/STORMWORKS_VSCodeExtension/issues - by Nameous Changey
 
-ADDON_VERSION = "(0.4.0.26)"
+ADDON_VERSION = "(0.4.0.27)"
 IS_DEVELOPMENT_VERSION = string.match(ADDON_VERSION, "(%d%.%d%.%d%.%d)")
 
 SHORT_ADDON_NAME = "ICM"
@@ -383,7 +383,8 @@ g_savedata = {
 }
 
 -- libraries
-require("libraries.addon.commands.commands") -- the command library
+require("libraries.addon.commands.command.command") -- the new command library.
+require("libraries.addon.commands.commands_legacy") -- the command old library, will slowly be migrated to the new system.
 require("libraries.addon.commands.flags") -- the flag command library
 
 require("libraries.addon.components.addonLocationUtils") -- functions for addon locations and environment mods
@@ -1070,22 +1071,24 @@ function setupMain(is_world_create)
 	end
 
 	g_savedata.info.setup = true
-	-- this one will reset every reload/load of the world, this ensures that tracebacks wont be enabled before setupMain is finished.
-	addon_setup = true
 
 	for debug_type, debug_setting in pairs(g_savedata.debug) do
 		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
 			local debug_id = d.debugIDFromType(debug_type)
 
 			if debug_setting.needs_setup_on_reload then
-				d.handleDebug(debug_id, true, 0)
+				d.handleDebug(debug_type, true, 0)
 			end
 
 			d.setDebug(debug_id, -1, true)
+
 		end
 	end
 
 	d.print(("%s%.3f%s"):format("ICM setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
+
+	-- this one will reset every reload/load of the world, this ensures that tracebacks wont be enabled before setupMain is finished.
+	addon_setup = true
 end
 
 function onCaptureIsland(island, new_faction, old_faction) -- triggers whenever an island is captured
@@ -1197,6 +1200,8 @@ function onPlayerJoin(steam_id, name, peer_id)
 		end,
 		function(self)
 
+			d.print(("Value of addon_setup: %s"):format(tostring(addon_setup)), false, 0)
+
 			local peer_id = self:getVar("peer_id")
 			local steam_id = self:getVar("steam_id")
 
@@ -1215,6 +1220,8 @@ function onPlayerJoin(steam_id, name, peer_id)
 			s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
 		
 			local player = Players.dataBySID(steam_id)
+
+			--d.print(string.fromTable(_ENV), false, 0)
 
 			if player then
 				for debug_type, debug_data in pairs(g_savedata.debug) do

@@ -82,19 +82,20 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 	if spawned_object_id and spawned_object_id ~= 0 then
 
 		local l_vehicle_type = VEHICLE.TYPE.HELI
+		
 		if Tags.has(component_data.tags, "vehicle_type=wep_plane") then
 			l_vehicle_type = VEHICLE.TYPE.PLANE
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_boat") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_boat") then
 			l_vehicle_type = VEHICLE.TYPE.BOAT
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_land") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_land") then
 			l_vehicle_type = VEHICLE.TYPE.LAND
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_turret") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_turret") then
 			l_vehicle_type = VEHICLE.TYPE.TURRET
-		end
-		if Tags.has(component_data.tags, "type=dlc_weapons_flag") then
+
+		elseif Tags.has(component_data.tags, "type=dlc_weapons_flag") then
 			l_vehicle_type = "flag"
 		end
 

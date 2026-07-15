@@ -246,7 +246,14 @@ command_aliases = {
 	kamikaze = "airvehicleskamikaze"
 }
 
+local old_onCustomCommand = onCustomCommand
 function onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
+
+	local was_intercepted = old_onCustomCommand(full_message, peer_id, is_admin, is_auth, prefix, command, ...)
+
+	if was_intercepted then
+		return
+	end
 
 	prefix = string.lower(prefix)
 
