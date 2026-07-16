@@ -176,6 +176,10 @@ function Debugging.getDebug(debug_id, peer_id)
 	return false
 end
 
+--- Used to enable/disable debug for a specific player. Does the actual code for this process, such as how tracebacks injects into the functions.
+---@param debug_type string the type of debug you want to enable/disable
+---@param enabled boolean if you want to enable or disable the debug
+---@param peer_id integer the peer_id of the player you want to enable/disable the debug for
 function Debugging.handleDebug(debug_type, enabled, peer_id)
 	if debug_type == "chat" then
 		return (enabled and "Enabled" or "Disabled").." Chat Debug"
@@ -336,6 +340,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 					-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
 					__ENV =  _ENV_NORMAL
+					---@diagnostic disable-next-line: inject-field
 					__ENV._ENV_MODIFIED = _ENV
 					_ENV = __ENV
 
@@ -366,6 +371,10 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 					-- switch back to modified environment
 					_ENV = _ENV_MODIFIED
+
+					-- remove __ENV and _ENV_NORMAL._ENV_MODIFIED as it could cause infinite recursion issues down the line.
+					__ENV = nil
+					_ENV_NORMAL._ENV_MODIFIED = nil
 
 					-- return the value to the function which called it.
 					return _ENV_NORMAL.table.unpack(returned)
@@ -527,9 +536,12 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
 
-			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
+			Debugging.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
-			g_savedata.foo_bar = true
+			-- Ensure _ENV_NORMAL exists.
+			if not _ENV_NORMAL then
+				Debugging.print("Failed to setup tracebacks, _ENV_NORMAL is nil!", true, 1)
+			end
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -559,6 +571,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						_ENV_MODIFIED = nil
 						-- Also remove __ENV, for the same reason as above.
 						__ENV = nil
+
+						-- Remove _ENV_MODIFIED from _ENV_NORMAL, as that could cause infinite recursion issues down the line.
+						_ENV_NORMAL._ENV_MODIFIED = nil
 
 						-- Set stack size to 0.
 						g_savedata.debug.traceback.stack_size = 0

@@ -415,28 +415,30 @@ function string.friendly(str, remove_spaces, keep_caps) -- function that replace
 
 	-- make all lowercase
 	
-	local friendly_string = not keep_caps and string.lower(str) or str
+Copyright 2024 Liam Matthews
 
-	-- replace all underscores with spaces
-	friendly_string = string.gsub(friendly_string, "_", " ")
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-	-- if remove_spaces is true, remove all spaces
-	if remove_spaces then
-		friendly_string = string.gsub(friendly_string, " ", "")
-	end
+	http://www.apache.org/licenses/LICENSE-2.0
 
-	return friendly_string
-end
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
----@param vehicle_name string the name you want to remove the prefix of
----@param keep_caps boolean? if you want to keep the caps of the name, false will make all letters lowercase
----@return string vehicle_name the vehicle name without its vehicle type prefix
-function string.removePrefix(vehicle_name, keep_caps)
+]]
 
-	if not vehicle_name then
-		d.print("(string.removePrefix) vehicle_name is nil!", true, 1)
-		return vehicle_name
-	end
+--[[ 
+	Flag command, used to manage more advanced settings.
+	Compliments the settings command, setting command is made to handle less
+	complex commands, and ones that should be set on the world's creation.
+	While flags are ones that may be set for compatiblity reasons, such as if
+	it adding currency rewards is incompatible with another addon on a server,
+	the economy module could be disabled via a flag.
+]]
 
 	local vehicle_type_prefixes = {
 		"BOAT %- ",
@@ -2440,6 +2442,7 @@ function Players.setupOOP(player)
 	function player:updateName()
 		self.name = s.getPlayerName(self.peer_id)
 	end
+)
 
 	-- update peer_id
 	function player:updatePID(peer_id)
@@ -2453,6 +2456,7 @@ function Players.setupOOP(player)
 			end
 		end
 	end
+)
 
 	function player:updateOID()
 		self.object_id = s.getPlayerCharacterID(self.peer_id)
@@ -3475,6 +3479,10 @@ function Debugging.getDebug(debug_id, peer_id)
 	return false
 end
 
+--- Used to enable/disable debug for a specific player. Does the actual code for this process, such as how tracebacks injects into the functions.
+---@param debug_type string the type of debug you want to enable/disable
+---@param enabled boolean if you want to enable or disable the debug
+---@param peer_id integer the peer_id of the player you want to enable/disable the debug for
 function Debugging.handleDebug(debug_type, enabled, peer_id)
 	if debug_type == "chat" then
 		return (enabled and "Enabled" or "Disabled").." Chat Debug"
@@ -3635,6 +3643,7 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 					-- switch our env to the non modified environment, to avoid us calling ourselves over and over.
 					__ENV =  _ENV_NORMAL
+					---@diagnostic disable-next-line: inject-field
 					__ENV._ENV_MODIFIED = _ENV
 					_ENV = __ENV
 
@@ -3665,6 +3674,10 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 
 					-- switch back to modified environment
 					_ENV = _ENV_MODIFIED
+
+					-- remove __ENV and _ENV_NORMAL._ENV_MODIFIED as it could cause infinite recursion issues down the line.
+					__ENV = nil
+					_ENV_NORMAL._ENV_MODIFIED = nil
 
 					-- return the value to the function which called it.
 					return _ENV_NORMAL.table.unpack(returned)
@@ -3826,9 +3839,12 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 			-- modify all functions in _ENV to have the debug "injected"
 			_ENV = setupTraceback(table.copy.deep(_ENV))
 
-			d.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
+			Debugging.print(("Completed setting up tracebacks! took %ss"):format((s.getTimeMillisec() - start_traceback_setup_time)*0.001), true, 8)
 
-			g_savedata.foo_bar = true
+			-- Ensure _ENV_NORMAL exists.
+			if not _ENV_NORMAL then
+				Debugging.print("Failed to setup tracebacks, _ENV_NORMAL is nil!", true, 1)
+			end
 
 			--onTick = setupTraceback(onTick, "onTick")
 
@@ -3858,6 +3874,9 @@ function Debugging.handleDebug(debug_type, enabled, peer_id)
 						_ENV_MODIFIED = nil
 						-- Also remove __ENV, for the same reason as above.
 						__ENV = nil
+
+						-- Remove _ENV_MODIFIED from _ENV_NORMAL, as that could cause infinite recursion issues down the line.
+						_ENV_NORMAL._ENV_MODIFIED = nil
 
 						-- Set stack size to 0.
 						g_savedata.debug.traceback.stack_size = 0
@@ -6062,16 +6081,17 @@ function SpawningUtils.spawnObject(spawn_transform, addon_index, location_index,
 	if spawned_object_id and spawned_object_id ~= 0 then
 
 		local l_vehicle_type = VEHICLE.TYPE.HELI
+		
 		if Tags.has(component_data.tags, "vehicle_type=wep_plane") then
 			l_vehicle_type = VEHICLE.TYPE.PLANE
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_boat") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_boat") then
 			l_vehicle_type = VEHICLE.TYPE.BOAT
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_land") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_land") then
 			l_vehicle_type = VEHICLE.TYPE.LAND
-		end
-		if Tags.has(component_data.tags, "vehicle_type=wep_turret") then
+
+		elseif Tags.has(component_data.tags, "vehicle_type=wep_turret") then
 			l_vehicle_type = VEHICLE.TYPE.TURRET
 		end
 		if Tags.has(component_data.tags, "type=dlc_weapons_flag") then
@@ -15549,22 +15569,24 @@ function setupMain(is_world_create)
 	end
 
 	g_savedata.info.setup = true
-	-- this one will reset every reload/load of the world, this ensures that tracebacks wont be enabled before setupMain is finished.
-	addon_setup = true
 
 	for debug_type, debug_setting in pairs(g_savedata.debug) do
 		if (debug_setting.needs_setup_on_reload and debug_setting.enabled) or (is_world_create and debug_setting.default) then
 			local debug_id = d.debugIDFromType(debug_type)
 
 			if debug_setting.needs_setup_on_reload then
-				d.handleDebug(debug_id, true, 0)
+				d.handleDebug(debug_type, true, 0)
 			end
 
 			d.setDebug(debug_id, -1, true)
+
 		end
 	end
 
 	d.print(("%s%.3f%s"):format("ICM setup complete! took: ", millisecondsSince(world_setup_time)/1000, "s"), true, 0)
+
+	-- this one will reset every reload/load of the world, this ensures that tracebacks wont be enabled before setupMain is finished.
+	addon_setup = true
 end
 
 function onCaptureIsland(island, new_faction, old_faction) -- triggers whenever an island is captured
@@ -15676,6 +15698,8 @@ function onPlayerJoin(steam_id, name, peer_id)
 		end,
 		function(self)
 
+			d.print(("Value of addon_setup: %s"):format(tostring(addon_setup)), false, 0)
+
 			local peer_id = self:getVar("peer_id")
 			local steam_id = self:getVar("steam_id")
 
@@ -15694,6 +15718,8 @@ function onPlayerJoin(steam_id, name, peer_id)
 			s.addMapObject(peer_id, g_savedata.player_base_island.ui_id, 0, 10, g_savedata.player_base_island.transform[13], g_savedata.player_base_island.transform[15], 0, 0, 0, 0, g_savedata.player_base_island.name.." ("..g_savedata.player_base_island.faction..")", 1, "", 0, 255, 0, 255)
 		
 			local player = Players.dataBySID(steam_id)
+
+			--d.print(string.fromTable(_ENV), false, 0)
 
 			if player then
 				for debug_type, debug_data in pairs(g_savedata.debug) do
